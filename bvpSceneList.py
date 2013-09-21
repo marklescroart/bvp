@@ -51,7 +51,7 @@ class bvpSceneList(object):
 		self.ScnConstr = ScnConstr # Un-used!
 		self.RenderOptions=RenderOptions
 		# Timing
-		self.FrameRate = 15.
+		self.FrameRate = FrameRate
 		# Other??		
 	def __repr__(self):
 		S = '<Class BVP scene list: > \n' # Add name??
@@ -101,6 +101,36 @@ class bvpSceneList(object):
 		else:
 			print('All scenes are complete!')
 			return None
+	
+	def getFiles(self,Type=('Scenes',)):
+		"""
+		Get full file names to be rendered by current state of scene list.
+
+		Inputs:
+			Type : tuple of image types (also folder names). All possibilities:
+					('Scenes','Masks','Normals','Zdepth') # more?
+					if only one Type is specified, a list is returned; otherwise,
+					a dictionary is returned, with each type as a key 
+		"""
+		# Inputs
+		if not type(Type) in (list,tuple):
+			Type = (Type,)
+		# Preallocate
+		files = dict(zip(Type,[[]]*len(Type)))
+		path = self.RenderOptions.BVPopts['BasePath']
+		fType = self.RenderOptions.image_settings['file_format'].lower()
+		for s in self.ScnList:
+			# Fill in "#" in path with 0001 (etc)
+			fp = copy.copy(s.fPath)
+			n = sum([f=="#" for f in fp])
+			fp = fp.replace("#",'')+'%'+'0%dd.'%n+fType 
+			ff = [path%fp%fr for fr in range(int(s.FrameRange[0]),int(s.FrameRange[-1]+1))]
+			for t in Type:
+				files[t] += [f.replace('Scenes',t) for f in ff]
+		if len(Type)==1:
+			files = files[t]
+		return files
+
 	def Save(self,fName=None):
 		"""
 		Save scenelist to fName (pickle file, usu. "SceneList.pik") 
@@ -581,7 +611,7 @@ class bvpSceneList(object):
 		# Done!
 		print('Rendering has begun... Check slurm for progress!')
 		return jobIDs
-	def RenderCheck(self,rType='Scenes'):
+	def RenderCheck(self,Type='Scenes'):
 		'''
 		Check on render progress, show a bar graph of completion
 
