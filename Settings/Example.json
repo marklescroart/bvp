@@ -1,0 +1,84 @@
+{
+  "Paths": {
+    "RenderDir": "/path/to/which/to/render/by/default", 
+    "BlenderCmd": "/path/to/your/blender/installation/executable/file", 
+    "LibDir": "/path/to/your/Library"
+  }, 
+  "CamDefaults": {
+    "frames": [
+      1
+    ], 
+    "location": [
+      [
+        17.5, 
+        -17.5, 
+        8
+      ]
+    ], 
+    "fixPos": [
+      [
+        0, 
+        0, 
+        2.5
+      ]
+    ]
+  }, 
+  "BGDefaults": {}, 
+  "RenderDefaults":{
+    "FrameRate": 15
+  },
+  "CamConstrDefaults": {
+    "origin": [
+      0.0, 
+      0.0, 
+      0.0
+    ], 
+    "phi": [
+      17.5, 
+      2.5, 
+      12.5, 
+      45.5
+    ], 
+    "fixZ": [
+      2.0, 
+      0.5, 
+      0.0, 
+      3.5
+    ], 
+    "fixY": [
+      0.0, 
+      3.0, 
+      -3.0, 
+      3.0
+    ], 
+    "fixX": [
+      0.0, 
+      1.0, 
+      -3.0, 
+      3.0
+    ], 
+    "zoom": true, 
+    "r": [
+      30.0, 
+      3.0, 
+      20.0, 
+      40.0
+    ], 
+    "X": null, 
+    "Y": null, 
+    "theta": [
+      0.0, 
+      60.0, 
+      -135.0, 
+      135.0
+    ], 
+    "Z": null, 
+    "speed": [
+      3.0, 
+      1.0, 
+      0.0, 
+      6.0
+    ], 
+    "pan": true
+  }
+}

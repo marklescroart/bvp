@@ -1,0 +1,26 @@
+# gitignore file for B.lender V.ision P.roject
+
+## -- No temp files -- ##
+*~
+*.pyc
+*.blend1
+*.blend2
+*__pycache__*
+
+## -- Do not copy actual settings, only example for distribution -- ##
+Settings/*ettings*.json
+
+## -- TEMPORARY: No demos yet. Not ready for prime-time. -- ##
+Demos_Tests/
+
+## -- Further examples of syntax -- ##
+# but do track lib.a, even though you're ignoring .a files above
+#!lib.a
+# only ignore the root TODO file, not subdir/TODO
+#/TODO
+# ignore all files in the build/ directory
+#build/
+# ignore doc/notes.txt, but not doc/server/arch.txt
+#doc/*.txt
+# ignore all .txt files in the doc/ directory
+#doc/**/*.txt
