@@ -18,9 +18,10 @@ import subprocess,bvp,math,os,pickle,copy,time,re
 from bvp.utils.blender import GetGroups
 from bvp.utils.basics import GetHostName,MakeBlenderSafe,loadPik,savePik,fixedKeyDict
 # For convenience
-np = bvp.np
+if bvp.Is_Numpy:
+	np = bvp.np
 pickle = bvp.pickle
-# If we're working in Blender
+# If we're working outside Blender
 if not bvp.Is_Blender:
 	from matplotlib import pyplot as plt
 
@@ -32,7 +33,8 @@ class bvpSceneList(object):
 		'''
 		Usage: ScnList = bvpSceneList(ScnListParams)
 		
-		A list of class "bvpScene" instances. Potentially, a stimulus set for an experiment,  a few scenes for a demo, etc.
+		A list of class "bvpScene" instances. Potentially, a stimulus set for an experiment, 
+		a few scenes for a demo, etc.
 		
 		Fields to set:
 		Minutes
@@ -68,6 +70,8 @@ class bvpSceneList(object):
 		elif type(ScnOrList) is bvp.bvpSceneList:
 			self.ScnList+=ScnOrList.ScnList
 			return self
+	def __getitem__(self,idx):
+		return self.ScnList[idx]
 	@property
 	def nScenes(self):
 		return(len(self.ScnList))
@@ -291,10 +295,21 @@ class bvpSceneList(object):
 			Cat = Co+Cb+Cs
 		return CatMat,Cat
 	def Update(self,RaiseError=False):
-		'''
+		'''Bring bvpSceneList up-to-date with library / code changes.
+
 		Assure that all objects / backgrounds are up-to-date with library files (semantic cats, real world size, etc.)
+		Also updates potentially out-dated functions?? (THIS NEEDS TO BE CLARIFIED / CHANGED)
 		Optionally, raise an error if the "grpName" (unique string designating each object) has changed in the bvpLibrary
 		since scene list creation.
+
+		Parameters
+		----------
+		RaiseError : bool | False
+			Whether to raise an error if named scene elemements are missing from library.
+
+		Returns
+		-------
+		(Nothing - modifies bvpSceneList in place)
 		'''
 		Lib = bvp.bvpLibrary()
 		Fail=False
@@ -337,8 +352,7 @@ class bvpSceneList(object):
 			raise Exception('One or more objects need manual updating!')
 
 	def PlotImagePos(self,ScnIdx=None):
-		'''
-		Plots image positions of objects in all scenes
+		'''Plots image positions of objects in all scenes
 		'''
 		if not ScnIdx:
 			ScnIdx = range(self.nScenes)
@@ -350,88 +364,94 @@ class bvpSceneList(object):
 		plt.xlim((0,1))
 		plt.ylim((1,0))
 		plt.show()
-	def Render(self,RenderType=('Image',),RenderGroupSize=1,memory=7700):
-		'''
-		Renders locally, calling this machine. Blender is closed and re-opened after RenderGroupSize scenes.
-		This is an easy way to prevent Blender from 
+	# def Render(self,RenderType=('Image',),RenderGroupSize=1,Is_Overwrite=False,memory=7700,nCPUs='2'):
+	# 	'''
+	# 	Renders locally, calling this machine. Blender is closed and re-opened after RenderGroupSize scenes.
+	# 	This is an easy way to prevent Blender from 
 
-		WARNING: Can go for a LONG time with big render jobs! Only recommended for one scene at a time! 
+	# 	WARNING: Can go for a LONG time with big render jobs! Only recommended for one scene at a time! 
 		
-		This function writes three different kinds of temporary files associated with the render job:
+	# 	This function writes three different kinds of temporary files associated with the render job:
 		
-		(1) a pickle (saved as .pik) file ("SLpickleFile" variable below)
-		(2) a python script to read in and do the rendering ("BlenderPyFile" variable below). Two lines written into this file determine (a) the pickled scene list file to load, and (b) the portion or chunk of the scene list to render for each job
-		(3) a shell script that calls blender with each chunk's python script
+	# 	(1) a pickle (saved as .pik) file ("SLpickleFile" variable below)
+	# 	(2) a python script to read in and do the rendering ("BlenderPyFile" variable below). Two lines written into this file determine (a) the pickled scene list file to load, and (b) the portion or chunk of the scene list to render for each job
+	# 	(3) a shell script that calls blender with each chunk's python script
 		
-		'''
-		# General set-up:
-		Blender = bvp.Settings['Paths']['BlenderCmd']
-		BlendFile = os.path.join(bvp.__path__[0],'BlendFiles','Blank.blend')
-		nCPUs = '2'
-		nChunks = int(math.ceil(float(self.nScenes)/RenderGroupSize))
-		# This string should be used to specify (masks, zdepth, contours, etc) 
-		if 'LogFileAdd' in self.RenderOptions.BVPopts:
-			LogAdd = self.RenderOptions.BVPopts['LogFileAdd']
-		else:
-			LogAdd = '' #self.RenderOptions.BVPopts['LogFileAdd']		
-		for x in ['Image','Clay','ObjectMasks','Zdepth','Contours','Normals']:
-			self.RenderOptions.BVPopts[x] = x in RenderType
-			if x in RenderType:
-				LogAdd += '_'+x
-		if 'Test' in RenderType:
-			if len(RenderType)>2 and not "Image" in RenderType:
-				raise Exception("I'm still too stupid to handle test renders of depth, normals, etc")
-			elif len(RenderType)==1 and not "Image" in RenderType:
-				RenderType = ("Test","Image")
-			# Keep original values to re-set later:
-			resPctOrig  = copy.copy(self.RenderOptions.resolution_percentage)
-			# Set render options for test render
-			self.RenderOptions.resolution_percentage = 50 
-			self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes','Test')
-			self.RenderOptions.BVPopts['Type'] = 'FirstAndLastFrame' #'FirstFrame'
+	# 	'''
+	# 	### --- General set-up: --- ###
+	# 	B1lender = bvp.Settings['Paths']['BlenderCmd']
+	# 	BlendFile = os.path.join(bvp.__path__[0],'BlendFiles','Blank.blend')
+	# 	if isinstance(nCPUs,int):
+	# 		nCPUs = str(nCPUs) 
+	# 	# This string should be used to specify (masks, zdepth, contours, etc) 
+	# 	if 'LogFileAdd' in self.RenderOptions.BVPopts:
+	# 		LogAdd = self.RenderOptions.BVPopts['LogFileAdd']
+	# 	else:
+	# 		LogAdd = '' #self.RenderOptions.BVPopts['LogFileAdd']		
+	# 	for x in ['Image','Clay','ObjectMasks','Zdepth','Contours','Normals']:
+	# 		self.RenderOptions.BVPopts[x] = x in RenderType
+	# 		if x in RenderType:
+	# 			LogAdd += '_'+x
+	# 	if 'Test' in RenderType:
+	# 		if len(RenderType)>2 and not "Image" in RenderType:
+	# 			raise Exception("I'm still too stupid to handle test renders of depth, normals, etc")
+	# 		elif len(RenderType)==1 and not "Image" in RenderType:
+	# 			RenderType = ("Test","Image")
+	# 		# Keep original values to re-set later:
+	# 		resPctOrig  = copy.copy(self.RenderOptions.resolution_percentage)
+	# 		# Set render options for test render
+	# 		self.RenderOptions.resolution_percentage = 50 
+	# 		self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes','Test')
+	# 		self.RenderOptions.BVPopts['Type'] = 'FirstAndLastFrame' #'FirstFrame'
 
-		# Creation of temporary files
-		# Pre: set up temp directory
-		BaseDir = os.path.dirname(os.path.split(self.RenderOptions.BVPopts['BasePath'])[0])
-		if not os.path.exists(BaseDir):
-			os.mkdir(BaseDir)
-		# -> (write slurm output here too???)
-		# -> Make specific date??? No - there should only be one for each stim set, right...?
-		if not os.path.exists(os.path.join(BaseDir,'Log')):
-			os.mkdir(os.path.join(BaseDir,'Log'))
+	# 	# Creation of temporary files
+	# 	# Pre: set up temp directory
+	# 	BaseDir = os.path.dirname(os.path.split(self.RenderOptions.BVPopts['BasePath'])[0])
+	# 	if not os.path.exists(BaseDir):
+	# 		os.mkdir(BaseDir)
+	# 	# -> (write slurm output here too???)
+	# 	# -> Make specific date??? No - there should only be one for each stim set, right...?
+	# 	if not os.path.exists(os.path.join(BaseDir,'Log')):
+	# 		os.mkdir(os.path.join(BaseDir,'Log'))
 		
-		# (1) Save scene list as a temporary pickle file to be loaded by the RenderFile
-		# Save scene list as a temporary pickle file to be loaded by the RenderFile
-		rName = 'ScnListRender_%s%s_%s'%(self.Name,LogAdd,time.strftime('%Y%m%d_%H%M%S'))
-		SLpickleFile = os.path.join(BaseDir,'Log',rName+'.pik') 
-		with open(SLpickleFile,'wb') as fid:
-			pickle.dump(self,fid,protocol=2)
-		# (2,3) Setup: 
-		BlenderPyFileBase = self.RenderOptions.BVPopts['RenderFile']
-		# Get this file into a list: 
-		with open(BlenderPyFileBase,'r') as fid:
-			RenderScript = fid.readlines()
-		# Set up first of two lines to print into temp file:
-		FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0],'Scripts','CurrentRender.pik')
+	# 	# (1) Save scene list as a temporary pickle file to be loaded by the RenderFile
+	# 	# Save scene list as a temporary pickle file to be loaded by the RenderFile
+	# 	rName = 'ScnListRender_%s%s_%s'%(self.Name,LogAdd,time.strftime('%Y%m%d_%H%M%S'))
+	# 	SLpickleFile = os.path.join(BaseDir,'Log',rName+'.pik') 
+	# 	with open(SLpickleFile,'wb') as fid:
+	# 		pickle.dump(self,fid,protocol=2)
+	# 	# (2,3) Setup: 
+	# 	BlenderPyFileBase = self.RenderOptions.BVPopts['RenderFile']
+	# 	# Get this file into a list: 
+	# 	with open(BlenderPyFileBase,'r') as fid:
+	# 		RenderScript = fid.readlines()
+	# 	# Set up first of two lines to print into temp file:
+	# 	FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0],'Scripts','CurrentRender.pik')
 		
-		for x in range(nChunks):
-			ScnToRenderLine = 'ScnToRender = range(%d,%d)\n'%(x*RenderGroupSize,min([(x+1)*RenderGroupSize,self.nScenes]))
-			InsertLine1 = RenderScript.index('### --- REPLACE 1 --- ###\n')+1
-			InsertLine2 = RenderScript.index('### --- REPLACE 2 --- ###\n')+1
-			RenderScript[InsertLine1] = FileToLoadLine
-			RenderScript[InsertLine2] = ScnToRenderLine
-			ChunkfNm = '%s_chunk%03d.py'%(rName,x+1)
-			BlenderPyFile = os.path.join(BaseDir,'Log',ChunkfNm) # Add datestr to "Log" ? 
-			with open(BlenderPyFile,'w') as fid:
-				fid.writelines(RenderScript)
-			# Create & call slurm script for this chunk
-			#TempScriptName = os.path.join(BaseDir,'Log','BlenderRenderTmp_chunk%03d.sh'%(x+1))
-			#BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile+' --mem '+str(memory) # Specify output? stdout? File?
-			BlenderCmd = [Blender,'-b',BlendFile,'-P',BlenderPyFile]
-			subprocess.call(BlenderCmd)
-	def RenderSlurm(self,RenderType=('Image',),RenderGroupSize=3,Is_Overwrite=False,memory=7700):
+	# 	for x in range(nChunks):
+	# 		ScnToRenderLine = 'ScnToRender = range(%d,%d)\n'%(x*RenderGroupSize,min([(x+1)*RenderGroupSize,self.nScenes]))
+	# 		InsertLine1 = RenderScript.index('### --- REPLACE 1 --- ###\n')+1
+	# 		InsertLine2 = RenderScript.index('### --- REPLACE 2 --- ###\n')+1
+	# 		RenderScript[InsertLine1] = FileToLoadLine
+	# 		RenderScript[InsertLine2] = ScnToRenderLine
+	# 		ChunkfNm = '%s_chunk%03d.py'%(rName,x+1)
+	# 		BlenderPyFile = os.path.join(BaseDir,'Log',ChunkfNm) # Add datestr to "Log" ? 
+	# 		with open(BlenderPyFile,'w') as fid:
+	# 			fid.writelines(RenderScript)
+	# 		# Create & call slurm script for this chunk
+	# 		#TempScriptName = os.path.join(BaseDir,'Log','BlenderRenderTmp_chunk%03d.sh'%(x+1))
+	# 		#BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile+' --mem '+str(memory) # Specify output? stdout? File?
+	# 		BlenderCmd = [Blender,'-b',BlendFile,'-P',BlenderPyFile]
+	# 		subprocess.call(BlenderCmd)
+	def RenderSlurm(self,RenderType=('Image',),RenderGroupSize=3,Is_Overwrite=False,memory=7700,nCPUs='2'):
+		'''Calls separate instances of Blender via Slurm queue to render the scene list. 
+		
+		DEPRECATED. Simply calls bvpSceneList.Render(...,Is_Slurm=True). Please use that in the future.
 		'''
-		Calls separate instances of Blender via Slurm to render the scene list. 
+		self.Render(RenderType=RenderType,Is_Overwrite=Is_Overwrite,Is_Slurm=True,nCPUs=nCPUs,RenderGroupSize=RenderGroupSize,memory=memory)
+
+	def Render(self,RenderType=('Image',),Is_Overwrite=False,Is_Slurm=False,nCPUs='2',RenderGroupSize=3,memory=7700):
+		'''Renders the scene list. 
 		
 		Writes three different kinds of temporary files associated with the render job:
 		
@@ -439,14 +459,28 @@ class bvpSceneList(object):
 		(2) a python script to read in and do the rendering ("BlenderPyFile" variable below). Two lines written into this file determine (a) the pickled scene list file to load, and (b) the portion or chunk of the scene list to render for each job
 		(3) a shell script for use by sbatch that calls blender with each chunk's python script
 		
-		Inputs: 
-		RenderType = a tuple, with any of the following strings in it: 
+		Parameters
+		----------
+		RenderType : tuple | ('Image',)
+			A tuple of types of outputs to render for this SceneList. Can contain any of the following:
 			('Image','Clay'*,'ObjectMasks','Zdepth','Contours'*,'Normals')
 			* Not working yet!
-		RenderGroupSize = <int>, number of scenes to render in a single job. A scene can be an arbitrary number of frames (usu. ~50)
-		Is_Overwrite = True/False, option as to whether to over-write extant files (True) or skip files that are already rendered (False). 
-		memory = maximum memory required for the job (in MB). This is a bit difficult to estimate... Aim high!
-		ML 2011.??
+		Is_Overwrite : bool | False
+			Whether to over-write extant files (True) or skip files that are already rendered (False)
+		nCPUs : str  | '2'
+			Number of cpus to use for render parallelization.
+		Is_Slurm : 
+		RenderGroupSize : int
+			Number of scenes to render in a single job. A scene can be an arbitrary number of frames.
+			For Is_Slurm=False, this is not really useful, since all jobs are done serially. This parameter
+			will still determines how often Blender closes and re-opens a new instance, which *SHOULD NOT* 
+			have any effect so long as each scene is correctly cleared (but there may still be bugs here))
+		memory : int
+			Maximum memory required for the job (in MB). For Is_Slurm=True only. 
+			This is difficult to estimate... Aim high!
+
+		TO DO: 
+		Add gpu render option??
 		'''
 
 		''' 
@@ -455,9 +489,10 @@ class bvpSceneList(object):
               Instruct SLURM to connect the batch script's standard error directly to the file name specified in the "filename pattern".  See the --input option for filename specification options.
         '''
 		### --- General set-up: --- ###
-		Blender = bvp.Settings['Paths']['BlenderCmd'] #'/Applications/Blender/FreestyleBranch_r37828_32bit/blender.app/Contents/MacOS/blender'
+		Blender = bvp.Settings['Paths']['BlenderCmd'] 
 		BlendFile = os.path.join(bvp.__path__[0],'BlendFiles','Blank.blend')
-		nCPUs = '2'
+		if isinstance(nCPUs,int):
+			nCPUs = str(nCPUs) 
 		### --- Set type of render --- ###
 		# Keep original render options for re-set at end:
 		BVPoptOrig = copy.copy(self.RenderOptions.BVPopts)
@@ -465,7 +500,7 @@ class bvpSceneList(object):
 			LogAdd = self.RenderOptions.BVPopts['LogFileAdd']
 		else:
 			LogAdd = '' #self.RenderOptions.BVPopts['LogFileAdd']		
-
+		# TO DO: set available render options in settings / config file
 		for x in ['Image','Clay','ObjectMasks','Zdepth','Contours','Normals','Voxels']:
 			self.RenderOptions.BVPopts[x] = x in RenderType
 			if x in RenderType:
@@ -532,9 +567,14 @@ class bvpSceneList(object):
 				for fr in frNum:
 					fToRender = S.fPath.replace('#'*n,ss)%fr
 					if 'ObjectMasks' in RenderType:
+						# This may let ObjectMasks govern all overwriting behavior...
 						if any([(fToRender in x) and ('m01' in x) for x in fNm]):
 							# File found!
 							doneFr = copy.copy(fr)
+							RenderMe=False
+						else:
+							RenderMe = True
+							break							
 					else:
 						if any([fToRender in x for x in fNm]):
 							# File found!
@@ -548,23 +588,8 @@ class bvpSceneList(object):
 					# All files have been found!
 					print('Cropping scene %d!'%S.Num)
 					ToKill.append(iS)
-				# ### ----
-				# fToRender = [S.fPath.replace('#'*n,ss)%fr for fr in frNum]
-				# # Do not re-render them if they have already been rendered!
-				# nRendered = sum([fP in x for x in fNm for fP in fToRender])
-				# if 'ObjectMasks' in RenderType:
-				# 	nRendered = sum([(fP in x) and ('m01' in x) for x in fNm for fP in fToRender])
-				# if nRendered >= S.ScnParams['frame_end']:
-				# 	print('Cropping scene %d!'%S.Num)
-				# 	# All done with this scene!
-				# 	ToKill.append(self.ScnList.index(S))
-				# elif nRendered>1 and self.RenderOptions.BVPopts['Type']=='FirstFrame':
-				# 	ToKill.append(self.ScnList.index(S))
-				# else:
-				# 	I = self.ScnList.index(S)
-				# 	self.ScnList[I].FrameRange = (self.ScnList[I].FrameRange[0]+nRendered,self.ScnList[I].FrameRange[1])
-			#1/0
 			self.ScnList = [self.ScnList[i] for i in range(self.nScenes) if not i in ToKill]
+		# Change to nJobs for clarity?
 		nChunks = int(math.ceil(float(self.nScenes)/RenderGroupSize))
 		# Save scene list as a temporary pickle file to be loaded by the RenderFile
 		rName = 'ScnListRender_%s%s_%s'%(self.Name,LogAdd,time.strftime('%Y%m%d_%H%M%S'))
@@ -596,33 +621,43 @@ class bvpSceneList(object):
 			BlenderPyFile = os.path.join(BaseDir,'Log',ChunkfNm) # Add datestr to "Log" ? 
 			with open(BlenderPyFile,'w') as fid:
 				fid.writelines(RenderScript)
-			# Create & call slurm script for this chunk
-			TempScriptName = os.path.join(BaseDir,'Log','%s_chunk%03d.sh'%(rName,x+1))
-			with open(TempScriptName,'wb') as fid:
-				fid.write('#!/bin/sh\n')
-				fid.write('#SBATCH\n')
+
+			if not Is_Slurm:
+				BlenderCmd = [Blender,'-b',BlendFile,'-P',BlenderPyFile]
+				subprocess.call(BlenderCmd)
+			else:
+				### --- Call via slurm --- ###
 				BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile
-				fid.write(BlenderCmd)
-				# Cleanup (move to .done file instead?)
-				#fid.write('rm '+BlenderPyFile) 
-				#fid.write('rm '+TempScriptName) 
-			SlurmOut = os.path.join(BaseDir,'Log','%s_chunk%03d_SlurmLog_hID=%%N'%(rName,x+1))
-			#SlurmJob = "BVPrender_Chunk%03d"
-			SlurmCmd = ['sbatch','-c',nCPUs,'-p','all','--mem',str(memory),'-o',SlurmOut,TempScriptName]
-			#SlurmCmd = ['sbatch','-c',nCPUs,'-w','ibogaine',TempScriptName,'-o',SlurmOut]
-			if bvp.Verbosity_Level>3:
-				print('Calling:')
-				print(SlurmCmd)
-			stdOut = subprocess.check_output(SlurmCmd).decode('utf-8')
-			jobID = re.search('(?<=Submitted batch job )[0-9]*',stdOut).group()
-			jobIDs.append(jobID)
+			
+				# Create & call slurm script for this chunk
+				TempScriptName = os.path.join(BaseDir,'Log','%s_chunk%03d.sh'%(rName,x+1))
+				with open(TempScriptName,'wb') as fid:
+					fid.write('#!/bin/sh\n')
+					fid.write('#SBATCH\n')
+					fid.write(BlenderCmd)
+					# Cleanup (move to .done file instead?)
+					#fid.write('rm '+BlenderPyFile) 
+					#fid.write('rm '+TempScriptName) 
+				SlurmOut = os.path.join(BaseDir,'Log','%s_chunk%03d_SlurmLog_hID=%%N'%(rName,x+1))
+				#SlurmJob = "BVPrender_Chunk%03d"
+				SlurmCmd = ['sbatch','-c',nCPUs,'-p','all','--mem',str(memory),'-o',SlurmOut,TempScriptName]
+				#SlurmCmd = ['sbatch','-c',nCPUs,'-w','ibogaine',TempScriptName,'-o',SlurmOut]
+				if bvp.Verbosity_Level>3:
+					print('Calling:')
+					print(SlurmCmd)
+				stdOut = subprocess.check_output(SlurmCmd).decode('utf-8')
+				jobID = re.search('(?<=Submitted batch job )[0-9]*',stdOut).group()
+				jobIDs.append(jobID)
 		# Re-set SceneList rendering options:
 		self.RenderOptions.BVPopts = BVPoptOrig
 		if 'Test' in RenderType:
 			self.RenderOptions.resolution_percentage = resPctOrig
-		# Done!
-		print('Rendering has begun... Check slurm for progress!')
-		return jobIDs
+		if Is_Slurm:
+			print('Rendering has begun... Check slurm for progress!')
+			return jobIDs
+		else:
+			print('Done!')
+
 	def RenderCheck(self,Type='Scenes'):
 		'''
 		Check on render progress, show a bar graph of completion

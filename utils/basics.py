@@ -9,8 +9,10 @@ Modified by ML 2013.09.18
 '''
 
 import os,random,subprocess,time,bvp
-np = bvp.np
-from numpy import mod,floor
+# if bvp.Is_Numpy:
+# 	np = bvp.np
+# 	from numpy import mod,floor
+# else:
 
 if bvp.Is_Blender:
 	import bpy

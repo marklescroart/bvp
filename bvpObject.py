@@ -13,28 +13,40 @@ if bvp.Is_Blender:
 	import bpy
 
 class bvpObject(object):
-	'''
-	Usage: bvpObject(obID=None,Lib=None,pos3D=None,size3D=None,rot3D=None,pose=None)
-	
-	Class to store an abstraction of an object in a BVP scene. Stores all necessary information to define an object in a scene.
-	
-	Inputs:
-		'obID':'Animal', # purely informative, not used (as of 2011.11.30)
-		'Lib': bvpLibrary object, contains relevant info about object (file location, real size, (more??))
-		'pos3D':[], # position [X,Y,Z] in 3D
-		'size3D':3., # Size of largest dimension. Set to "None" to use object's real world size? (TO DO??)
-		'rot3D':[], # rotation (xyz euler) in 3D
-		'pose':[], # number for pose in object's pose library
-	
-	Other Properties:
-		(All object properties from bvpLibrary.objects entry, including "realWorldSize","semanticCat")
-	
-	To place in a scene, minimally requires obID and Lib. Optionally input position in 3D, position in 2D
-	
-	All properties should be scalars (int/float) or tuples
-	
+	'''Layer of abstraction for objects (imported from other files) in Blender scenes.
 	'''
 	def __init__(self,obID=None,Lib=None,pos3D=None,size3D=3.,rot3D=None,pose=None):
+		"""	Class to store an abstraction of an object in a BVP scene. 
+
+		Stores all necessary information to define an object in a scene.
+
+		To place in a scene, minimally requires obID and Lib. Optionally input position in 3D, position in 2D
+
+		All properties should be scalars (int/float) or tuples
+		
+		Parameters
+		----------
+		obID : str, e.g. 'Animal'
+			Purely informative, (??not used (as of 2011.11.30)) 
+		Lib : bvpLibrary object
+			Contains relevant info about object (file location, real size, (more??))
+		pos3D : tuple,bpy.Vector]
+			Position [X,Y,Z] in 3D
+		size3D : float, [3.]
+			Size of largest dimension. Set to "None" to use object's real world size? (TO DO??)
+		rot3D : bpy euler
+			rotation (xyz euler) in 3D
+		pose : int
+			number for pose in object's pose library
+		
+		Other Properties:
+			(All object properties from bvpLibrary.objects entry, including "realWorldSize","semanticCat")
+		
+		Returns
+		-------
+		bvpObject instance
+
+		"""
 		# Set inputs to local values
 		Inpt = locals()
 		for i in Inpt:
@@ -77,12 +89,15 @@ class bvpObject(object):
 			S+='%d Verts; %d Faces'%(self.nVertices,self.nFaces)
 		return(S)
 	def PlaceObj(self,Scn=None):
-		'''
-		Usage: PlaceObj(Scn=None)
-		
-		Places object into Blender scene, along with pose, animation information** 
+		'''Places object into Blender scene, with pose & animation information**
 		
 		** animation info still to come **
+
+		Parameters
+		----------
+		Scn : scene name? (?) | None
+			don't know if this works... stick w/ None for now
+		
 		ML 2012.01.31
 		'''
 		if not Scn:
@@ -128,11 +143,16 @@ class bvpObject(object):
 		Scn.update()
 		Scn.frame_current-=1
 		Scn.update()
+
 	def PlaceObjFull(self,Scn=None):
-		"""
-		import full copy of object (all meshes, etc)
-		USE WITH CAUTION. Only for modifying meshes / materials, 
-		which you PROBABLY DON'T WANT TO DO.
+		"""Import full copy of object (all meshes, etc)
+
+		USE WITH CAUTION. Only for modifying meshes / materials, which you PROBABLY DON'T WANT TO DO.
+
+		Parameters
+		----------
+		Scn : scene within file (?) | None
+			Don't know if this is even usable (2014.02.05)
 		"""
 		if not Scn:
 			Scn=bpy.context.scene
@@ -179,8 +199,7 @@ class bvpObject(object):
 		Scn.update()
 
 	def GetPoses(self,pOb):
-		'''
-		Usage: Arm,Pose = GetPoses(pOb)
+		'''Gets the available poses for the armature of a linked object.
 		
 		Creates a proxy object from the armature object within a linked 
 		group. (note: THERE BETTER ONLY BE ONE!). Assigns the pose library
@@ -188,7 +207,15 @@ class bvpObject(object):
 		returns the proxy armature object and a list of the pose names in 
 		the pose library.
 		
-		ML 2012.03.02
+		Parameters
+		----------
+		pOb : bpy.data.object instance
+			The Blender object for which to get poses.
+
+		Returns
+		-------
+		
+		
 		'''
 		# Make proxy object
 		GrabOnly(pOb)
@@ -199,10 +226,7 @@ class bvpObject(object):
 		Pose = [x.name for x in ArmProxy.pose_library.pose_markers]
 		return ArmProxy,Pose
 	def ApplyPose(self,Arm,PoseIdx):
-		'''
-		Usage: ApplyPose(Arm,PoseIdx)
-		
-		Apply a pose to an armature
+		'''Apply a pose to an armature
 		
 		ML 2012.01
 		'''

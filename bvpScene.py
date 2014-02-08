@@ -66,12 +66,17 @@ class bvpScene(object):
 		# Default camera: Fixed position!
 		if not self.Cam:
 			self.Cam = bvp.bvpCamera(lens=self.BG.lens) # TO DO: Set cam default to file "Settings"! 
-		# (Not necessary to have shadows)
+		# Final elements, shadows, are not necessary
+		# Set file path for renders:
 		if not self.fPath:
 			self.fPath = 'Sc%04d_##'%self.Num
 		self.FrameRate = FrameRate
 
-
+	# Consider adding fPath to the list of attributes...
+	# Change fPath in inputs to fBase, incorporate self.num automatically into base.
+	# @propertry
+	# def fPath(self):
+	# 	...
 	@property
 	def nObjects(self):
 		return len(self.Obj)
@@ -95,8 +100,7 @@ class bvpScene(object):
 		return S
 	
 	def PopulateScene(self,ObList,ResetCam=True,ImPosCt=None,EdgeDist=0.,ObOverlap=.50,MinSz2D=0,RaiseError=False,nIter=50):
-		'''
-		Choose positions for all objects in "ObList" input within the scene,
+		'''Choose positions for all objects in "ObList" input within the scene,
 		according to constraints provided by scene background.
 		
 		ImPosCt tracks the number of times that each image location (bin) 

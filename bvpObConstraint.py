@@ -235,37 +235,6 @@ class bvpObConstraint(bvpPosConstraint):
 			EdgeOK_2D,ObDstOK_2D = self.checkXYZS_2D(TmpPos,Sz,Cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap)
 			TmpOb = bvpObject(pos3D=TmpPos,size3D=Sz)
 			SzOK_2D = self.checkSize2D(TmpOb,Cam,MinSz2D)
-			# # OLD:
-			# ObDstOK_3D = [True for x in range(nObj)]
-			# ObDstOK_2D = [True for x in range(nObj)]
-			# TmpOb = bvpObject(pos3D=TmpPos,size3D=Sz)
-			# tmpIP_Top,tmpIP_Bot,tmpIP_L,tmpIP_R = PerspectiveProj(TmpOb,Cam,ImSz=(100,100))
-			# TmpObSz_X = tmpIP_R[0]-tmpIP_L[0]
-			# TmpObSz_Y = tmpIP_Bot[1]-tmpIP_Top[1]
-			# TmpImPos = [listMean([tmpIP_R[0],tmpIP_L[0]]),listMean([tmpIP_Bot[1],tmpIP_Top[1]])]
-			# # Check distance from edge of image
-			# Top_OK = EdgeDist < tmpIP_Top[1]
-			# Bot_OK = 100-EdgeDist > tmpIP_Bot[1]
-			# L_OK = EdgeDist < tmpIP_L[0]
-			# R_OK = 100-EdgeDist > tmpIP_R[0]
-			# EdgeOK_2D = all([Top_OK,Bot_OK,L_OK,R_OK])
-			# # Check distance from other objects in 2D and 3D
-			# obstPos2D_List = []
-			# for c in range(nObj):
-			# 	# First: 3D
-			# 	DstThresh3D = TmpOb.size3D/2. +  Obst[c].size3D /2. 
-			# 	Dst3D = vecDist(TmpOb.pos3D,Obst[c].pos3D)
-			# 	ObDstOK_3D[c] = Dst3D>DstThresh3D
-			# 	# Second: 2D
-			# 	obstIP_Top,obstIP_Bot,obstIP_L,obstIP_R = PerspectiveProj(Obst[c],Cam,ImSz=(100,100))
-			# 	obstSz_X = obstIP_R[0]-obstIP_L[0]
-			# 	obstSz_Y = obstIP_Bot[1]-obstIP_Top[1]
-			# 	obstPos2D = [listMean([obstIP_R[0],obstIP_L[0]]),listMean([obstIP_Bot[1],obstIP_Top[1]])]
-			# 	obstPos2D_List.append(obstPos2D) # For debugging
-			# 	ObstSz2D = listMean([obstSz_X,obstSz_Y])
-			# 	ObjSz2D = listMean([TmpObSz_X,TmpObSz_Y])
-			# 	PixDstThresh = (ObstSz2D/2. + ObjSz2D/2.) - (min([ObjSz2D,ObstSz2D]) * ObOverlap)
-			# 	ObDstOK_2D[c] = vecDist(TmpImPos,obstPos2D) > PixDstThresh
 			if all(ObDstOK_3D) and all(ObDstOK_2D) and all(BoundOK_3D) and EdgeOK_2D:
 				TooClose = False
 				TmpOb = bvpObject(pos3D=TmpPos,size3D=Sz)
@@ -358,75 +327,14 @@ class bvpObConstraint(bvpPosConstraint):
 			oPosUp = linePlaneInt(Cam.location[0],oPosZ,P0=(0,0,Zbase+Sz/2.))
 			TmpPos = oPosUp
 			TmpPos[2] -= Sz/2.
-
+			# Check on 3D bounds
 			BoundOK_3D,ObDstOK_3D = self.checkXYZS_3D(TmpPos,Sz,Obst=Obst)
+			# Check on 2D bounds
 			EdgeOK_2D,ObDstOK_2D = self.checkXYZS_2D(TmpPos,Sz,Cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap)
+			# Instantiate temp object and...
 			TmpOb = bvpObject(pos3D=TmpPos,size3D=Sz)
+			# ... check on 2D size
 			SzOK_2D = self.checkSize2D(TmpOb,Cam,MinSz2D)
-			# # Proceed as above (consolidate this code??)
-			# TmpOb = bvpObject(pos3D=TmpPos,size3D=Sz)
-			# tmpIP_Top,tmpIP_Bot,tmpIP_L,tmpIP_R = PerspectiveProj(TmpOb,Cam,ImSz=(1.,1.))
-			# TmpObSz_X = tmpIP_R[0]-tmpIP_L[0]
-			# TmpObSz_Y = tmpIP_Bot[1]-tmpIP_Top[1]
-			# TmpImPos = [listMean([tmpIP_R[0],tmpIP_L[0]]),listMean([tmpIP_Bot[1],tmpIP_Top[1]])]
-			# # Check distance from edge of image
-			# Top_OK = EdgeDist*TmpObSz_Y < tmpIP_Top[1]
-			# Bot_OK = 1.-EdgeDist*TmpObSz_Y > tmpIP_Bot[1]
-			# L_OK = EdgeDist*TmpObSz_X < tmpIP_L[0]
-			# R_OK = 1.-EdgeDist*TmpObSz_X > tmpIP_R[0]
-			# EdgeOK_2D = all([Top_OK,Bot_OK,L_OK,R_OK])
-			# # Check distance from X,Y limits (and R)
-			# X_OK,Y_OK,r_OK = True,True,True # True by default
-			# if self.X:
-			# 	xA,xB = True,True
-			# 	if self.X[2]:
-			# 		xA = (TmpPos[0]-Sz/2.)>self.X[2]
-			# 	if self.X[3]:
-			# 		xB = (TmpPos[0]+Sz/2.)<self.X[3]
-			# 	X_OK = xA and xB
-			# if self.Y:
-			# 	yA,yB = True,True
-			# 	if self.Y[2]:
-			# 		yA = (TmpPos[1]-Sz/2.)>self.Y[2]
-			# 	if self.Y[3]:
-			# 		yB = (TmpPos[1]+Sz/2.)<self.Y[3]
-			# 	Y_OK = yA and yB
-			# if self.r:
-			# 	oX,oY,oZ = self.origin
-			# 	R = ((TmpPos[0]-oX)**2+(TmpPos[1]-oY)**2)**.5
-			# 	rA,rB = True,True
-			# 	if self.r[2]:
-			# 		rA = (R-Sz/2.)>self.r[2]
-			# 	if self.r[3]:
-			# 		rB = (R+Sz/2.)<self.r[3]
-			# 	r_OK = rA and rB
-			# EdgeOK_3D = all([X_OK,Y_OK,r_OK])
-			# # Check distance from other objects in 2D and 3D
-			# obstPos2D_List = []
-			# Dist_List = []
-			# Dthresh_List = []
-			# ObstSz_List = []
-			# ObDstOK_2D = [True for x in range(nObj)]
-			# ObDstOK_3D = [True for x in range(nObj)]
-			# for c in range(nObj):
-			# 	# First: 3D
-			# 	DstThresh3D = TmpOb.size3D/2. +  Obst[c].size3D /2. 
-			# 	Dst3D = vecDist(TmpOb.pos3D,Obst[c].pos3D)
-			# 	ObDstOK_3D[c] = Dst3D>DstThresh3D
-			# 	# Second: 2D
-			# 	obstIP_Top,obstIP_Bot,obstIP_L,obstIP_R = PerspectiveProj(Obst[c],Cam,ImSz=(1.,1.))
-			# 	obstSz_X = obstIP_R[0]-obstIP_L[0]
-			# 	obstSz_Y = obstIP_Bot[1]-obstIP_Top[1]
-			# 	obstPos2D = [listMean([obstIP_R[0],obstIP_L[0]]),listMean([obstIP_Bot[1],obstIP_Top[1]])]
-			# 	ObstSz2D = listMean([obstSz_X,obstSz_Y])
-			# 	ObjSz2D = listMean([TmpObSz_X,TmpObSz_Y])
-			# 	PixDstThresh = (ObstSz2D/2. + ObjSz2D/2.) - (min([ObjSz2D,ObstSz2D]) * ObOverlap)
-			# 	ObDstOK_2D[c] = vecDist(TmpImPos,obstPos2D) > PixDstThresh
-			# 	# For debugging
-			# 	obstPos2D_List.append(obstPos2D) 
-			# 	Dist_List.append(vecDist(TmpImPos,obstPos2D))
-			# 	Dthresh_List.append(PixDstThresh)
-			# 	ObstSz_List.append(ObstSz2D)
 			if all(ObDstOK_3D) and all(ObDstOK_2D) and EdgeOK_2D and all(BoundOK_3D) and SzOK_2D:
 				TooClose = False
 				if bvp.Is_Numpy:
