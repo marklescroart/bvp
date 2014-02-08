@@ -31,8 +31,11 @@ import os
 import sys
 import json
 import math
-import numpy as np
-Is_Numpy = True
+try:
+	import numpy as np
+	Is_Numpy = True
+except:
+	Is_Numpy = False
 # Pickle
 try:
 	import cPickle as pickle

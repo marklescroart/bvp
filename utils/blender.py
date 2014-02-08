@@ -6,7 +6,7 @@
 
 import os,random,subprocess,bvp,copy
 import math as bnp
-from bvp.utils.math import circ_dst
+from bvp.utils.bvpMath import circ_dst
 
 if bvp.Is_Blender:
 	import bpy

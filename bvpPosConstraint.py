@@ -7,7 +7,7 @@ ML 2012.01.31
 import bvp,random
 import math as bnp
 from bvp.bvpConstraint import bvpConstraint
-from bvp.utils.math import sph2cart # ? WORKING ? 
+from bvp.utils.bvpMath import sph2cart # ? WORKING ? 
 
 '''def mod(x,y): 
 	z = x - bnp.floor(x/y) * y; 

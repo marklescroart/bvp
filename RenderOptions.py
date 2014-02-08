@@ -1,7 +1,7 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import bvp,os
+import bvp,os,sys
 import math as bnp
 from bvp.utils.blender import SetLayers
 from bvp.utils.basics import fixedKeyDict
@@ -12,6 +12,29 @@ if bvp.Is_Blender:
 # numerous times throughout Blender API development. This is EXTREMELY 
 # IRRITATING. Nonetheless, the format may change again, so I've collected
 # all the node type IDs here and use the variables below
+
+#['R_LAYERS', 'COMPOSITE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE']
+if sys.platform == 'darwin':
+	print('Mac computer node names!')
+	RLayerNodeX = 'R_LAYERS' 
+	CompositorNodeX = 'COMPOSITE'
+	OutputFileNodeX = 'OUTPUT_FILE'
+	ViewerNodeX = 'VIEWER'
+	SepRGBANodeX = 'CompositorNodeSepRGBA'
+	CombRGBANodeX = 'CompositorNodeCombRGBA'
+	IDmaskNodeX = 'ID_MASK'
+	MathNodeX = 'CompositorNodeMath'
+else:
+	RLayerNodeX = 'CompositorNodeRLayers' 
+	CompositorNodeX = 'CompositorNodeComposite'
+	OutputFileNodeX = 'CompositorNodeOutputFile'
+	ViewerNodeX = 'CompositorNodeViewer'
+	SepRGBANodeX = 'CompositorNodeSepRGBA'
+	CombRGBANodeX = 'CompositorNodeCombRGBA'
+	IDmaskNodeX = 'CompositorNodeIDMask'
+	MathNodeX = 'CompositorNodeMath'
+
+# else:
 RLayerNode = 'CompositorNodeRLayers' 
 CompositorNode = 'CompositorNodeComposite'
 OutputFileNode = 'CompositorNodeOutputFile'
@@ -56,8 +79,8 @@ class RenderOptions(object):
 		self.resolution_x = 512
 		self.resolution_y = 512
 		self.resolution_percentage = 100
-		self.tile_x = 12 # More?
-		self.tile_y = 12 # More?
+		self.tile_x = 64 # More?
+		self.tile_y = 64 # More?
 		# Fields not in bpy.data.scene.render class:
 		# Image settings: File format and color mode
 		self.image_settings = {}
@@ -182,12 +205,14 @@ class RenderOptions(object):
 		if not self.BVPopts['Image']:
 			# Switch all properties from one of the file output nodes to the composite output
 			# Grab a node
-			fOut = [N for N in Scn.node_tree.nodes if N.type==OutputFileNode][0]
+			aa = [N for N in Scn.node_tree.nodes if N.type==OutputFileNodeX]
+			print([a.type for a in Scn.node_tree.nodes])
+			fOut = aa[0]
 			# Find input to this node
 			Lnk = [L for L in Scn.node_tree.links if L.to_node == fOut][0]
 			Input = Lnk.from_socket
 			# Remove all input to composite node:
-			NodeComposite = [N for N in Scn.node_tree.nodes if N.type==CompositorNode][0]
+			NodeComposite = [N for N in Scn.node_tree.nodes if N.type==CompositorNodeX][0]
 			L = [L for L in Scn.node_tree.links if L.to_node==NodeComposite]
 			for ll in L:
 				Scn.node_tree.links.remove(ll)
@@ -201,6 +226,7 @@ class RenderOptions(object):
 			# Get rid of render layer that renders image:
 			RL = Scn.render.layers['RenderLayer']
 			Scn.render.layers.remove(RL)
+			# Turn off raytracing??
 
 		Scn.update()
 	'''
