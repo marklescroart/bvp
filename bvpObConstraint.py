@@ -7,7 +7,7 @@ ML 2012.01.31
 import bvp,random,copy,sys
 from bvp.bvpObject import bvpObject
 from bvp.bvpPosConstraint import bvpPosConstraint
-from bvp.utils.math import PerspectiveProj,PerspectiveProj_Inv,linePlaneInt,vecDist,listMean,AddLists,ImPosCount
+from bvp.utils.bvpMath import PerspectiveProj,PerspectiveProj_Inv,linePlaneInt,vecDist,listMean,AddLists,ImPosCount
 from bvp.utils.basics import MakeBlenderSafe
 class bvpObConstraint(bvpPosConstraint):
 	def __init__(self,X=None,Y=None,Z=None,
@@ -481,17 +481,17 @@ class bvpObConstraint(bvpPosConstraint):
 		'''
 		if not Cam is None:
 			import random
-			VectorFn = bvp.utils.math.VectorFn
+			VectorFn = bvp.utils.bvpMath.VectorFn
 			# Get vector from fixation->camera
 			cVec = VectorFn(Cam.fixPos[0])-VectorFn(Cam.location[0])
 			# Convert to X,Y,Z Euler angles
-			x,y,z = bvp.utils.math.vec2eulerXYZ(cVec)
+			x,y,z = bvp.utils.bvpMath.vec2eulerXYZ(cVec)
 			if round(random.random()):
 				posNeg=1
 			else:
 				posNeg=-1
 			zRot = z + random.random()*90.*posNeg
-			zRot = bvp.utils.math.bnp.radians(zRot)
+			zRot = bvp.utils.bvpMath.bnp.radians(zRot)
 		else:
 			zRot = self.sampleWConstr(self.zRot)
 		return (0,0,zRot)

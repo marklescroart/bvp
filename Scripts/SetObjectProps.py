@@ -6,14 +6,19 @@ See ListObjectProps.py for file format conventions for the text file.
 
 ML 2012.02.12
 '''
-import bpy
+import bpy,sys,os
 from bvp.utils.blender import DeclareProperties
 # Get groups in this file
 AllGrp = bpy.data.groups
 # Define RealWorldSize, SemanticCat (more?) as object properites in Blender
 DeclareProperties() 
 ###--- Modify these lines to change object file ---###
-fRead = '/auto/k6/mark/BlenderFiles/objectProps.txt'
+if len(sys.argv)>1:
+	LibDir = sys.argv[-1]
+else:
+	LibDir = bvp.Settings['Paths'][LibDir]
+fRead = os.path.join(LibDir,'objectProps.txt')
+#fRead = '/auto/k6/mark/BlenderFiles/objectProps.txt'
 ###--- To here ---###
 
 with open(fRead,'r') as fid:

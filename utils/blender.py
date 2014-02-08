@@ -6,7 +6,7 @@
 
 import os,random,subprocess,bvp,copy
 import math as bnp
-from bvp.utils.math import circ_dst
+from bvp.utils.bvpMath import circ_dst
 
 if bvp.Is_Blender:
 	import bpy
@@ -32,7 +32,7 @@ def xyz2constr(xyz,ConstrType,originXYZ=(0.,0.,0.)):
 	elif ConstrType.lower() == 'r':
 		Out = (X**2+Y**2+Z**2)**.5
 	return Out
-def GetConstr(Grp): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
+def GetConstr(Grp,LockZtoFloor=True): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
 	'''
 	Usage: camConstr,obConstr = GetConstr(Grp)
 
@@ -70,9 +70,10 @@ def GetConstr(Grp): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
 	thetaOffset = 270
 	fn = [bvp.bvpCamConstraint,bvp.bvpObConstraint]
 	Out = list()
-	for iCT,cTypeL in enumerate(ConstrType):
-		cParams = dict()
+	for cFn,cTypeL in zip(fn,ConstrType):
+		cParams = [dict()]
 		for cType in cTypeL:
+			cParams[0]['origin'] = [0,0,0]
 			if cType=='fix':
 				dimAdd = 'fix'
 			else:
@@ -81,37 +82,37 @@ def GetConstr(Grp): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
 			# Size constraints (object only!)
 			SzConstr =  [n for n in ConstrOb if 'size' in n.name.lower() and cType=='ob']
 			if SzConstr:
-				cParams['Sz'] = [None,None,None,None]
+				cParams[0]['Sz'] = [None,None,None,None]
 			for sz in SzConstr:
 				# obsize should be done with spheres! (min/max only for now!)
 				if sz.empty_draw_type=='SPHERE' and '_min' in sz.name:
-					cParams['Sz'][2] = sz.scale[0]
+					cParams[0]['Sz'][2] = sz.scale[0]
 				elif sz.empty_draw_type=='SPHERE' and '_max' in sz.name:
-					cParams['Sz'][3] = sz.scale[0]	
+					cParams[0]['Sz'][3] = sz.scale[0]	
 			# Cartesian position constraints (object, camera)
 			XYZconstr = [n for n in ConstrOb if 'xyz' in n.name.lower()]
 			if XYZconstr:
-				xyzOrigin = [None]*3 # Pre-allocate; set below if an "objXYZ" empty exists
-			else:
-				xyzOrigin = None
-			for xyz in XYZconstr:
+				print('Found XYZ cartesian constraints!')
+				cParams = [copy.copy(cParams[0]) for r in range(len(XYZconstr))]
+				
+			for iE,xyz in enumerate(XYZconstr):
 				for ii,dim in enumerate(['X','Y','Z']):
-					cParams[dimAdd+dim] = [None,None,None,None]
+					cParams[iE][dimAdd+dim] = [None,None,None,None]
 					if xyz.empty_draw_type=='CUBE':
 						# Interpret XYZ cubes as minima / maxima
-						if dim=='Z' and cType=='ob':
+						if dim=='Z' and cType=='ob' and LockZtoFloor:
 							# Lock to height of bottom of cube
-							cParams[dimAdd+dim][2] = xyz.location[ii]-xyz.scale[ii] # min
-							cParams[dimAdd+dim][3] = xyz.location[ii]-xyz.scale[ii] # max
-							xyzOrigin[ii] = xyz.location[ii]-xyz.scale[ii]
+							cParams[iE][dimAdd+dim][2] = xyz.location[ii]-xyz.scale[ii] # min
+							cParams[iE][dimAdd+dim][3] = xyz.location[ii]-xyz.scale[ii] # max
+							cParams[iE]['origin'][ii] = xyz.location[ii]-xyz.scale[ii]
 						else:
-							cParams[dimAdd+dim][2] = xyz.location[ii]-xyz.scale[ii] # min
-							cParams[dimAdd+dim][3] = xyz.location[ii]+xyz.scale[ii] # max
-							xyzOrigin[ii] = xyz.location[ii]
+							cParams[iE][dimAdd+dim][2] = xyz.location[ii]-xyz.scale[ii] # min
+							cParams[iE][dimAdd+dim][3] = xyz.location[ii]+xyz.scale[ii] # max
+							cParams[iE]['origin'][ii] = xyz.location[ii]
 					elif xyz.empty_draw_type=='SPHERE':
 						# Interpret XYZ spheres as mean / std
-						cParams[dimAdd+dim][0] = xyz.location[ii] # mean
-						cParams[dimAdd+dim][1] = xyz.scale[0] # std # NOTE! only 1 dim for STD for now!
+						cParams[iE][dimAdd+dim][0] = xyz.location[ii] # mean
+						cParams[iE][dimAdd+dim][1] = xyz.scale[0] # std # NOTE! only 1 dim for STD for now!
 			# Polar position constraints (object, camera)
 			if cType=='fix':
 				continue
@@ -123,47 +124,45 @@ def GetConstr(Grp): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
 				rptOrigin = OriginOb[0].location
 				if not all([o.location==rptOrigin for o in OriginOb]):
 					raise Exception('Inconsistent origins for spherical coordinates!')
-				rptOrigin = tuple(rptOrigin)
-			# THIS IS SOME DODGY SHIT: Set origin (by default) to be 
-			if xyzOrigin:
-				cParams['origin'] = xyzOrigin
-			elif rptOrigin:
-				cParams['origin'] = rptOrigin
-			else:
-				cParams['origin'] = (0,0,0)
+				#rptOrigin = tuple(rptOrigin)
+				cParams['origin'] = tuple(rptOrigin)
+			
 			# Second: Get spherical constraints wrt that origin
 			for dim in pDims:
-				cParams[dimAdd+dim] = [None,None,None,None]
-				ob = [o for o in ConstrOb if dim in o.name.lower()]
-				for o in ob:
-					# interpret spheres or arrows w/ "_min" or "_max" in their name as limits
-					if '_min' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
-						cParams[dimAdd+dim][2] = xyz2constr(list(o.location),dim,rptOrigin)
-						if dim=='theta':
-							cParams[dimAdd+dim][2] = circ_dst(cParams[dimAdd+dim][2]-thetaOffset,0.)
-					elif '_min' in o.name.lower() and o.empty_draw_type=='SPHERE':
-						cParams[dimAdd+dim][2] = o.scale[0]
-
-					elif '_max' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
-						cParams[dimAdd+dim][3] = xyz2constr(list(o.location),dim,rptOrigin)
-						if dim=='theta':
-							cParams[dimAdd+dim][3] = circ_dst(cParams[dimAdd+dim][3]-thetaOffset,0.)
-					elif '_max' in o.name.lower() and o.empty_draw_type=='SPHERE':
-						cParams[dimAdd+dim][3] = o.scale[0]
-					elif o.empty_draw_type=='SPHERE':
-						# interpret sphere w/out "min" or "max" as mean+std
-						## Interpretation of std here is a little fucked up: 
-						## the visual display of the sphere will NOT correspond 
-						## to the desired angle. But it should work.
-						cParams[dimAdd+dim][0] = xyz2constr(list(o.location),dim,rptOrigin)
-						if dim=='theta':
-							cParams[dimAdd+dim][0] = circ_dst(cParams[dimAdd+dim][0]-thetaOffset,0.)
-						cParams[dimAdd+dim][1] = o.scale[0]
-				if not any(cParams[dimAdd+dim]):
-					# If no constraints are present, simply ignore
-					cParams[dimAdd+dim] = None
-
-		Out.append(fn[iCT](**cParams))
+				# Potentially problematic: IF xyz is already filled, fill nulls for all cParams in list of cParams
+				for iE in range(len(cParams)):
+					cParams[iE][dimAdd+dim] = [None,None,None,None]
+					ob = [o for o in ConstrOb if dim in o.name.lower()]
+					for o in ob:
+						# interpret spheres or arrows w/ "_min" or "_max" in their name as limits
+						if '_min' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
+							cParams[iE][dimAdd+dim][2] = xyz2constr(list(o.location),dim,rptOrigin)
+							if dim=='theta':
+								cParams[iE][dimAdd+dim][2] = circ_dst(cParams[iE][dimAdd+dim][2]-thetaOffset,0.)
+						elif '_min' in o.name.lower() and o.empty_draw_type=='SPHERE':
+							cParams[iE][dimAdd+dim][2] = o.scale[0]
+						elif '_max' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
+							cParams[iE][dimAdd+dim][3] = xyz2constr(list(o.location),dim,rptOrigin)
+							if dim=='theta':
+								cParams[iE][dimAdd+dim][3] = circ_dst(cParams[iE][dimAdd+dim][3]-thetaOffset,0.)
+						elif '_max' in o.name.lower() and o.empty_draw_type=='SPHERE':
+							cParams[iE][dimAdd+dim][3] = o.scale[0]
+						elif o.empty_draw_type=='SPHERE':
+							# interpret sphere w/out "min" or "max" as mean+std
+							## Interpretation of std here is a little fucked up: 
+							## the visual display of the sphere will NOT correspond 
+							## to the desired angle. But it should work.
+							cParams[iE][dimAdd+dim][0] = xyz2constr(list(o.location),dim,rptOrigin)
+							if dim=='theta':
+								cParams[iE][dimAdd+dim][0] = circ_dst(cParams[iE][dimAdd+dim][0]-thetaOffset,0.)
+							cParams[iE][dimAdd+dim][1] = o.scale[0]
+					if not any(cParams[iE][dimAdd+dim]):
+						# If no constraints are present, simply ignore
+						cParams[iE][dimAdd+dim] = None
+		toAppend = [cFn(**cp) for cp in cParams]
+		if len(toAppend)==1:
+			toAppend = toAppend[0]
+		Out.append(toAppend)
 	return Out
 def GetScene(Num,Scn=None,Lib=None):
 	"""

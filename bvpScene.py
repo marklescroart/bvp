@@ -4,7 +4,7 @@
 import bvp,copy
 from bvp.utils.basics import fixedKeyDict,gridPos,linspace # non-numpy-dependent version of linspace
 from bvp.utils.blender import SetCursor
-from bvp.utils.math import ImPosCount
+from bvp.utils.bvpMath import ImPosCount
 if bvp.Is_Blender:
 	import bpy
 
@@ -105,6 +105,7 @@ class bvpScene(object):
 
 		ML 2012.03
 		'''
+		from random import shuffle
 		if not ImPosCt:
 			ImPosCt = ImPosCount(0,0,ImSz=1.,nBins=5,e=1)
 		Attempt = 1
@@ -119,7 +120,17 @@ class bvpScene(object):
 				cPos = self.BG.camConstraints.sampleCamPos(self.FrameRange)
 				fPos = self.BG.camConstraints.sampleFixPos(self.FrameRange)
 				self.Cam = bvp.bvpCamera(location=cPos,fixPos=fPos,frames=self.FrameRange,lens=self.BG.lens)
+			# Multiple object constraints for moving objects
+			OC = []
 			for o in ObList:
+				# Randomly cycle through object constraints
+				if not OC:
+					if type(self.obConstraints) is list:
+						OC = copy.copy(self.obConstraints)
+					else:
+						OC = [copy.copy(self.obConstraints)]
+					shuffle(OC)
+				oc = OC.pop()
 				NewOb = copy.copy(o) # resets size each iteration as well as position
 				if self.BG.obstacles:
 					Obst = self.BG.obstacles+ObToAdd
@@ -132,13 +143,13 @@ class bvpScene(object):
 				if not o.size3D:
 					# OR: Make real-world size the default??
 					# OR: Choose objects by size??
-					NewOb.size3D = self.BG.obConstraints.sampleSize()
+					NewOb.size3D = oc.sampleSize()
 				if not o.rot3D:
 					# NOTE: This is fixing rotation of objects to be within 90 deg of facing camera
-					NewOb.rot3D = self.BG.obConstraints.sampleRot(self.Cam)
+					NewOb.rot3D = oc.sampleRot(self.Cam)
 				if not o.pos3D:
 					# Sample position last (depends on Cam position, It may end up depending on pose, rotation, (or action??)
-					NewOb.pos3D,NewOb.pos2D = self.BG.obConstraints.sampleXY(NewOb.size3D,self.Cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap,RaiseError=False,ImPosCt=ImPosCt,MinSz2D=MinSz2D)
+					NewOb.pos3D,NewOb.pos2D = oc.sampleXY(NewOb.size3D,self.Cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap,RaiseError=False,ImPosCt=ImPosCt,MinSz2D=MinSz2D)
 					if NewOb.pos3D is None:
 						Fail=True
 						break

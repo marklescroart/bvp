@@ -63,7 +63,14 @@ for G in Grp:
 	# Camera & object position constraints 
 	if len([x for x in G.objects if x.type=='EMPTY']) > 0:
 		try:
-			camConstr,obConstr = GetConstr(G)
+			print('LOOKING FOR TF!!!\n\n')
+			TF = bvp.Settings['LibDefaults']['LockZtoFloor']
+			print("FOUND THE FUCKER!")
+			if TF:
+				print('Objects LOCKED THE FUCK DOWN!')
+			else:
+				print("Objects are FREEEEEE!")
+			camConstr,obConstr = GetConstr(G,LockZtoFloor=TF)
 		except:
 			# Fill in None values for now...
 			camConstr = None # Size=...

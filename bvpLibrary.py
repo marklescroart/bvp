@@ -203,7 +203,7 @@ class bvpLibrary(object):
 			fList.sort()
 			scriptF = os.path.join(bvp.__path__[0],'Scripts','List'+cls.capitalize()+'Props.py')
 			# Three: Run script
-			RunScriptForAllFiles(scriptF,fList)
+			RunScriptForAllFiles(scriptF,fList,Inpts=[self.LibDir])
 			
 	def UpdateBlendFiles(self,ClassToUpdate=('object','background','sky','shadow')):
 		'''
@@ -231,7 +231,7 @@ class bvpLibrary(object):
 				print('%s files to update:'%cls.capitalize())
 				print(fList)
 			scriptF = os.path.join(bvp.__path__[0],'Scripts','Set'+cls.capitalize()+'Props.py')
-			RunScriptForAllFiles(scriptF,fList)
+			RunScriptForAllFiles(scriptF,fList,Inpts=[self.LibDir])
 
 
 	def UpdateLibrary(self,ClassToUpdate=('object','background','sky','shadow')):

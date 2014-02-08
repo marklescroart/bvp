@@ -10,7 +10,7 @@ ML 2012.02.15
 import bvp,copy,random
 import math as bnp
 from bvp.bvpPosConstraint import bvpPosConstraint
-from bvp.utils.math import vecDist,sph2cart,cart2sph,CirclePos,circ_dst
+from bvp.utils.bvpMath import vecDist,sph2cart,cart2sph,CirclePos,circ_dst
 
 class bvpCamConstraint(bvpPosConstraint):
 	'''

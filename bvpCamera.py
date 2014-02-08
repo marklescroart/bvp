@@ -6,7 +6,7 @@ import math as bnp
 from bvp.bvpCamConstraint import bvpCamConstraint
 from bvp.utils.basics import fixedKeyDict
 from bvp.utils.blender import AddCameraWithTarget,GrabOnly,CreateAnim_Loc
-from bvp.utils.math import vec2eulerXYZ
+from bvp.utils.bvpMath import vec2eulerXYZ
 # This won't work yet! Poop!
 
 

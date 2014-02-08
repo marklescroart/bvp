@@ -30,11 +30,16 @@ ML 2012.02.15
 '''
 
 # Imports
-import bpy,re,os
+import bpy,re,os,sys
 ###--- Change this line to change file written out! ---###
-#sName = '/auto/k6/mark/BlenderFiles/objectList.txt'
+# sName = '/auto/k6/mark/BlenderFiles/objectList.txt'
 # sName = bvp.settings.files.ObListFile
-sName = '/auto/k6/mark/BlenderFiles/backgroundProps.txt'
+# sName = '/auto/k6/mark/BlenderFiles/backgroundProps.txt'
+if len(sys.argv)>1:
+	LibDir = sys.argv[-1]
+else:
+	LibDir = bvp.Settings['Paths'][LibDir]
+sName = os.path.join(LibDir,'backgroundProps.txt')
 ###--- Change to here ---###
 fName = os.path.split(bpy.data.filepath)[-1]
 with open(sName,'a') as fid:

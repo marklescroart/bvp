@@ -87,7 +87,7 @@ def MakeBlenderSafe(Array,Type='int'):
 		Type = 'float32'
 	Out = np.cast[Type](Array).tolist()
 	return Out
-def RunScriptForAllFiles(scriptF,fNm,Is_Cluster=False):
+def RunScriptForAllFiles(scriptF,fNm,Is_Cluster=False,Inpts=None):
 	'''
 	Run a script in all files in in some list (fNm)
 	?? Update to run on selected/all files within the library? (so, get rid of fNm input?) ??
@@ -103,6 +103,8 @@ def RunScriptForAllFiles(scriptF,fNm,Is_Cluster=False):
 		for BlendFile in fNm:
 			#BlendFile = os.path.join(fDir,BlendFile)
 			BlenderCmd = [Blender,'-b',BlendFile,'-P',scriptF] # Specify output? stdout? File?
+			if not Inpts is None:
+				BlenderCmd+=Inpts
 			print('Calling:')
 			print(BlenderCmd)
 			subprocess.call(BlenderCmd)

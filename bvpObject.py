@@ -7,7 +7,7 @@
 import os,bvp,random
 from bvp.utils.basics import fixedKeyDict 
 from bvp.utils.blender import AddGroup,GrabOnly
-from bvp.utils.math import PerspectiveProj
+from bvp.utils.bvpMath import PerspectiveProj
 # Blender imports
 if bvp.Is_Blender:
 	import bpy

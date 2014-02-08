@@ -116,9 +116,11 @@ class bvpSceneList(object):
 		if not type(Type) in (list,tuple):
 			Type = (Type,)
 		# Preallocate
-		files = dict(zip(Type,[[]]*len(Type)))
+		files = {} #dict(zip(Type,[[]]*len(Type)))
 		path = self.RenderOptions.BVPopts['BasePath']
 		fType = self.RenderOptions.image_settings['file_format'].lower()
+		for t in Type:
+			files[t] = []
 		for s in self.ScnList:
 			# Fill in "#" in path with 0001 (etc)
 			fp = copy.copy(s.fPath)
@@ -126,7 +128,17 @@ class bvpSceneList(object):
 			fp = fp.replace("#",'')+'%'+'0%dd.'%n+fType 
 			ff = [path%fp%fr for fr in range(int(s.FrameRange[0]),int(s.FrameRange[-1]+1))]
 			for t in Type:
-				files[t] += [f.replace('Scenes',t) for f in ff]
+				if t=='Scenes':
+					fq = copy.copy(ff)
+				elif t=='Masks':
+					fq = [f.replace('.'+fType,'_m%02d.%s'%(m+1,fType)) for f in ff for m in range(s.nObjects)]
+				elif t=='Normals':
+					fq = [f.replace('.png','_nor.exr') for f in ff]
+				elif t=='Zdepth':
+					fq = [f.replace('.png','_z.exr') for f in ff]
+				else:
+					raise Exception('Render type "%s" not supported yet!'%t)
+				files[t] += [f.replace('Scenes',t) for f in fq]
 		if len(Type)==1:
 			files = files[t]
 		return files
