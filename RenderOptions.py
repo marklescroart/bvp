@@ -121,6 +121,7 @@ class RenderOptions(object):
 			"Image":True,
 			"Voxels":False,
 			"ObjectMasks":False,
+			"Motion":False,
 			"Zdepth":False,
 			"Contours":False, #Freestyle, yet to be implemented
 			"Axes":False, # based on N.Cornea code, for now - still unfinished
@@ -151,7 +152,8 @@ class RenderOptions(object):
 		# Backwards compatibility:
 		if not 'Voxels' in self.BVPopts:
 			self.BVPopts['Voxels'] = False
-			
+		if not 'Motion' in self.BVPopts:
+			self.BVPopts['Motion'] = False
 		Scn.use_nodes = True
 		# Set only first layer to be active
 		Scn.layers = [True]+[False]*19
@@ -191,6 +193,8 @@ class RenderOptions(object):
 			return # Special case! no other node-based options can be applied!
 		if self.BVPopts['ObjectMasks']:
 			self.AddObjectMaskLayerNodes(Is_RenderOnlyMasks=SingleOutput)
+		if self.BVPopts['Motion']:
+			self.AddMotionLayerNodes(Is_RenderOnlyMotion=SingleOutput)
 		if self.BVPopts['Zdepth']:
 			self.AddZdepthLayerNodes(Is_RenderOnlyZ=SingleOutput)
 		if self.BVPopts['Contours']:
@@ -236,13 +240,18 @@ class RenderOptions(object):
 	To add nodes: NewNode = NT.nodes.new(type=NodeType) 
 	See top of code for list of node types used.
 	'''
-	def AddObjectMaskLayerNodes(self,Scn=None,Is_RenderOnlyMasks=True):
-		'''
-		Usage: AddObjectMaskLayerNodes(Scn=None,Is_RenderOnlyMasks=True)
+	def AddObjectMaskLayerNodes(self,Scn=None,Is_RenderOnlyMasks=False):
+		'''Adds compositor nodes to render out object masks.
 
-		Adds compositor nodes to render out object masks.
+		Parameters
+		----------
+		Scn : bpy.data.scene | None (default=None)
+			Leave as default (None) for now. Placeholder for future code updates.
+		Is_RenderOnlyMasks : bool
 
-		NOTES:
+
+		Notes
+		-----
 		The current implementation relies on objects being linked into Blender scene (without creating proxies), or being 
 		mesh objects. Older versions of the code filtered objects by whether or not they had any parent object. The old 
 		way may be useful, if object insertion methods change.
@@ -424,6 +433,9 @@ class RenderOptions(object):
 		if '/Masks/' in Scn.render.filepath: 
 			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
 			DepthOut.base_path = DepthOut.base_path.replace('/Masks/','/Zdepth/')+'_z'
+		elif '/Motion/' in Scn.render.filepath:
+			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_mot"
+			DepthOut.base_path = DepthOut.base_path.replace('/Motion/','/Zdepth/')+'_z'
 		elif '/Normals/' in Scn.render.filepath:
 			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_nor"
 			DepthOut.base_path = DepthOut.base_path.replace('/Normals/','/Zdepth/')+'_z'
@@ -520,6 +532,9 @@ class RenderOptions(object):
 		if '/Masks/' in Scn.render.filepath:
 			NorOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
 			NorOut.base_path = NorOut.base_path.replace('/Masks/','/Normals/')+'_z'
+		elif '/Motion/' in Scn.render.filepath:
+			NorOut.base_path = Scn.render.filepath[0:-4] # get rid of "_mot"
+			NorOut.base_path = NorOut.base_path.replace('/Motion/','/Normals/')+'_mot'
 		elif '/Zdepth/' in Scn.render.filepath:
 			NorOut.base_path = NorOut.base_path[0:-2] # remove '_z'	
 			NorOut.base_path = Scn.render.filepath.replace('/Zdepth/','/Scenes/')+'_nor'
@@ -532,6 +547,102 @@ class RenderOptions(object):
 			# Set base path
 			NorOut.base_path = NorOut.base_path[:endCut]
 		NT.links.new(NorCom.outputs['Image'],NorOut.inputs[0])
+	def AddMotionLayerNodes(self,Scn=None,Is_RenderOnlyMotion=False):
+		'''Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
+
+		Parameters
+		----------
+		Scn : bpy scene instance | None. default = None
+			Leave as default (None) for now. For potential future code upgrades
+		Is_RenderOnlyMotion : bool
+			Set True if optical flow is the only desired output of the render
+		'''
+		if not Scn:
+			Scn = bpy.context.scene
+		Scn.use_nodes = True
+		Scn.render.use_compositing = True
+		#####################################################################
+		### ---                Set up render layers:                  --- ### 
+		#####################################################################
+		RL = Scn.render.layers.keys()
+		if not 'Motion' in RL:
+			bpy.ops.scene.render_layer_add() 
+			# Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
+			ObLayer = [x for x in Scn.render.layers.keys() if not x in RL]
+			ObLayer = Scn.render.layers[ObLayer[0]]
+			# /Hacky
+			# Set default layer options
+			for k in self.DefaultLayerOpts.keys():
+				ObLayer.__setattr__(k,self.DefaultLayerOpts[k])
+			# And set motion-specific layer options
+			ObLayer.name = 'Motion'
+			ObLayer.use_pass_vector = True # Motion layer
+			ObLayer.use_ztransp = True # Necessary (?) for motion to work for transparent materials
+			ObLayer.use_pass_z = True # Necessary (?)
+			#ObLayer.use_pass_object_index = True # for masking out depth of sky dome 
+			RL.append('Motion')
+		else:
+			raise Exception('Motion layer already exists!')
+		########################################################################
+		### ---                Set up compositor nodes:                  --- ### 
+		########################################################################
+		NT = Scn.node_tree
+		# Get all node names (keys)
+		NodeRL = NT.nodes.new(type=RLayerNode)
+		NodeRL.layer = 'Motion'
+
+		# QUESTION: Better to zero out motion in sky?? NO for now, 
+		# but leave here in case we want the option later...
+		if False:
+			# Zero out all depth info from the sky dome (the sky doesn't have any depth!)
+			NodeSky = NT.nodes.new(IDmaskNode)
+			NodeSky.use_antialiasing = False  #No AA for z depth! doesn't work to combine non-AA node w/ AA node!
+			NodeSky.index = 100
+			NT.links.new(NodeRL.outputs['IndexOB'],NodeSky.inputs['ID value'])
+			NodeInv = NT.nodes.new(MathNode)
+			NodeInv.operation = 'SUBTRACT'
+			# Invert (ID) alpha layer, so sky values are zero, objects/bg are 1
+			NodeInv.inputs[0].default_value = 1.0
+			NT.links.new(NodeSky.outputs[0],NodeInv.inputs[1])
+			# Mask out sky by multiplying with inverted sky mask
+			NodeMult = NT.nodes.new(MathNode)
+			NodeMult.operation = 'MULTIPLY'
+			NT.links.new(NodeRL.outputs['Speed'],NodeMult.inputs[0])
+			NT.links.new(NodeInv.outputs[0],NodeMult.inputs[1])
+			# Add 1000 to the sky:
+			NodeMult1000 = NT.nodes.new(MathNode)
+			NodeMult1000.operation = 'MULTIPLY'
+			NodeMult1000.inputs[0].default_value = 1000.0
+			NT.links.new(NodeMult1000.inputs[1],NodeSky.outputs[0])
+			NodeAdd1000 = NT.nodes.new(MathNode)
+			NodeAdd1000.operation = 'ADD'
+			NodeAdd1000.inputs[0].default_value = 1000.0
+			NT.links.new(NodeMult.outputs[0],NodeAdd1000.inputs[0])
+			NT.links.new(NodeMult1000.outputs[0],NodeAdd1000.inputs[1])
+
+		# Depth output node
+		MotionOut = NT.nodes.new(OutputFileNode)
+		MotionOut.location =  bvp.bmu.Vector((0.,300.))
+		MotionOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
+		if '/Masks/' in Scn.render.filepath: 
+			MotionOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
+			MotionOut.base_path = DepthOut.base_path.replace('/Masks/','/Motion/')+'_mot'
+		elif '/Normals/' in Scn.render.filepath:
+			MotionOut.base_path = Scn.render.filepath[0:-4] # get rid of "_nor"
+			MotionOut.base_path = DepthOut.base_path.replace('/Normals/','/Motion/')+'_mot'
+		elif '/Zdepth/' in Scn.render.filepath:
+			MotionOut.base_path = Scn.render.filepath[0:-2] # get rid of "_z"
+			MotionOut.base_path = DepthOut.base_path.replace('/Zdepth/','/Motion/')+'_mot'
+		else:
+			MotionOut.base_path = Scn.render.filepath.replace('/Scenes/','/Motion/')
+			# Set unique name per frame
+			endCut = MotionOut.base_path.index('Motion/')+len('Motion/')
+			MotionOut.file_slots[0].path = MotionOut.base_path[endCut:]+'_mot'
+			# Set base path
+			MotionOut.base_path = MotionOut.base_path[:endCut]
+
+		NT.links.new(NodeRL.outputs['Speed'],MotionOut.inputs[0])
+
 	def SetUpVoxelization(self,Scn=None):
 		"""
 		Set up Blender for rendering images to create 3D voxelization of an object
