@@ -193,11 +193,16 @@ def PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.)):
 	
 	UNIVERSAL version...		
 	
-	Inputs:
-		bvpObj = bvpObject class, which should contain object position (x,y,z) and size
-		bvpCam = bvpCamera class, which should contain a list of (x,y,z) camera and fixation positions for n frames
-			ImSz = Image size (e.g. [500,500]) default = (100,100) (for pct of image computation)
+	Parameters
+	----------
+	bvpObj : bvpObject class
+		Should contain object position (x,y,z) and size
+	bvpCam : bvpCamera class
+		Should contain a list of (x,y,z) camera and fixation positions for n frames
+	ImSz : tuple or list
+		Image size (e.g. [500,500]) default = (1.,1.) (for pct of image computation)
 	
+
 	Created by ML 2011.10.06
 	'''
 

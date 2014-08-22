@@ -1,6 +1,6 @@
 '''
-.B.lender .V.ision .P.roject utils for functions to be used within Blender itself.
-
+.B.lender .V.ision .P.roject utils for functions to be used within Blender
+(at Blender command line or in scripts run through Blender)
 
 '''
 
@@ -32,6 +32,7 @@ def xyz2constr(xyz,ConstrType,originXYZ=(0.,0.,0.)):
 	elif ConstrType.lower() == 'r':
 		Out = (X**2+Y**2+Z**2)**.5
 	return Out
+
 def GetConstr(Grp,LockZtoFloor=True): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
 	'''
 	Usage: camConstr,obConstr = GetConstr(Grp)
@@ -287,6 +288,7 @@ def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 			a.fcurves[iXYZ].keyframe_points[ifr].handle_right_type = hType[ifr][1]
 		a.fcurves[iXYZ].extrapolation = 'CONSTANT'
 	return a
+
 def SetUpGroup(ObList=None,Scn=None):
 	'''
 	Usage: SetUpGroup(ObList=None,Scn=None)
@@ -361,7 +363,6 @@ def SetUpGroup(ObList=None,Scn=None):
 		for o in ObList:
 			o.select=True
 		bpy.ops.group.create(name=Scn.name)
-	
 
 def AddSelectedToGroup(gNm):
 	'''
@@ -448,35 +449,37 @@ def SetLayers(Ob,LayerList):
 	bpy.ops.object.move_to_layer(layers=LL)
 	
 def GetCursor():
+	'''Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
+
+	Returns
+	-------
+	CursorPos : 
 	'''
-	Usage: CursorLoc = GetCursor()
-	
-	Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
-	
-	ML 2011.??
-	'''
-	if not bvp.Is_Blender:
-		print("Sorry, won't run outside of Blender!")
-		return
 	# Now this is some serious bullshit. Look where Blender hides the cursor information. Just look.
 	V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
 	return V.spaces[0].cursor_location
 	
-def SetCursor(CursPos):
-	'''
-	Again, need a function because there is a totally uselessly complex data structure for the cursor position.
+def SetCursor(CursorPos):
+	'''Sets 3D cursor to specified location in VIEW_3D window
+
+	Useful to have a function for this because there is an irritatingly
+	complex data structure for the cursor position in Blender's API
+
+	Inputs
+	------
+	CursorPos : list or bpy Vector
+		Desired position of the cursor
 	'''
 	V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
-	V.spaces[0].cursor_location=CursPos
+	V.spaces[0].cursor_location=CursorPos
 
 def GrabOnly(Ob):
-	'''
-	Usage: GrabOnly(Ob)
-	
-	Select one object and deselect all others (because Blender's functions to do this are cumbersome)
-	Ob is a Blender object (bpy class object)
-	
-	2011.06.14 ML
+	'''Selects the input object `Ob` and and deselects everything else
+
+	Inputs
+	------
+	Ob : bpy class object
+		Object to be selected
 	'''
 	bpy.ops.object.select_all(action='DESELECT')
 	Ob.select = True
@@ -490,7 +493,7 @@ def GetMeOb(Scn=None,Do_Select=True):
 	
 	2011.05 ML
 	'''
-	if not Scn:
+	if Scn is None:
 		Scn = bpy.context.scene
 	bpy.ops.object.select_all(action='DESELECT')
 	MeOb = [Ob for Ob in Scn.objects if Ob.type=='MESH']
@@ -786,6 +789,88 @@ def GetGroupBoundingBox(ObList):
 	#print('Min/max z = %.2f,%.2f'%(min(BBz),max(BBz)))
 	return MinXYZ,MaxXYZ
 
+def new_scene(scene_name=None):
+	"""Create new named scene, return scene object. 
+
+	For the record: This function only exists because Blender's scene creation function
+	is SOOPER lame. bpy.ops.scene.new() should take a name as an input argument and 
+	return a scene object. But it does not. 
+	"""
+	SL = list(bpy.data.scenes)
+	bpy.ops.scene.new()
+	new_scn = [s for s in bpy.data.scenes if not s in SL][0]
+	if not scene_name is None:
+		new_scn.name = scene_name
+	return new_scn
+
+def get_collada_action(fnm,act_name=None,scn=None):
+	"""Imports an armature and its associated action from a collada (.dae) file.
+
+	Also rescales the armature to be 
+
+	Inputs
+	------
+	input_name : string
+		file name from which to import action(s)(?). 
+	act_name : string
+		name for action to create
+	scn : string (name of scene) or bpy.data.scenes object
+		Scene to which the armature for the action should be linked (this is
+		just for housekeeping so that when files are opened, their contents
+		will be clearer to human users).
+	"""
+	# Get list of extant actions, objects
+	ext_act = [a.name for a in bpy.data.actions]
+	ext_obj = [o.name for o in bpy.data.objects]
+
+	# Import new armature
+	bpy.ops.wm.collada_import(filepath=fnm)
+	
+	# Find new object	
+	arm_ob = [o for o in bpy.data.objects if isinstance(o.data,bpy.types.Armature) and not o.name in ext_obj]
+	if len(arm_ob)>1:
+		# Perhaps more subtlety will be required
+		raise Exception("WTF! TOO MANY NEW ARMATURES!")
+	else:
+		arm_ob = arm_ob[0]
+	# Rename armature object, armature, bones
+	arm_ob.name = act_name+'_armature_ob'
+	arm_ob.data.name = act_name+'_armature'
+	for b in arm_ob.data.bones:
+		xx = re.search('_',b.name).start()
+		b.name = act_name+b.name[xx:]
+	
+	# Find new action
+	arm_act = [a for a in bpy.data.actions if not a.name in ext_act]
+	if len(arm_act)>1:
+		# Perhaps more subtlety will be required
+		raise Exception("WTF! TOO MANY NEW ACTIONS!")
+	else:
+		arm_act = arm_act[0]
+	# Rename new action
+	arm_act.name = act_name
+
+	# Adjust size to standard 10 units, IF standing straight up in T pose.
+
+	# Get T pose for standard mesh from library...
+	
+	# Get scale factor
+	
+	# put back original action
+
+	# Rescale
+
+	# Link to scene, for clarity? 
+	if not scn is None:
+		bpy.context.scene.unlink(arm_ob)
+		if isinstance(scn,(str,unicode)):
+			if scn in bpy.data.scenes
+				# Check for existence of scene
+				scn = bpy.data.scenes[scn]
+			else:
+				# Create new scene
+				scn = new_scene(scn)
+		scn.link(arm_ob)
 
 ###########################################################
 ### --- 	Adding Stuff, library manipulation  	--- ###
