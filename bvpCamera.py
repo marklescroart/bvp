@@ -6,7 +6,7 @@ import math as bnp
 from bvp.bvpCamConstraint import bvpCamConstraint
 from bvp.utils.basics import fixedKeyDict
 from bvp.utils.blender import AddCameraWithTarget,GrabOnly,CreateAnim_Loc
-from bvp.utils.bvpMath import vec2eulerXYZ
+from bvp.utils.bvpMath import vec2eulerXYZ,VectorFn,MatrixFn,atand,sind,cosd
 # This won't work yet! Poop!
 
 
@@ -63,6 +63,56 @@ class bvpCamera(object):
 	@property
 	def nKeyFrames(self):
 		return len(self.frames)
+	@property
+	def Matrix(self):
+
+		ImDist = 32. # Blender assumption - see above!
+		FOV = 2*atand(ImDist/(2*self.lens))
+		camPos = self.location
+		fixPos = self.fixPos
+		# Convert to vector
+		cPos = VectorFn(camPos[0]) # Only do this wrt first frame for now!
+		fPos = VectorFn(fixPos[0])
+		# Prep for shift in L,R directions (wrt camera)
+		cVec = fPos-cPos
+		# Compute cTheta (Euler angles (XYZ) of camera)
+		cVec = fPos-cPos
+		# Get anlge of camera in world coordinates 
+		cTheta = vec2eulerXYZ(cVec)
+		# Blender is Right-handed
+		Flag = {'Handedness':'Right'} 
+		x,y,z = 0,1,2
+		if Flag['Handedness'].lower() == 'left':
+			# X rotation
+			xRot = MatrixFn([[1.,0.,0.],
+				[0.,cosd(cTheta[x]),-sind(cTheta[x])],
+				[0.,sind(cTheta[x]), cosd(cTheta[x])]])
+			# Y rotation
+			yRot = MatrixFn([[cosd(cTheta[y]),0., sind(cTheta[y])],
+				[0.,1.,0.],
+				[-sind(cTheta[y]), 0., cosd(cTheta[y])]])
+			# Z rotation
+			zRot = MatrixFn([[cosd(cTheta[z]),-sind(cTheta[z]), 0.],
+				[sind(cTheta[z]), cosd(cTheta[z]), 0.],
+				[0., 0., 1.]])
+		elif Flag['Handedness'].lower() == 'right':
+			# X rotation
+			xRot = MatrixFn([[1., 0., 0.],
+				[0., cosd(cTheta[x]),sind(cTheta[x])],
+				[0., -sind(cTheta[x]), cosd(cTheta[x])]])
+			# Y rotation
+			yRot = MatrixFn([[cosd(cTheta[y]), 0., -sind(cTheta[y])],
+				[0., 1., 0.],
+				[sind(cTheta[y]), 0., cosd(cTheta[y])]])
+			# Z rotation
+			zRot = MatrixFn([[cosd(cTheta[z]),sind(cTheta[z]), 0.],
+				[-sind(cTheta[z]), cosd(cTheta[z]), 0.],
+				[0., 0., 1.]])
+		else: 
+			raise Exception('WTF are you thinking handedness should be? Options are "Right" and "Left" only!')
+		# Compute camera matrix
+		CamMat = xRot * yRot * zRot
+		return CamMat
 	def __repr__(self):
 		S = '\n~C~ bvpCamera ~C~\n'
 		S += 'Camera lens: %s, clipping: %s, frames: %s\n Cam location key points: %s\n Fix location key points: %s'%(str(self.lens),

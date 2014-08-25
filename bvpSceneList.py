@@ -479,11 +479,10 @@ class bvpSceneList(object):
 			Maximum memory required for the job (in MB). For Is_Slurm=True only. 
 			This is difficult to estimate... Aim high!
 
+		Notes
+		-----
 		TO DO: 
 		Add gpu render option??
-		'''
-
-		''' 
 		For error messages:
 		 -e, --error=<filename pattern>
               Instruct SLURM to connect the batch script's standard error directly to the file name specified in the "filename pattern".  See the --input option for filename specification options.
@@ -658,7 +657,7 @@ class bvpSceneList(object):
 		else:
 			print('Done!')
 
-	def RenderCheck(self,Type='Scenes'):
+	def RenderCheck(self,rType='Scenes'):
 		'''
 		Check on render progress, show a bar graph of completion
 
@@ -688,10 +687,12 @@ class bvpSceneList(object):
 			tt = 'FirstFrame'
 		if tt=='All':
 			a = np.array(self.nFramesPerScene)
-			Pct = n/a
+			Pct = np.array(n)/a
 		elif tt=='every4th':
 			a = np.array(self.nFramesPerScene)
-			Pct = n/a # This is still bogus for Counterstrike data, b/c scenes are not separately labeled
+			Pct = (np.array(n)/4.)/a # This is still bogus for Counterstrike data, b/c scenes are not separately labeled
+			import ipdb
+			ipdb.set_trace()
 		else:
 			Pct=n
 		plt.barh(range(self.nScenes),Pct)

@@ -65,21 +65,27 @@ def vecDist(a,b):
 def cosd(theta):
 	theta = bnp.radians(theta)
 	return bnp.cos(theta)
-
 def sind(theta):
 	theta = bnp.radians(theta)
 	return bnp.sin(theta)
-
 def tand(theta):
 	theta = bnp.radians(theta)
 	return bnp.tan(theta)
 def atand(theta):
 	return bnp.degrees(bnp.atan(theta))
 def sph2cart(r,az,elev):
-	'''
-	Usage: x,y,z = sph2cart(r,az,elev)
-	Or:    x,y,z = sph2cart(r,theta,phi)
+	'''Spherical to cartesian coordinate transform
+	
 	Converts spherical to cartesian coordinates. Azimuth and elevation angles in degrees.
+
+	Parameters
+	----------
+	r : scalar or array-like
+		radius
+	az : scalar or array-like
+		azimuth angle, in degrees
+	elev : scalar or array-like
+		elevation angle, in degrees
 
 	ML 2011.10.13
 	'''
@@ -185,25 +191,31 @@ def CirclePos(radius,nPos,x_center=0,y_center=0,Direction='BotCCW'):
 		Pos = [[x,y] for x,y in zip(PosX,PosY)]
 		return Pos
 def PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.)): 
-	'''
-	Usage: imPos_Top,imPos_Bot,imPos_L,imPos_R = PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.))
-	
-	Gives image coordinates of an object (Bottom,Top,L,R) given the 3D position of the object and a camera.
+	'''Compute the 2D (image) location to which an object projects
+
+	Gives image coordinates of an object (Bottom,Top,L,R) given the 3D position of the object 
+	and a camera (each specified within bvpObject and bvpCamera instances)
+
 	Assumes that the origin of the object is at the center of its base (BVP convention!)
 	
-	UNIVERSAL version...		
+	This is the UNIVERSAL version (numpy / no numpy [only Blender Math], should work)	
 	
-	Inputs:
-		bvpObj = bvpObject class, which should contain object position (x,y,z) and size
-		bvpCam = bvpCamera class, which should contain a list of (x,y,z) camera and fixation positions for n frames
-			ImSz = Image size (e.g. [500,500]) default = (100,100) (for pct of image computation)
-	
-	Created by ML 2011.10.06
-	'''
+	Parameters
+	----------
+	bvpObj : bvpObject instance
+		Should have object position (.pos3D) and size (.size3D) attributes set
+	bvpCam : bvpCamera instance
+		Should contain a list of (x,y,z) camera and fixation positions for n frames
+	ImSz : 2-tuple | default = (1.,1.) 
+		Image size (for pct of image computation)
 
-	"""
-	NOTE: 
-	Note: Blender seems to convert focal length in mm to FOV by assuming a particular
+	Returns
+	-------
+	top,bottom,left,right locations in image
+
+	Notes
+	-----
+	Blender seems to convert focal length in mm to FOV by assuming a particular
 	(horizontal/diagonal) distance, in mm, across an image. This is not
 	exactly correct, i.e. the rendering effects will not necessarily match
 	with real rectilinear lenses, etc... See
@@ -218,7 +230,8 @@ def PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.)):
 	# http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
 	plot(fL,FOV,'bo',fL,FOVcomputed,'r')
 	
-	"""
+	Created by ML 2011.10.06
+	'''
 	ImDist = 32. # Blender assumption - see above!
 	FOV = 2*atand(ImDist/(2*bvpCam.lens))
 
@@ -335,21 +348,30 @@ def PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.)):
 	#elif bvp.Is_Blender:
 	#	return imPos_Top,imPos_Bot,imPos_L,imPos_R #,d,CamMat
 
-def PerspectiveProj_Inv(ImPos,bvpCam,Z):
-	'''
-	Usage: oPos = PerspProj_Inv(ImPos,bvpCam,Z)
+def PerspectiveProj_Inv(ImPos,bvpCam,Z,Handedness="Right"):
+	'''Computes 3D location for a given 2D image position and distance from camera.
 	
-	Inputs:
-	    ImPos = x,y image position as a pct of the image (in range 0-1)
-	    bvpCam = bvpCamera class, which contains all camera info (position, lens/FOV, angle)
-	    Z = distance from camera for inverse computation
+	Parameters
+	----------
+	ImPos : array-like, length 2
+		x,y image position as a pct of the image (in range 0-1)
+	bvpCam : bvpCamera isinstance
+		Contains all camera info (position, fixation location, lens/FOV)
+	Z : scalar
+		Distance from camera for inverse computation
 	
-	Created by ML 2011.10.06
-	'''
+	Other Parameters
+	----------------
+	Handedness : "Left" | "Right"
+		Blender uses right-handed coordinate system. Stick with that.
 
-	'''
-	NOTES: 
+	Returns
+	-------
+	oPos : list
+		List of X,Y,Z location for 
 
+	Notes
+	-----
 	Blender seems to convert focal length(in mm) to FOV by assuming a particular
 	(horizontal/diagonal) distance, in mm, across an image. This is not
 	exactly correct, i.e. the rendering effects will not necessarily match
@@ -364,15 +386,16 @@ def PerspectiveProj_Inv(ImPos,bvpCam,Z):
 	FOVcomputed = 2*atand(ImDist./(2*fL)); # Focal length equation, from
 	# http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
 	plot(fL,FOV,'bo',fL,FOVcomputed,'r')
+
+	Created by ML 2011.10.06
 	'''
 
-	# Blender uses right-handed coordinates
-	Handedness = 'Right'
-	ImDist = 32. # Blender assumption - see above!
+	ImDist = 32. # Blender assumption - see notes above
 	FOV = 2*atand(ImDist/(2*bvpCam.lens))
 	x,y,z = 0,1,2
 	if Z>0:
 		# ensure that Z < 0
+		# Question: Does +/- value of Z depend on handedness of coordinate system?
 		Z = -Z
 	cPos = VectorFn(bvpCam.location[0]) 
 	fixPos = VectorFn(bvpCam.fixPos[0])
@@ -415,15 +438,21 @@ def PerspectiveProj_Inv(ImPos,bvpCam,Z):
 	#if bvp.Is_Numpy:
 	CamMatInv = np.linalg.pinv(CamMat);
 	# sample one point at Z units from camera
-	# This calculation is basically: PctToSideOfImage * x/f * Z = X  # (tand(FOV/2.) = x/f)
 	d = [0,0,Z]; 
+	# This calculation is basically: 
+	# PctToSideOfImage * x/f * Z = X  
+	# (tand(FOV/2.) = x/f)
 	d[x] = -(xP-ImSz[x]/2.) * tand(FOV/2.)/(ImSz[x]/2.) * d[z] 
 	d[y] = (yP-ImSz[y]/2.) * tand(FOV/2.)/(ImSz[y]/2.) * d[z]
 	d = VectorFn(d)
+	print(d)
 	# So: d is a vector pointing straight from the camera to the object, with the camera at (0,0,0) pointing DOWN (?)
 	# d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
 	# of the object in the world.
+	#cPos[2] = -cPos[2] # (?)
+	print(CamMatInv*d)
 	oPos = CamMatInv*d+cPos
+	print(oPos)
 	return lst(oPos)
 
 
@@ -649,16 +678,35 @@ class ImPosCount(object):
 		return p
 
 def linePlaneInt(L0,L1,P0=(0.,0.,0.),n=(0.,0.,1.)):
-	'''
-	Usage: IntPt = linePlaneInt(L0,L1,P0=(0.,0.,0.),n=(0.,0.,1.))
-
-	Find intersection of line with a plane.
+	'''Find intersection of line with a plane.
 	
-	Line is specified by two points L0 and L1, each of which is a 
-	list / tuple of (x,y,z) values.
-	P0 is a point on the plane, and n is the normal of the plane.
-	default is a flat floor at z=0 (P0 = (0,0,0), n = (0,0,1))
+	Line is specified by two points `L0` and `L1`
+	Plane is specified by is a point `P0` and a surface normal `n`
 
+	Default is to use the floor (a flat plane at Z=0, with n = (0,0,1))
+	as the plane.
+
+	Useful for setting objects on the ground plane, given a point in 3D
+	space to which they should project.
+
+	Parameters
+	----------
+	L0 : 3-list/3-tuple
+		1st point on the line
+	L1 : 3-list/3-tuple
+		2nd point on the line
+	P0 : 3-list/3-tuple
+		Point on plane
+	n : 3-list/3-tuple
+		Surface normal of the plane
+
+	Returns
+	-------
+	IntersectionPt : 3-list/tuple
+		(x,y,z) coordinate of the point of intersection
+	
+	Notes
+	-----
 	For formulas / more description, see:
 	http://en.wikipedia.org/wiki/Line-plane_intersection
 

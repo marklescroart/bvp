@@ -129,10 +129,10 @@ class bvpScene(object):
 			for o in ObList:
 				# Randomly cycle through object constraints
 				if not OC:
-					if type(self.obConstraints) is list:
-						OC = copy.copy(self.obConstraints)
+					if type(self.BG.obConstraints) is list:
+						OC = copy.copy(self.BG.obConstraints)
 					else:
-						OC = [copy.copy(self.obConstraints)]
+						OC = [copy.copy(self.BG.obConstraints)]
 					shuffle(OC)
 				oc = OC.pop()
 				NewOb = copy.copy(o) # resets size each iteration as well as position

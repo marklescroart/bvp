@@ -56,6 +56,7 @@ class bvpObject(object):
 		self.grpName=None
 		self.parentFile=None
 		self.semanticCat=None
+		self.wordnet_label=None
 		self.realWorldSize=1.0 # size of object in meters
 		self.nVertices=0
 		self.nFaces=0
