@@ -4,6 +4,11 @@
     "BlenderCmd": "/path/to/your/blender/installation/executable/file", 
     "LibDir": "/path/to/your/Library"
   }, 
+  "db": {
+    "name": "bvp_1_0", 
+    "host": "localhost", 
+    "port": 9194
+  },
   "CamDefaults": {
     "frames": [
       1

@@ -864,7 +864,7 @@ def get_collada_action(fnm,act_name=None,scn=None):
 	if not scn is None:
 		bpy.context.scene.unlink(arm_ob)
 		if isinstance(scn,(str,unicode)):
-			if scn in bpy.data.scenes
+			if scn in bpy.data.scenes:
 				# Check for existence of scene
 				scn = bpy.data.scenes[scn]
 			else:
