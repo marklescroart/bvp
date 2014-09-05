@@ -70,7 +70,7 @@ class bvpDB(object):
 	Class to interact with (mongo) database 
 	'''
 	def __init__(self,dbname=bvp.Settings['db']['name'],dbhost=bvp.Settings['db']['host'],
-				dbport=bvp.Settings['db']['port']):
+				port=bvp.Settings['db']['port']):
 		'''Class to interface with bvp elements stored in mongo db
 		
 		Separate collections for objects, bgs, 
@@ -88,11 +88,11 @@ class bvpDB(object):
 			Name for host server. Read from config file. Config default is intialized to be 'localhost'
 		dbname : string
 			Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
-		dbport : scalar
+		port : scalar
 			Port number for database. 
 		'''		
-		self.LibDir = LibDir
-		self.dbi = pymongo.MongoClient(host=dbhost,port=dbport)[dbname]
+		#self.LibDir = LibDir
+		self.dbi = pymongo.MongoClient(host=dbhost,port=port)[dbname]
 		# Make bvpDB fields (objects, backgrounds, skies, etc) the actual database collections (?)
 		for sc in ['objects','backgrounds','skies','shadows']: # More? Better not to enumerate? 
 			setattr(self,sc,self.dbi[sc])
@@ -114,27 +114,35 @@ class bvpDB(object):
 
 		return wtf
 
-	def print_list(self,fname,sctype=('objects',),params=None):
-		'''Prints a list of all groups (and parameters??) to a text file
+	def print_list(self,fname,params,sctype=('objects',),qdict=None):
+		'''Prints a semicolon-separated list of all groups (and parameters??) to a text file
 		
 		Gets grp Names (unique ids for each object / background / etc). By default, gets ALL names, but can be filtered
 		(as in getSceneComponentList)
 
 		Parameters
 		----------
-		params input to specify which params to print out? (one key/value pair at a time should be better, 
-			yeah?)
-
+		fname : string file name
+			File name for file to which to write. Extant files will be overwritten.
+		params : list|tuple
+			List of parameters to print. 
+		sctype : list|tuple
+			List of scene component types for which to print items.
+		
 		Returns
 		-------
+		(nothing - writes to file)
 		'''
-		# if not filterFn:
-		# 	filterFn = lambda x: isinstance(x,dict)
-		# L = self.getSCL(filterFn,ComponentType)
-		# Nm = [x['grpName'] for x in L]
-		# Nm.sort()
-		# return Nm
-		pass
+		if qdict is None:
+			# Return all objects
+			qdict = {}
+		fid = open(fname,'w')
+		for sct in sctype:
+			ob = self.dbi[sct].find(qdict)
+			for o in ob:
+				ss = o['grpName'] + ("; %s"*len(params))%tuple([repr(o[p]) for p in params])
+				fid.write(ss+'\n')
+		fid.close()
 	def read_list(self,fname):
 		"""Reads in a list in the same format as print_list, uses it to update many database fields
 
@@ -145,6 +153,7 @@ class bvpDB(object):
 	def add_file(self,fname,sctype): 
 		'''Adds groups in file to database, moves file?
 		
+		NOT UPDATED YET. STILL WORKING.
 		.blend files -> *Props.txt files
 
 		Update text files (objectProps.txt,backgroundProps.txt,etc) that 
@@ -172,9 +181,20 @@ class bvpDB(object):
 			scriptF = os.path.join(bvp.__path__[0],'Scripts','List'+cls.capitalize()+'Props.py')
 			# Three: Run script
 			RunScriptForAllFiles(scriptF,fList,Inpts=[self.LibDir])
-			
+
+	##########################################################
+	### --- FROM HERE: OLD FUNCTIONS. Replace? Update? --- ###
+	##########################################################
 	def UpdateBlendFiles(self,ClassToUpdate=('object','background','sky','shadow')):
 		'''
+		NOTES:
+		For maximum portability of files, it should be possible to 
+		store within each .blend file all the necessary information to
+		upload it to another database. Thus this function should be 
+		converted to something like a pack_blends file, that would 
+		write all database information to blender-defined properties
+		of each group in each .blend file.
+
 		*Props.txt files -> .blend files
 
 		Update .blend files based on information in *Props.txt files 
