@@ -3,7 +3,7 @@
 # Imports.
 import os,types,bvp
 import math as bnp
-from bvp.utils.blender import AddGroup
+from bvp.utils.blender import add_group
 from bvp.bvpObConstraint import bvpObConstraint
 from bvp.bvpCamConstraint import bvpCamConstraint
 from bvp.bvpObject import bvpObject as O
@@ -87,13 +87,15 @@ class bvpBG(object):
 		if self.grpName:
 			# Add group of mesh object(s)
 			fDir,fNm = os.path.split(self.parentFile)
-			AddGroup(fNm,self.grpName,fDir)
+			add_group(self.grpName,fNm,fDir)
 		else:
 			print("BG is empty!")
 	def TestBG(self,frames=(1,1),ObL=(),nObj=0,EdgeDist=0.,ObOverlap=.50):
 		'''
 		Tests object / camera constraints to see if they are working
 		** And shadows??
+
+		Should be grouped with other testing functions, not here. Move.
 		'''
 		Lib = bvp.bvpLibrary('/Users/mark/Documents/BlenderFiles/')
 		Cam = bvp.bvpCamera(frames=frames)
@@ -104,7 +106,7 @@ class bvpBG(object):
 			nObj = 0
 		elif not ObL and nObj:
 			ObL = [O(None,None,size3D=None) for x in range(nObj)]
-		Scn.PopulateScene(ObList=ObL,ResetCam=True,RaiseError=True,nIter=100,EdgeDist=EdgeDist,ObOverlap=ObOverlap)
+		Scn.populate_scene(ObList=ObL,ResetCam=True,RaiseError=True,nIter=100,EdgeDist=EdgeDist,ObOverlap=ObOverlap)
 		if bvp.Is_Blender:
 			RO = bvp.RenderOptions()
 			Scn.Create(RO)

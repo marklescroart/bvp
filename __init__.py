@@ -35,6 +35,7 @@ import json
 import math
 import subprocess
 
+# We can lose this now. Not necessary; blender now ships with Numpy.
 try:
 	import numpy as np
 	Is_Numpy = True
@@ -124,7 +125,12 @@ def blend(script,blend_file=None,is_local=True,tmpdir='/tmp/',**kwargs):
 		# To do (?) 
 		# - Use subprocess.Popen and PIPE instead of writing temp script? 
 		# - check output for error?
-		subprocess.call(blender_cmd)
+		proc = subprocess.Popen(blender_cmd,
+			stdin=subprocess.PIPE,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.PIPE)
+		stdout,stderr = proc.communicate()
+		return stdout,stderr
 	else:
 		# Call via cluster
 		if Verbosity_Level>3:

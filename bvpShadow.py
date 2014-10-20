@@ -2,7 +2,7 @@
 
 # Imports.
 import os,types,bvp
-from bvp.utils.blender import AddGroup
+from bvp.utils.blender import add_group
 #import logger
 # Blender imports
 if bvp.Is_Blender:
@@ -55,7 +55,7 @@ class bvpShadow(object):
 		if self.grpName:
 			# Add group of mesh object(s)
 			fDir,fNm = os.path.split(self.parentFile)
-			ShOb = AddGroup(fNm,self.grpName,fDir)
+			ShOb = add_group(self.grpName,fNm,fDir)
 		if not Scale is None:
 			if bvp.Verbosity_Level >3:
 				print('Resizing shadow...')

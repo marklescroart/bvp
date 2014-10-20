@@ -1,12 +1,20 @@
 '''
 .B.lender .V.ision .P.roject utils for functions to be used within Blender
 (at Blender command line or in scripts run through Blender)
-
 '''
 
-import os,random,subprocess,bvp,copy
+import os
+import random
+import subprocess
+import warnings
+# import bvp seems like bad practice. 
+# Only here for global (package-wide) variables, 
+# e.g. verbosity_level, is_blender. REMOVE.
+import bvp 
+import copy
+import re
 import math as bnp
-from bvp.utils.bvpMath import circ_dst
+from .bvpMath import circ_dst # 
 
 if bvp.Is_Blender:
 	import bpy
@@ -34,19 +42,19 @@ def xyz2constr(xyz,ConstrType,originXYZ=(0.,0.,0.)):
 	return Out
 
 def GetConstr(Grp,LockZtoFloor=True): #self,bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
-	'''
-	Usage: camConstr,obConstr = GetConstr(Grp)
-
-	Get constraints on object / camera position associated with a particular 
-	BG group within a .blend file.
+	'''Get constraints on object & camera position for a particular background
 	
+	Parameters
+	----------
+
+
 	* Camera constraints must have "cam" in their name
 	* Object constraints must have "ob" in their name
 
 	For Cartesian (XYZ) constraints: 
 	* Empties must have "XYZ" in their name
 	Interprets empty cubes as minima/maxima in XYZ
-	interprets empty spheres as means/stds in XYZ (not possible to have 
+	Interprets empty spheres as means/stds in XYZ (not possible to have 
 	non-circular Gaussians as of 2012.02)
 
 	For polar (rho,phi,theta) constraints:
@@ -165,11 +173,22 @@ def GetConstr(Grp,LockZtoFloor=True): #self,bgLibDir='/auto/k6/mark/BlenderFiles
 			toAppend = toAppend[0]
 		Out.append(toAppend)
 	return Out
-def GetScene(Num,Scn=None,Lib=None):
-	"""
-	Gets the Sky, objects, and shadows of the current scene for saving in a BVPscene
-	Must provide "Num" argument (0-FIRST INDEX FOR THE SCENE IN THE SCENE LIST). The
-	resultant file name will be 'Sc%04d_##'%(Num+1)
+
+def GetScene(*args,**kwargs):
+	warnings.warn("Deprecated! use get_scene()")
+	S = get_scene(*args,**kwargs)
+	return S
+def get_scene(num,Scn=None,Lib=None):
+	"""Gathers all elements present in a blender scene into a bvpScene.
+
+	Gets the background, objects, sky, shadows, and camera of the current scene
+	for saving in a BVPscene. 
+	
+	Parameters
+	----------
+	num : int
+		0-first index for scene in scene list. (Sets render path for scene to be 'Sc%04d_##'%(Num+1))
+
 	"""
 	if not Scn:
 		Scn = bpy.context.scene
@@ -289,18 +308,23 @@ def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 		a.fcurves[iXYZ].extrapolation = 'CONSTANT'
 	return a
 
-def SetUpGroup(ObList=None,Scn=None):
-	'''
-	Usage: SetUpGroup(ObList=None,Scn=None)
-	
-	Set a group of objects to canonical position (centered, facing forward, max dimension = 10)
-	Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
-	box, irrespective of the object's origin) Origins are set to (0,0,0) as well.
+def SetUpGroup(*args,**kwargs):
+	warings.warn("Deprecated! Use set_up_group() instead!")
+	set_up_group(*args,**kwargs)
 
-	WARNING: NOT SUPER RELIABLE. There is a great deal of variability in the way in which 3D model 
-	objects are stored in the myriad free 3D sites online; thus a GREAT MANY conditional statements
+def set_up_group(ObList=None,Scn=None):
+	'''Creates a group of Blender objects and standardizes the size.
+
+	Set a group of objects to canonical position (centered, max dimension = 10)
+	Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
+	box (maximal extent of vertices, irrespective of the object's origin) 
+
+	Origins of all objects are set to (0,0,0).
+
+	WARNING: NOT NECESSARILY RELIABLE. There is a great deal of variability in the way in which 3D 
+	models are stored in the myriad free 3D sites online; thus a GREAT MANY conditional statements
 	would be necesary to have a reliably working function. If you want to write such a function, 
-	be my guest. This works... OK. In many cases. Use with caution. ML
+	be my guest. In the meantime, use with caution. 
 	
 	ML 2011.10.25
 	'''
@@ -327,15 +351,15 @@ def SetUpGroup(ObList=None,Scn=None):
 	np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
 	if p:
 		for o in np:
-			GrabOnly(o)
+			grab_only(o)
 			bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
 			if 'ChildOf' in o.constraints.keys():
 				o.constraints.remove(o.constraints['ChildOf'])
 	
 	# SECOND: Reposition all object origins 
-	(MinXYZ,MaxXYZ) = GetGroupBoundingBox(ObList)
+	(MinXYZ,MaxXYZ) = get_group_bounding_box(ObList)
 	BotMid = [(MaxXYZ[0]+MinXYZ[0])/2,(MaxXYZ[1]+MinXYZ[1])/2,MinXYZ[2]]
-	SetCursor(BotMid)
+	set_cursor(BotMid)
 	
 	SzXYZ = []
 	for Dim in range(3):
@@ -347,7 +371,7 @@ def SetUpGroup(ObList=None,Scn=None):
 		print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size,ScaleF,max(SzXYZ)))
 	
 	for o in ObList:
-		GrabOnly(o)
+		grab_only(o)
 		bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 		o.scale = o.scale * ScaleF
 		o.location = ToSet_Loc
@@ -355,7 +379,7 @@ def SetUpGroup(ObList=None,Scn=None):
 	Scn.update()
 	# Re-parent everything
 	for o in np:
-		GrabOnly(p)
+		grab_only(p)
 		o.select = True
 		bpy.ops.object.parent_set()
 	# Create group (if necessary) and name group
@@ -375,8 +399,9 @@ def AddSelectedToGroup(gNm):
 		G.objects.link(o)
 
 def GetScenesToRender(SL):
-	'''
-	Check on which scenes within a scene list have already been rendered.
+	'''Check on which scenes within a scene list have already been rendered.
+
+	DEPRECATED?? Overlapping in function with something else? 
 	'''
 	# Get number of scenes to render in one job:
 	RenderGrpSize = SL.RenderOptions.BVPopts['RenderGrpSize']
@@ -433,6 +458,9 @@ def RemoveActionFromMemory(ActionName):
 	bpy.data.actions.remove(Act)
 
 def SetLayers(Ob,LayerList):
+	warnings.warn('Deprecated! Use set_layers instead!')
+	set_layers(Ob,LayerList)
+def set_layers(Ob,LayerList):
 	''' 
 	Convenience function to set layers. Note that active layers affect what will be selected with bpy select_all commands. 
 	Ob = blender object data structure
@@ -445,21 +473,28 @@ def SetLayers(Ob,LayerList):
 	for L in LayerList:
 		LL[L] = True
 	LL = tuple(LL)
-	GrabOnly(Ob)
+	grab_only(Ob)
 	bpy.ops.object.move_to_layer(layers=LL)
-	
-def GetCursor():
+
+def GetCursor():	
+	warings.warn("Deprecated! Use get_cursor() instead!")
+	return get_cursor()
+def get_cursor():
 	'''Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
 
 	Returns
 	-------
-	CursorPos : 
+	CursorPos : blender Vector
+		X,Y,Z location of 3D cursor
 	'''
 	# Now this is some serious bullshit. Look where Blender hides the cursor information. Just look.
 	V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
 	return V.spaces[0].cursor_location
-	
+
 def SetCursor(CursorPos):
+	warings.warn("Deprecated! Use set_cursor() instead!")
+	set_cursor(CursorPos)
+def set_cursor(CursorPos):
 	'''Sets 3D cursor to specified location in VIEW_3D window
 
 	Useful to have a function for this because there is an irritatingly
@@ -474,6 +509,9 @@ def SetCursor(CursorPos):
 	V.spaces[0].cursor_location=CursorPos
 
 def GrabOnly(Ob):
+	warnings.warn('Deprecated! use grab_only()')
+	grab_only(Ob)
+def grab_only(Ob):
 	'''Selects the input object `Ob` and and deselects everything else
 
 	Inputs
@@ -486,12 +524,7 @@ def GrabOnly(Ob):
 	bpy.context.scene.objects.active = Ob
 
 def GetMeOb(Scn=None,Do_Select=True):
-	'''
-	Usage: MeOb = GetMeOb(Scn=bpy.context.scene,Do_Select=True)
-	
-	Returns a list of - and optionally, selects - all mesh objects in a scene
-	
-	2011.05 ML
+	'''Returns a list of - and optionally, selects - all mesh objects in a scene
 	'''
 	if Scn is None:
 		Scn = bpy.context.scene
@@ -531,13 +564,13 @@ def CommitModifiers(ObList,mTypes=['Mirror','EdgeSplit']):
 		Mods = [x for x in mTypes if x in PossMods]
 		for mf in Mods:
 			if mf in o.modifiers.keys():
-				GrabOnly(o)
+				grab_only(o)
 				m = o.modifiers[mf]
 				#m.show_viewport = True # Should not be necessary - we don't want to commit any un-shown modifiers
 				print("Applying %s modifier to %s"%(mf,o.name))	
 				bpy.ops.object.modifier_apply(modifier=m.name)
 		if 'Subsurf' in o.modifiers.keys() and 'Subsurf' in mTypes:
-			GrabOnly(o)
+			grab_only(o)
 			m = o.modifiers['Subsurf']
 			m.show_viewport = True 
 			m.levels = m.render_levels
@@ -549,68 +582,6 @@ def CommitModifiers(ObList,mTypes=['Mirror','EdgeSplit']):
 				print("Applying Subsurf modifier to %s"%(o.name))
 			bpy.ops.object.modifier_apply(modifier=m.name)
 
-def RepositionObject(Ob,Pos):
-	'''
-	Usage: RepositionObject(Ob,Pos)
-	
-	Set scale, position, and rotation of an object.
-	
-	Note that position refers to the BOTTOM, CENTER of the object (defined by the  bounding box, irrespective of the object's origin)
-	Pos is: [Size (scalar, for largest dimension)
-			 Position (tuple, (X,Y,Z) location
-			 Rotation (scalar, ** Z rotation only **, in degrees, from imported orientation)]
-	
-	UPDATE: Not necessary if objects have center properly positioned (at center bottom). Deprecated, may be killed in future code revisions.
-	
-	ML 2011.05.31
-	'''
-	bvp.Verbosity_Level > 3
-	Scn = bpy.context.scene # (NOTE: think about making this an input!)
-	ToSet_Size = Pos[0]
-	ToSet_Loc = Pos[1]
-	ToSet_Rot = Pos[2]
-	# FIRST: SCALE
-	(MinXYZ,MaxXYZ) = GetGroupBoundingBox(Ob)
-	SzXYZ = list()
-	for Dim in range(3):
-		SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
-	#print(SzXYZ)
-	if not ToSet_Size==max(SzXYZ):
-		ScaleF = ToSet_Size/max(SzXYZ)
-	if bvp.Verbosity_Level > 3:	
-		print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size,ScaleF,max(SzXYZ)))
-	Ob.scale = Ob.scale * ScaleF
-	# Alternative with crappy context-based commands:
-	# bpy.ops.object.select_all(action='DESELECT')
-	# bpy.ops.object.select_name(name=Ob.name)
-	# bpy.ops.transform.resize(value=(ScaleF,ScaleF,ScaleF))
-
-	Scn.update()
-	# SECOND: POSITION
-	Ob.location = ToSet_Loc
-	# Alternative with crappy context-based commands:
-	# bpy.ops.object.select_all(action='DESELECT')
-	# bpy.ops.object.select_name(name=Ob.name)
-	# bpy.ops.transform.translate(value=NewLoc-Ob.location)
-	Scn.update()
-	
-	# THIRD: SETTING ROTATION
-	if bvp.Verbosity_Level > 3:	
-		print('Setting rotation to %.2f, %.2f, %.2f'%(ToSet_Rot[0],ToSet_Rot[1],ToSet_Rot[2]))
-	# Rotate X, Y, Z in that order - this is SKETCH, should probably be a rotation matrix.
-	Ob.rotation_euler = ToSet_Rot
-	Scn.update()
-
-	# POSITION, EXTRA - SET BASE EVEN WITH SPECIFIED POSITION
-	(MinXYZ,MaxXYZ) = GetGroupBoundingBox(Ob)
-	#bpy.ops.object.select_all(action='DESELECT')
-	#bpy.ops.object.select_name(name=Ob.name)
-	if MinXYZ[2]<ToSet_Loc[2]:
-		Ob.location[2] = Ob.location[2] - MinXYZ[2]
-		# bpy.ops.transform.translate(value=(0,0,-MinXYZ[2]))
-	#bpy.ops.object.select_all(action='DESELECT')
-	#bpy.ops.object.select_name(name=Ob.name)
-	GrabOnly(Ob)
 
 def getVoxelizedVertList(obj,size=10/96.,smooth=1,fNm=None,showVox=False):
 	'''
@@ -734,48 +705,30 @@ def getVoxelizedVertList(obj,size=10/96.,smooth=1,fNm=None,showVox=False):
 		print('getVoxelizedVertList took %d mins, %.2f secs'%divmod((t1-t0),60))
 	return verts,norms
 
-def ParToChildOfConstr(ScnAll):
-	'''
-	Changes all "Parent" relationships to "ChildOf" constraints. 
-	
-	NOT USED / NECESSARY as of 2011.10.18, but kept around anyway...
-	
-	'''
-	#ScnAll = bpy.data.scenes
-	for Scn in ScnAll:
-		if 'BaseScene' in Scn.name:
-			continue
-		print('--- Scene %s ---'%(Scn.name))
-		Ob = Scn.objects
-		NoPar = [x for x in Ob if x.parent==None]
-		#print(list(Ob))
-		for o in Ob:
-			if o.parent:
-				bpy.ops.object.select_name(name=o.name)
-				Par = o.parent # Save parent object
-				bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
-				print('replacing relationship of %s to %s with Child-Of'%(o.name,Par.name))
-				o.constraints.new(type='CHILD_OF')
-				o.constraints['ChildOf'].target = Par
-				# Potentially dodgy:
-				bpy.ops.constraint.childof_set_inverse(constraint='ChildOf')
-
 def GetGroupBoundingBox(ObList):
-	'''
-	Usage: (MinXYZ,MaxXYZ) = GetGroupBoundingBox(ObList)
-	
-	Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
-		
-	Created by ML 2011.05
+	warnings.warn("Deprecated! Use get_group_bounding_box() instead!")
+	return get_group_bounding_box(ObList)
+def get_group_bounding_box(ObList):
+	'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
+
+	Parameters
+	----------
+	ObList : list or tuple 
+		list of Blender objects for which to get bounding box
+
+	Returns
+	-------
+	minxyz,maxxyz : lists
+		min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
+		more standard format for a bounding box. 
 	'''
 	BBx = list()
 	BBy = list()
 	BBz = list()
-	if not isinstance(ObList,type(['I am a list'])):
+	if not isinstance(ObList,(list,tuple)):
 			ObList = [ObList]
 	for ob in ObList: 
-		bpy.ops.object.select_all(action='DESELECT')
-		ob.select = True
+		grab_only(ob)
 		if ob.type in ['MESH','LATTICE','ARMATURE']:
 			bpy.ops.object.transform_apply(rotation=True)
 		for ii in range(8):
@@ -785,9 +738,53 @@ def GetGroupBoundingBox(ObList):
 			#bpy.ops.mesh.primitive_uv_sphere_add(location=[BBx[ii],BBy[ii],BBz[ii]])
 	MinXYZ = [min(BBx),min(BBy),min(BBz)]
 	MaxXYZ = [max(BBx),max(BBy),max(BBz)]
-	#print('Min/max y = %.2f,%.2f'%(min(BBy),max(BBy)))
-	#print('Min/max z = %.2f,%.2f'%(min(BBz),max(BBz)))
+	# 
 	return MinXYZ,MaxXYZ
+
+def add_img_material(name,imfile,imtype):
+	"""Add a texture containing an image to Blender.
+
+	Is this optimal? May require different materials/textures w/ different uv mappings 
+	to fully paint all the shit in a scene. Better to just load an image?
+
+	Parameters
+	----------
+	name : string
+		Name of texture to be added. Blender image object will be called <name>,
+		Blender texture will be called <name>_tex, and Blender material will be 
+		<name>_mat
+	imfile : string
+		full path to movie or image to add
+	imtype : string
+		one of : 'sequence','file','generated','movie'
+	"""
+	# Load image
+	from bpy_extras.image_utils import load_image
+	img = load_image(imfile)
+	img.source = imtype.upper()
+	# Link image to new texture 
+	tex = bpy.data.textures.new(name=name+'_image',type='IMAGE')
+	tex.image = img
+	if imtype.upper()=='MOVIE':
+		tex.image_user.use_cyclic = True
+		bpy.ops.image.match_movie_length()
+	# Link texture to new material
+	mat = bpy.data.materials.new(name=name)
+	mat.texture_slots.create(0)
+	mat.texture_slots[0].texture = tex
+	return mat
+def set_material(proxy_ob,mat):
+	"""Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
+	for g in proxy_ob.dupli_group.objects:
+		grab_only(proxy_ob)
+		if not g.type=='MESH':
+			continue
+		bpy.ops.object.proxy_make(object=g.name)
+		o = bpy.context.object
+		for ms in o.material_slots:
+			ms.material = mat
+		# Get rid of proxy now that material is set
+		bpy.context.scene.objects.unlink(o)
 
 def new_scene(scene_name=None):
 	"""Create new named scene, return scene object. 
@@ -803,77 +800,107 @@ def new_scene(scene_name=None):
 		new_scn.name = scene_name
 	return new_scn
 
-def get_collada_action(fnm,act_name=None,scn=None):
+def set_scene(scene_name=None):
+	"""Sets all blender screens in an open Blender session to scene_name
+	"""
+	if scene_name is None:
+		Scn = bpy.context.scene
+	else:
+		SL = [s.name for s in bpy.data.scenes]
+		if scene_name in SL:
+			Scn = bpy.data.scenes[scene_name]
+			for scr in bpy.data.screens:
+				scr.scene = Scn
+		else:
+			Scn = new_scene(scene_name)
+	return Scn
+def apply_action(target_object,action_file,action_name):
+	""""""
+	pass
+	# (character must already have been imported)
+	# import action & armature from action_file
+	# get list of matching bones
+	# for all matching bones, apply (matrix? position?) of first frame
+
+def get_collada_action(collada_file,act_name=None):
 	"""Imports an armature and its associated action from a collada (.dae) file.
 
-	Also rescales the armature to be 
+	Imports armature and rescales it to be standard Blender size (when the armature 
+	is in a basic T pose)
+
 
 	Inputs
 	------
-	input_name : string
+	collada_file : string filename
 		file name from which to import action(s)(?). 
 	act_name : string
 		name for action to create
-	scn : string (name of scene) or bpy.data.scenes object
-		Scene to which the armature for the action should be linked (this is
-		just for housekeeping so that when files are opened, their contents
-		will be clearer to human users).
 	"""
+	# Work in a new scene
+	scn = new_scene(scene_name=act_name)
 	# Get list of extant actions, objects
 	ext_act = [a.name for a in bpy.data.actions]
 	ext_obj = [o.name for o in bpy.data.objects]
 
 	# Import new armature
-	bpy.ops.wm.collada_import(filepath=fnm)
+	bpy.ops.wm.collada_import(filepath=collada_file)
 	
 	# Find new object	
 	arm_ob = [o for o in bpy.data.objects if isinstance(o.data,bpy.types.Armature) and not o.name in ext_obj]
 	if len(arm_ob)>1:
 		# Perhaps more subtlety will be required
-		raise Exception("WTF! TOO MANY NEW ARMATURES!")
-	else:
-		arm_ob = arm_ob[0]
-	# Rename armature object, armature, bones
-	arm_ob.name = act_name+'_armature_ob'
-	arm_ob.data.name = act_name+'_armature'
-	for b in arm_ob.data.bones:
-		xx = re.search('_',b.name).start()
-		b.name = act_name+b.name[xx:]
+		from pprint import pprint
+		print('=========================================')
+		print('Multiple armatures found for %s:'%act_name)
+		pprint('New armatures:')
+		pprint(arm_ob)
+		print('=========================================')
+		#raise Exception("WTF! TOO MANY NEW ARMATURES!")
+		# Skip error, just go with it:
+		#arm_ob = arm_ob[0]
+		# Rename armature object, armature, bones
+	# else:
+	# 	arm_ob = arm_ob[0]
+	# 	# Used to be outside if/else	
+	# 	# Rename armature object, armature, bones
+	# 	arm_ob.name = act_name+'_armature_ob'
+	# 	arm_ob.data.name = act_name+'_armature'
+	# 	for b in arm_ob.data.bones:
+	# 		xx = re.search('_',b.name).start()
+	# 		b.name = act_name+b.name[xx:]
+	for iao,ao in enumerate(arm_ob):
+		ao.name = act_name+'_%d_armature_ob'%iao
+		ao.data.name = act_name+'_%d_armature'%iao
+		if not ao.data.bones is None:
+			for b in ao.data.bones:
+				#print(b.name)
+				grp = re.search('_',b.name)
+				if not grp is None:
+					xx = grp.start()+1
+				else:
+					xx = 0
+				b.name = b.name[xx:]
+				#print(b.name)
 	
 	# Find new action
 	arm_act = [a for a in bpy.data.actions if not a.name in ext_act]
 	if len(arm_act)>1:
 		# Perhaps more subtlety will be required
-		raise Exception("WTF! TOO MANY NEW ACTIONS!")
+		#raise Exception("WTF! TOO MANY NEW ACTIONS!")
+		print('Keeping first action only!')
+		arm_act = arm_act[0]
 	else:
 		arm_act = arm_act[0]
 	# Rename new action
 	arm_act.name = act_name
 
-	# Adjust size to standard 10 units, IF standing straight up in T pose.
-
-	# Get T pose for standard mesh from library...
-	
-	# Get scale factor
-	
-	# put back original action
-
-	# Rescale
-
-	# Link to scene, for clarity? 
-	if not scn is None:
-		bpy.context.scene.unlink(arm_ob)
-		if isinstance(scn,(str,unicode)):
-			if scn in bpy.data.scenes:
-				# Check for existence of scene
-				scn = bpy.data.scenes[scn]
-			else:
-				# Create new scene
-				scn = new_scene(scn)
-		scn.link(arm_ob)
+	# Adjust size to standard 10 units (standing straight up in rest pose)
+	arm_ob.data.pose_position = "REST"
+	set_up_group()
+	arm_ob.data.pose_position = "POSE"
 
 ###########################################################
-### --- 	Adding Stuff, library manipulation  	--- ###
+### ---       Adding BVP elements to a scene        --- ###
 ###########################################################
 
 def AddCameraWithTarget(Scn=None,CamName='CamXXX',CamPos=[25,-25,5],FixName='CamTarXXX',FixPos=[0.,0.,0.],Lens=50.,Clip=(.1,300.)):
@@ -897,7 +924,7 @@ def AddCameraWithTarget(Scn=None,CamName='CamXXX',CamPos=[25,-25,5],FixName='Cam
 	Fix.empty_draw_size = .33
 	Fix.name = FixName
 	# Add camera constraint
-	GrabOnly(Cam)
+	grab_only(Cam)
 	bpy.ops.object.constraint_add(type='TRACK_TO')	
 	bpy.ops.object.constraint_add(type='TRACK_TO')
 	Cam.data.lens = Lens
@@ -910,18 +937,20 @@ def AddCameraWithTarget(Scn=None,CamName='CamXXX',CamPos=[25,-25,5],FixName='Cam
 	Cam.constraints[1].track_axis = 'TRACK_NEGATIVE_Z'
 	Cam.constraints[1].up_axis = 'UP_Y'	
 
-def AddLamp(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Scenes/'):
-	'''
-	Usage: AddLamp(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'Scenes/'):
-	Add all the lamps and world settings from a given file to the current .blend file.
+def AddLamp(fname, scname, fPath=bvp.Settings['Paths']['LibDir']+'/Scenes/'):
+	'''Add all the lamps and world settings from a given file to the current .blend file.
+
 	Relies on ML's file structure (see ML notes on file structure in overall document)
 
-	Inputs:
-	fName = .blend file name (including .blend extension)
-	ScName = name of scene within file to import lamps/world from
-	fPath = path to directory with all .blend files in it
+	Parameters
+	----------
+	fname : string
+		.blend file name (including .blend extension)
+	scname : string
+		name of scene within file to import lamps/world from
+	fPath : string
+		path to directory with all .blend files in it
 
-	Created by ML 2011.06
 	''' 
 	# PERMISSIBLE TYPES OF OBJECTS TO ADD:
 	AllowedTypes = ['LAMP']	# No curves for now...'CURVE',
@@ -932,9 +961,9 @@ def AddLamp(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Scenes/'):
 	ScnListOld = [s.name for s in bpy.data.scenes]
 	# APPEND SCENE CONTAINING LAMPS TO BE ADDED
 	bpy.ops.wm.link_append(
-		directory=fPath+fName+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
-		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
-		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
+		directory=fPath+fname+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
+		filepath="//"+fname+"\\Scene\\"+scname, # local filepath within .blend file to the scene to be imported
+		filename=scname, # "filename" being the name of the data block, i.e. the name of the scene.
 		link=False,
 		relative_path=False,
 		autoselect=True)
@@ -959,254 +988,89 @@ def AddLamp(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Scenes/'):
 		L.select = True
 	return LampOut
 
-def GetGroups(LibDir,Type):
-	'''
-	OBSOLETE wit new (ver 0.9907+) bvpLibrary??
+def add_action(action_name,fname,fPath=bvp.Settings['Paths']['LibDir']+'/Actions/'):
+	'''Import an action into the current .blend file
 
-	Usage: GrpFiles, GrpList = GetGroups(LibDir,Type)
-	
-	Gets a list of the files of type "Type" in directory "LibDir", as well as 
-	groups (whole objects / scenes / lighting arrangements, whatever) within those files.
-	
-	Type can be "Object" (objects) ,"BG" (backgrounds/floors/shadows), "Sky" (case doesn't matter)
-	
 	'''
-	Type = Type.lower()
-	if Type=='object':
-		S = 'Category'
-	elif Type=='bg':
-		S = 'Category_BG'
-	elif Type=='sky':
-		S = 'Category_Skies'
+	if action_name in bpy.data.actions:
+		# Group already exists in file, for whatever reason
+		print('Action already exists!')
 	else:
-		print(GetGroups.__doc__)
-		raise Exception("SHEEEIT you done fucked up... Please supply a correct type.")
+		bpy.ops.wm.link_append(
+			directory=os.path.join(fPath,fname)+"\\Action\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+			filepath="//"+fname+"\\Action\\"+action_name, # local filepath within .blend file to the scene to be imported
+			filename=action_name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
+			link=True,
+			relative_path=False,
+			autoselect=True)
+	a = bpy.data.actions[action_name]
+	return a
+
+def add_group(grpName, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
+	'''Add a proxy object for a Blender group to the current scene.	
+
+	Add a group of Blender objects (all the parts of a single object, most likely) from another 
+	file to the current scene. 
+
+	Parameters
+	----------
+	fname : string
+		.blend file name (including .blend extension)
+	grpName : string
+		Name of group to import 
+	fPath : string
+		Path of directory in which .blend file resides
 	
-	ObFiles = [f for f in os.listdir(LibDir) if (S in f) and (f[-6:]=='.blend')]
-	GrpList = list() # Object identifiers
-	Ct = 0;
-	for ObF in ObFiles:
-		fp = os.path.join(LibDir,ObF)
-		with bpy.data.libraries.load(fp) as (ToAdd,CurrScn): 
-			TmpList = [s for s in ToAdd.groups]
-			TmpList.sort()
-			GrpList.append(TmpList); 
-	return ObFiles, GrpList
-
-def AddObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
-	# GET RID OF THIS os.getenv shit. Cutesy. Useless.
-	'''
-	Usage: AddObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
-	Add the (single) object in a given scene of a given file to the current .blend file.
-	Relies on ML's file structure (see ML notes on file structure in overall document)
-
-	Inputs:
-	fName = .blend file name (including .blend extension)
-	ScName = name of scene within file to import object from
-	PosInfo = Position info: [ScaleTo,LocNumber,RotZ*]
-	* Only Z for now
-	fPath = path to directory with all .blend files in it
-	
-	Counts objects currently in scene and increments count...
-	
-	Created by ML 2011.05        
-	''' 
-	# PERMISSIBLE TYPES OF OBJECTS TO ADD:
-	AllowedTypes = ['MESH','ARMATURE','LATTICE']	# No curves for now...'CURVE',
-	# ... but we cannot currently add these guys:
-	DisallowedTypes	= ['ARMATURE','CURVE','LATTICE']# ESTABLISH SCENE TO WHICH STUFF MUST BE ADDED, STATE OF .blend FILE
-	Scn = bpy.context.scene # (NOTE: think about making this an input!)
-	MeOb = GetMeOb(Scn,False)
-	ObCt = len(MeOb)+1
-	ScnNum = len(bpy.data.scenes)
-	ScnListOld = [s.name for s in bpy.data.scenes]
-	# APPEND SCENE CONTAINING "OBJECT" TO BE ADDED
-	# Note that "OBJECT" is in quotes because it may be a composite object, composed of several different Blender objects (i.e., parts of the object may be modeled separately). All objects should have a single parent, though.
-	bpy.ops.wm.link_append(
-		directory=os.path.join(fPath,fName)+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
-		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
-		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
-		link=False,
-		relative_path=False,
-		autoselect=True)
-	ScnListNew = [s.name for s in bpy.data.scenes]
-	nScn = [s for s in ScnListNew if not s in ScnListOld]
-	print('nScn = ')
-	print(nScn)
-	nScn = bpy.data.scenes[nScn[0]]
-
-	# PRE-FIRST: Change all parented relationships to new (Blender 2.5) Child-of constraints
-	#bpy.ops.object.constraint_add(type='CHILD_OF')	
-	#NoPar = [x for x in Ob if x.parent==None]
-	#bpy.ops.object.constraint_add(type='CHILD_OF')
-	Ob = [o for o in nScn.objects if (o.type in AllowedTypes) and (not 'NoRender' in o.name)]
-	#if any([nono in [o.type for o in nScn.objects] for nono in DisallowedTypes]):
-	#	print('Found a disallowed type! (armature, curve, Crap!')
-	#	NoPar = [x for x in Ob if x.parent==None]
-	#	raise Exception('More than one master object present in scene!')
-	#else:
-	NoPar = [x for x in Ob if not 'ChildOf' in [c.name for c in x.constraints]]
-	if len(NoPar)>1:
-		NoPar = [x for x in Ob if x.parent==None]
-		# Try second way: 	
-		if len(NoPar)>1:
-			raise Exception('More than one master object present in scene!')#	# Special case: Armatures
-#	if 'ARMATURE' in [o.type for o in nScn.objects]:
-#		print('Found an armature! Crap!')
-#		NoPar = [x for x in Ob if x.parent==None]
-#	else:
-#		NoPar = [x for x in Ob if not 'ChildOf' in [c.name for c in x.constraints]]
-#	if len(NoPar)>1:		
-#		raise Exception('More than one master object present in scene!')
-
-	ObOut = list()
-	# Make parent / master object the first object in the list:	
-	PartCt = 1
-	#ObNm = 's%so%02dp%02d'%(Scn.name,ObCt)#,PartCt)
-	#NoPar[0].name = ObNm
-	Scn.objects.link(NoPar[0])
-	ObOut.append(NoPar[0])
-	Ob.remove(NoPar[0])
-	PartCt += 1
-	for o in Ob:
-		#ObNm = 's%03do%02d'%(ScnNum,ObCt)#,PartCt)
-		#o.name = ObNm
-		# --- #
-		# Re-set parenting here?? 
-		# --- #
-		Scn.objects.link(o)
-		ObOut.append(o)
-		PartCt += 1
-	Scn.update()
-	bpy.data.scenes.remove(nScn)
-	bpy.ops.object.select_all(action = 'DESELECT')
-	for o in ObOut:
-		o.select = True
-	return ObOut
-def AddGroup(fName, GrpName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
-	'''
-	Usage: AddGroup(fName, GrpName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
-	
-	Add a group of objects (all the parts of a single object, most likely) from another 
-	file to the current .blend file. Relies on ML's file structure (see ML notes on file 
-	structure in overall document)
-
-	Inputs:
-	fName = .blend file name (including .blend extension)
-	GrpName = name of group to import 
-	fPath = path to directory with all .blend files in it
-	
-	Counts objects currently in scene and increments count...
-
-	Created by ML 2011.05        
+	Notes
+	-----
+	Counts objects currently in scene and increments count.
 	''' 
 
-	if GrpName in bpy.data.groups:
+	if grpName in bpy.data.groups:
+		# Group already exists in file, for whatever reason
 		print('Found group! adding new object...')
-		bpy.ops.object.add() # Add empty
+		# Add empty
+		bpy.ops.object.add() 
+		# Fill empty with dupli-group object of desired group
 		G = bpy.context.object
 		G.dupli_type = "GROUP"
-		G.dupli_group = bpy.data.groups[GrpName]
-		G.name = GrpName
+		G.dupli_group = bpy.data.groups[grpName]
+		G.name = grpName
 	else:
 		print('Did not find group! adding...')
 		bpy.ops.wm.link_append(
-			directory=os.path.join(fPath,fName)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-			filepath="//"+fName+"\\Group\\"+GrpName, # local filepath within .blend file to the scene to be imported
-			filename=GrpName, # "filename" being the name of the data block, i.e. the name of the group
+			directory=os.path.join(fPath,fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+			filepath="//"+fname+"\\Group\\"+grpName, # local filepath within .blend file to the scene to be imported
+			filename=grpName, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
 			link=True,
 			relative_path=False,
 			autoselect=True)
 		G = bpy.context.object
 	return G
-	
-def AddJoinedObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
-	'''
-	Usage: AddJoinedObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
-	Add the (single) object in a given scene of a given file to the current .blend file.
-	Relies on ML's file structure (see ML notes on file structure in overall document)
+def meshify(ob):
+	"""
+	Create a single (water-tight?) mesh from a multi-mesh group
+	"""
+	raise NotImplementedError('Not yet!')
+	# Select object
+	grab_only(ob)
+	# Prep list of new objects to be joined later
+	new_obs = []
+	for oo in list(ob.dupli_group.objects):
+		try:
+			grab_only(o)
+			bpy.ops.object.proxy_make(object=oo.name)
+			N = bpy.context.object
+			# Apply all modifiers in stack? 
 
-	Inputs:
-	fName = .blend file name (including .blend extension)
-	ScName = name of scene within file to import object from
-	fPath = path to directory with all .blend files in it
-	
-
-	Created by ML 2011.05        
-	''' 
-	bvp.Verbosity_Level > 3
-	# This is shitty - should be an input
-	ScnNum = len(bpy.data.scenes)
-	# PERMISSIBLE TYPES OF OBJECTS TO ADD:
-	# (That is, we WANT to be able to add these guys: )
-	AllowedTypes = ['MESH','ARMATURE','CURVE','LATTICE']
-	# ... but we cannot currently add these guys:
-	DisallowedTypes	= ['ARMATURE','CURVE','LATTICE']
-	# ESTABLISH SCENE TO WHICH STUFF MUST BE ADDED, STATE OF .blend FILE
-	Scn = bpy.context.scene # (NOTE: think about making this an input!)
-	MeOb = GetMeOb(Scn,False)
-	# This is shitty too - should be an input ???
-	ObCt = len(MeOb)+1
-	ScnListOld = [s.name for s in bpy.data.scenes]
-	# APPEND SCENE CONTAINING "OBJECT" TO BE ADDED
-	# Note that "OBJECT" is in quotes because it may be a composite object, composed of several different Blender objects (i.e., parts of the object may be modeled separately). All objects should have a single parent, though.
-	bpy.ops.wm.link_append(
-		directory=fPath+fName+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
-		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
-		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
-		link=False,
-		relative_path=False,
-		autoselect=True)
-	ScnListNew = [s.name for s in bpy.data.scenes]
-	nScn = [s for s in ScnListNew if not s in ScnListOld]
-	nScn = bpy.data.scenes[nScn[0]]
-
-	Ob = [o for o in nScn.objects if (o.type in AllowedTypes) and (not 'NoRender' in o.name)]
-	# Special case: Armatures
-	if any([nono in [o.type for o in nScn.objects] for nono in DisallowedTypes]):
-		print('Found a disallowed type! (armature, curve, Crap!')
-		NoPar = [x for x in Ob if x.parent==None]
-		raise Exception('More than one master object present in scene!')
-	else:
-		NoPar = [x for x in Ob if not 'ChildOf' in [c.name for c in x.constraints]]
-	if len(NoPar)>1:
-		NoPar = [x for x in Ob if x.parent==None]
-		# Try second way: 	
-		if len(NoPar)>1:
-			raise Exception('More than one master object present in scene!')
-
-	ObOut = list()
-	# Make parent / master object the first object in the list:	
-	PartCt = 1
-	ObNm = 's%04do%02d'%(ScnNum,ObCt) #,PartCt)
-	NoPar[0].name = ObNm
-	Scn.objects.link(NoPar[0])
-	ObOut.append(NoPar[0])
-	Ob.remove(NoPar[0])
-	PartCt += 1
-	for o in Ob:
-		#ObNm = 's%so%02dp%02d'%(Scn.name[2:5],ObCt,PartCt)
-		#o.name = ObNm
-		# --- #
-		# Re-set parenting here?? 
-		# --- #
-		Scn.objects.link(o)
-		ObOut.append(o)
-		PartCt += 1
-	Scn.update()
-	bpy.data.scenes.remove(nScn)
-	# To avoid weirdness and excessive sub-surfacing of objects to be joined:
-	
-	#print(ObOut)
-	CommitModifiers(ObOut)
-	# Join all objects together:
-	bpy.ops.object.select_all(action = 'DESELECT')
-	bpy.ops.object.select_name(name=ObOut[0].name)
-	for o in ObOut:
-		o.select = True
-	bpy.ops.object.join()
-	(mnXYZ,mxXYZ) = GetGroupBoundingBox(ObOut[0])
-	CursPos = p = [(mnXYZ[0]+mxXYZ[0])/2.,(mnXYZ[1]+mxXYZ[1])/2.,mnXYZ[2]]
-	SetCursor(CursPos)
-	bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-	return ObOut[0]
+			# Re-mesh once to assure quality no shady bits in mesh
+			bpy.ops.object.modifier_add(type='REMESH')
+			# Must be precise or it looks awful
+			N.modifiers['Remesh'].octree_depth = 8 #??
+			N.modifiers['Remesh'].scale = .8 # ??
+			N.modifiers['Remesh'].mode = "SHARP"
+			bpy.ops.object.modifier_apply(as_type='DATA',modifier='REMESH')
+			# T
+			new_obs.append(N.name)
+		except:
+			print("Failed for %s"%oo.name)

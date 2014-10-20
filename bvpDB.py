@@ -4,8 +4,6 @@
 
 FOR THIS CLASS: 
 
-Unclear what to do about rendering different chunks of this as simple demos. 
-
 Impression is that that should all be cleared out to scripts, that wrap the database. 
 
 Voxelize, e.g., should be a method of the object. 
@@ -21,27 +19,29 @@ Game plan:
 Each item stored in the database will map to a particular bvp class:
 
 - Scene elements -
-bvp_object
-bvp_bg
+bvp_object # Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
+bvp_bg # alias to bvp_background
 bvp_sky
 bvp_camera
 bvp_shadow
 
 - Actions - 
-bvp_action - must be linked to an object or group of objects
-bvp_armature - armature??
-
+bvp_action - must be linked to specific class of armatures (which will be a property of bvp_objects)
+	- Armature_class
+	- wordnet_label
+	- semantic_category
+	- 
 - Scenes - 
-bvp_scene
+bvp_scene # will contain links to bvp_objects, bvp_skies, etc..
 bvp_scene_list
 
 
--> What to do about constraints? store as db objects as well? (linked to other )
+-> What to do about constraints? store as db objects as well? (linked to other elements?)
 
 -> Add armature field to objects
 -> All animations must be based on armatures, and we should be able to flexibly define classes of armatures.
--> All positioning should probably be done with armatures, too. Or maybe no. Because bounding boxes 
-	will still be unique to individual meshes, and not all meshes will deform. 
+-> Positioning (for START of action) will still be handled by pos3D,rot3D,size3D. 
+-> Actions will need bounding boxes, which will have to be multiplied by the bounding boxes for objects.
 
 Fields for objects: 
 semantic_labels # loose; whatever hierarchy you feel like labeling. Useful for pulling specific classes of STUFF.
@@ -55,10 +55,16 @@ grp_name # Name of group in .blend file. Should be unique. Meh. Maybe not. Has t
 
 # Imports
 import pymongo
-import subprocess,bvp,math,os,re,random,shutil,time
-from bvp.utils.blender import GetGroups
+import subprocess
+import bvp
+import math
+import os
+import re
+import random
+import shutil
+import time
 from bvp.utils.basics import GetHostName,unique,loadPik,RunScriptForAllFiles#,dotDict
-from bvp.bvpObject import bvpObject as bvpObj
+#from bvp.bvpObject import bvpObject
 if bvp.Is_Blender:
 	import bpy
 
@@ -66,14 +72,9 @@ if bvp.Is_Blender:
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
 class bvpDB(object):
-	'''
-	Class to interact with (mongo) database 
-	'''
-	def __init__(self,dbname=bvp.Settings['db']['name'],dbhost=bvp.Settings['db']['host'],
-				port=bvp.Settings['db']['port']):
-		'''Class to interface with bvp elements stored in mongo db
+	'''Class to interface with bvp elements stored in mongo db
 		
-		Separate collections for objects, bgs, 
+		Separate collections for objects, bgs, skies, actions, shadows, scenelists, more?
 		
 		Files in the library directory must be stored according to bvp directory structure: 
 		
@@ -91,10 +92,13 @@ class bvpDB(object):
 		port : scalar
 			Port number for database. 
 		'''		
+	def __init__(self,dbname=bvp.Settings['db']['name'],dbhost=bvp.Settings['db']['host'],
+				port=bvp.Settings['db']['port']):
+		'''Class to interact with (mongo) database'''
 		#self.LibDir = LibDir
 		self.dbi = pymongo.MongoClient(host=dbhost,port=port)[dbname]
 		# Make bvpDB fields (objects, backgrounds, skies, etc) the actual database collections (?)
-		for sc in ['objects','backgrounds','skies','shadows']: # More? Better not to enumerate? 
+		for sc in ['objects','backgrounds','skies','shadows','actions']: # More? Better not to enumerate? 
 			setattr(self,sc,self.dbi[sc])
 	def query(self,sctype,**query_dict):
 		'''Query the database for particular scene elements (objects, backgrounds, skies, etc)
@@ -108,11 +112,13 @@ class bvpDB(object):
 		-------
 
 		'''
-		wtf = self[sctype].find(query_dict) 
-		# Need indices
-		# Convert to class
-
-		return wtf
+		result = self.dbi[sctype].find(query_dict)
+		# Need indices in database (?)
+		if sctype == 'objects':
+			out = [bvp.bvpObject(dbi=None,**params) for params in result]
+		else:
+			raise Exception('Not ready yet!')
+		return out
 
 	def print_list(self,fname,params,sctype=('objects',),qdict=None):
 		'''Prints a semicolon-separated list of all groups (and parameters??) to a text file
@@ -270,9 +276,9 @@ class bvpDB(object):
 		for o in self.objects:
 			if o['nPoses']:
 				for p in range(o['nPoses']):
-					ObList.append(bvpObj(o['grpName'],self,size3D=None,pose=p))
+					ObList.append(bvp.bvpObject(o['grpName'],self,size3D=None,pose=p))
 			else:
-				ObList.append(bvpObj(o['grpName'],self,size3D=None,pose=None))
+				ObList.append(bvp.bvpObject(o['grpName'],self,size3D=None,pose=None))
 		return ObList
 
 	def render_objects(self,query_dict,rtype=('Image',),rot_list=(0,),render_pose=True,render_group_size=1,is_overwrite=False,scale_obj=None):
@@ -503,7 +509,7 @@ for f in fNm:
 									FrameRate=15)
 				try:
 					# Allow re-set of camera position with each attempt to populate scene
-					S.PopulateScene(ObL,ResetCam=True)
+					S.populate_scene(ObL,ResetCam=True)
 				except:
 					print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)
@@ -555,7 +561,7 @@ for f in fNm:
 									FrameRate=15)
 				#try:
 					# Allow re-set of camera position with each attempt to populate scene
-				S.PopulateScene(ObL,ResetCam=True)
+				S.populate_scene(ObL,ResetCam=True)
 				#except:
 				#	print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)

@@ -41,7 +41,7 @@ for bg in ToRender:
 							FrameRate=15)
 		try:
 			# Allow re-set of camera position with each attempt to populate scene
-			S.PopulateScene(ObL,ResetCam=True)
+			S.populate_scene(ObL,ResetCam=True)
 		except:
 			print('Unable to populate scene %s!'%S.fPath)
 		ScnL.append(S)

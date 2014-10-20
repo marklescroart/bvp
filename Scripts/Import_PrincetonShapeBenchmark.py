@@ -113,7 +113,7 @@ def import_psb(sdir,psd_dir,dbname='bvp_psb',port=9194):
 			dbob = dict(grpName=name,basicCat=None,semanticCat=None,
 				wordnet_label=None,realWorldSize=[ob_dict['scale']],
 				nFaces=ob_dict['polygons'],nVertices=None,nPoses=None,
-				constraints=None,verified=False)
+				constraints=None,verified=False,parentFile=blend_file)
 			dbi.objects.insert([dbob])
 			script = off_object_import.format(blend_file=blend_file,
 				off_file=os.path.join(mdir,mm+'.off'),

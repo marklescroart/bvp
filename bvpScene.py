@@ -1,105 +1,105 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import bvp,copy
+import bvp
+import copy
 from bvp.utils.basics import fixedKeyDict,gridPos,linspace # non-numpy-dependent version of linspace
-from bvp.utils.blender import SetCursor
+from bvp.utils.blender import set_cursor
 from bvp.utils.bvpMath import ImPosCount
 if bvp.Is_Blender:
 	import bpy
 
-# def getCamPos(n,xL=(-5,5),yL=(-5,5),zL=(0,10)):
-# 	# Cam Position
-# 	p = []
-# 	for x in linspace(xL[0],xL[1],n):
-# 		for y in linspace(yL[0],yL[1],n):
-# 			for z in linspace(zL[0],zL[1],n):
-# 				p.append([x,y,z])
-# # Fix Position
-# f = [[0,0,0] for x in range(len(p))]
-# return p,f
-
 class bvpScene(object):
-	'''
-	Usage: S = bvpScene(Num=0,Obj=None,BG=None,Sky=None,Shadow=None,Cam=None,FrameRange=(1,1),fPath=None,FrameRate=15)
+	'''Class for storing an abstraction of a Blender scene. 
+
+	Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
+	position, animation) in the scene. Scenes in .blend files can be created on the fly from these 
+	objects, for rendering or inspection (in an interactive Blender session). 
 	
-	Class for an abstraction of a Blender scene. Holds all information regarding background, sky, and objects 
-	(identity, size, position) in the scene. NOT (necessarily) a real Blender scene in a .blend file. Can be 
-	rendered / created in Blender (for debugging, inspection, modification, custom render, whatever).
+	Parameters
+	----------
+	num : scalar
+		Scene number (one-based by convention) within a list of scenes. Determines default scene name.
+	objects : list of bvpObjects | None
+		Objects with which to populate the scene. Defaults to none (no objects)
+	bg : bvpBG instance | None
+		Scene background; controls background and constraints on object / camera positions. Defaults
+		to complete blank scene. 
+	sky : bvpSky instance | None
+		Sky and lights; controls sky appearance, world settings, and lighting. Defaults to single
+		sun lamp angled to the back-left of the whole scene, mild environment lighting, and no sky 
+		(all alpha with no image/sky texture)
+	shadow : bvpShadow instance | None
+		Controls added shadows, if any. Defaults to none (no added shadows)
+	cam : bvpCam instance | None
+		Camera for the scene. Defaults to slight up-right camera with no camera motion.
+	frame_range : 2-tuple
+		Frame span to render of this scene. NOTE that this is 1-based (the first frame of a scene is 1, 
+		not zero). Defaults to (1,1)
+
+	Other Parameters
+	----------------
+	frame_rate : scalar
+		Frame rate of movies to render. Technically this doesn't do much, since most renders are per-frame,
+		and you specify a final frame rate for a movie when you concatenate the images together, either with
+		Blender, ffmpeg, or whatever your preferred video encoder is. Defaults to 15 (set in bvp.settings)
 	
-	Inputs:
-	Num - Scene number (identifier - 1 to ????)
-	Obj - List of class bvpObject. Objects can either have* or not have* position specified in advance. 
-		If no positions are specified a priori, bvpScene method "PopulateScene" 
-	BG - instance of class bvpBG, which controls background and constraints on object / camera positions.
-	Sky - instance of class bvpSky, which controls sky (image), world settings, and lighting. 
-	Cam - instance of class bvpCam. Defaults to slight up-right camera with no motion.
-	
-	FrameRange - frame span to render of this scene (1,1) by default.
-	FrameRate - 15 by default (set in bvp.settings)
-	
-	Commonly, the 
-	ML 2011.10.26
+	Notes
+	-----
+	Objects can be placed in a scene without their positions / scales specified. You can then use the 
+	bvpScene.populate_scene() method to set positions for the objects, given the background constraints.
 	'''
 	#def __init__(self,scnParams={}):
-	def __init__(self,Num=0,Obj=None,BG=None,Sky=None,Shadow=None,Cam=None,FrameRange=(1,1),fPath=None,FrameRate=bvp.Settings['RenderDefaults']['FrameRate']): # is frame rate Necessary? Determines camera speed...
-		'''
-		Class to store sufficient info for defining a scene in Blender.
-		
-		2011.10.11 ML
+	def __init__(self,num=0,objects=None,bg=None,sky=None,shadow=None,cam=None,frame_range=(1,1),fpath=None,frame_rate=bvp.Settings['RenderDefaults']['FrameRate']): 
+		'''Class to store scene information in Blender.
 		'''		
-		# Add inputs as class properties
+		# Add all inputs as class properties (Shady?)
 		Input = locals()
 		for i in Input:
 			if not i in ['self']:
 				setattr(self,i,Input[i])
 		
-		if not self.Obj:
-			# Make "Obj" field into a list
-			self.Obj = []
+		if self.objects is None:
+			# Make "objects" field into a list
+			self.objects = []
 		# Set default sky parameters
-		if not self.Sky: 
-			self.Sky = bvp.bvpSky()
+		if self.sky is None: 
+			self.sky = bvp.bvpSky()
 		# Set default background parameters
-		if not self.BG:
-			self.BG = bvp.bvpBG()
+		if self.bg is None:
+			self.bg = bvp.bvpBG()
 		# Default camera: Fixed position!
-		if not self.Cam:
-			self.Cam = bvp.bvpCamera(lens=self.BG.lens) # TO DO: Set cam default to file "Settings"! 
+		if self.cam is None:
+			self.cam = bvp.bvpCamera(lens=self.bg.lens) # TO DO: Set cam default to file "Settings"! 
 		# Final elements, shadows, are not necessary
 		# Set file path for renders:
-		if not self.fPath:
-			self.fPath = 'Sc%04d_##'%self.Num
-		self.FrameRate = FrameRate
+		if self.fpath is None:
+			self.fpath = 'Sc%04d_##'%self.num
+		self.frame_rate = frame_rate
 
-	# Consider adding fPath to the list of attributes...
-	# Change fPath in inputs to fBase, incorporate self.num automatically into base.
-	# @propertry
-	# def fPath(self):
-	# 	...
 	@property
 	def nObjects(self):
-		return len(self.Obj)
+		return len(self.objects)
 	@property
 	def ScnParams(self):
 		d = fixedKeyDict({
-			'frame_start':self.FrameRange[0],
-			'frame_end':self.FrameRange[1] # Default is 3 seconds
+			'frame_start':self.frame_range[0],
+			'frame_end':self.frame_range[1] # Default is 3 seconds
 			# MORE??
 			})
 		return d
 	def __repr__(self):
-		S = 'Class "bvpScene" (Num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.Num,(self.FrameRange[1]-self.FrameRange[0]+1)/float(self.FrameRate),self.FrameRange[0],self.FrameRange[1])
-		S+='BACKGROUND%s\n\n'%self.BG
-		S+='SKY%s\n\n'%self.Sky
-		S+='SHADOW%s\n\n'%self.Shadow
-		S+='CAMERA%s\n\n'%self.Cam
+		S = 'Class "bvpScene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num,(self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate),self.frame_range[0],self.frame_range[1])
+		S+='BACKGROUND%s\n\n'%self.bg
+		S+='SKY%s\n\n'%self.sky
+		S+='SHADOW%s\n\n'%self.shadow
+		S+='CAMERA%s\n\n'%self.cam
 		S+='OBJECTS\n'
-		for o in self.Obj:
+		for o in self.objects:
 			S+='%s\n'%o
 		return S
 	
-	def PopulateScene(self,ObList,ResetCam=True,ImPosCt=None,EdgeDist=0.,ObOverlap=.50,MinSz2D=0,RaiseError=False,nIter=50):
+	def populate_scene(self,ObList,ResetCam=True,ImPosCt=None,EdgeDist=0.,ObOverlap=.50,MinSz2D=0,RaiseError=False,nIter=50):
 		'''Choose positions for all objects in "ObList" input within the scene,
 		according to constraints provided by scene background.
 		
@@ -118,12 +118,12 @@ class bvpScene(object):
 			Fail = False
 			ObToAdd = []
 			if bvp.Verbosity_Level > 3:
-				print('### --- Running PopulateScene, Attempt %d --- ###'%Attempt)
+				print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
 			if ResetCam:
 				# Start w/ random cam,fixation position
-				cPos = self.BG.camConstraints.sampleCamPos(self.FrameRange)
-				fPos = self.BG.camConstraints.sampleFixPos(self.FrameRange)
-				self.Cam = bvp.bvpCamera(location=cPos,fixPos=fPos,frames=self.FrameRange,lens=self.BG.lens)
+				cPos = self.bg.camConstraints.sampleCamPos(self.frame_range)
+				fPos = self.bg.camConstraints.sampleFixPos(self.frame_range)
+				self.cam = bvp.bvpCamera(location=cPos,fixPos=fPos,frames=self.frame_range,lens=self.bg.lens)
 			# Multiple object constraints for moving objects
 			OC = []
 			for o in ObList:
@@ -136,12 +136,12 @@ class bvpScene(object):
 					shuffle(OC)
 				oc = OC.pop()
 				NewOb = copy.copy(o) # resets size each iteration as well as position
-				if self.BG.obstacles:
-					Obst = self.BG.obstacles+ObToAdd
+				if self.bg.obstacles:
+					Obst = self.bg.obstacles+ObToAdd
 				else:
 					Obst = ObToAdd
 				if not o.semanticCat:
-					# Sample semantic category based on BG??
+					# Sample semantic category based on bg??
 				 	# UNFINISHED as of 2012.10.22
 				 	pass #etc.
 				if not o.size3D:
@@ -150,10 +150,10 @@ class bvpScene(object):
 					NewOb.size3D = oc.sampleSize()
 				if not o.rot3D:
 					# NOTE: This is fixing rotation of objects to be within 90 deg of facing camera
-					NewOb.rot3D = oc.sampleRot(self.Cam)
+					NewOb.rot3D = oc.sampleRot(self.cam)
 				if not o.pos3D:
-					# Sample position last (depends on Cam position, It may end up depending on pose, rotation, (or action??)
-					NewOb.pos3D,NewOb.pos2D = oc.sampleXY(NewOb.size3D,self.Cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap,RaiseError=False,ImPosCt=ImPosCt,MinSz2D=MinSz2D)
+					# Sample position last (depends on cam position, It may end up depending on pose, rotation, (or action??)
+					NewOb.pos3D,NewOb.pos2D = oc.sampleXY(NewOb.size3D,self.cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap,RaiseError=False,ImPosCt=ImPosCt,MinSz2D=MinSz2D)
 					if NewOb.pos3D is None:
 						Fail=True
 						break
@@ -164,149 +164,154 @@ class bvpScene(object):
 				Attempt+=1
 		# Check for failure
 		if Attempt>nIter and RaiseError:
-			raise Exception('MaxAttemptReached','Unable to populate scene %s after %d attempts!'%(self.BG.grpName,nIter))
+			raise Exception('MaxAttemptReached','Unable to populate scene %s after %d attempts!'%(self.bg.grpName,nIter))
 		elif Attempt>nIter and not RaiseError:
 			print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
-		self.Obj = ObToAdd
+		self.objects = ObToAdd
 		# Make sure last fixation hasn't "wandered" away from objects: 
-		fPosFin = self.BG.camConstraints.sampleFixPos((1,),obj=ObToAdd)
-		self.Cam.fixPos = self.Cam.fixPos[:-1]+[fPosFin[0],]
+		fPosFin = self.bg.camConstraints.sampleFixPos((1,),obj=ObToAdd)
+		self.cam.fixPos = self.cam.fixPos[:-1]+[fPosFin[0],]
 
-	def ApplyOpts(self,Scn=None,rOpts=None):
-		'''
-		Usage: ApplyOpts(Scn=None,rOpts=None)
-
-		Apply general options to scene (environment lighting, world, start/end frames, etc), 
+	def apply_opts(self,scn=None,render_options=None):
+		'''Apply general options to scene (environment lighting, world, start/end frames, etc), 
 		including (optionally) render options (of class 'RenderOptions'))
 		
 		ML 2011
 		'''
-		if not Scn:
-			Scn = bpy.context.scene # Get current scene if input not supplied
+		scn = bvp.utils.blender.set_scene(scn) 
 		# Set frames (and other scene props?)
 		for s in self.ScnParams.keys():
-			setattr(Scn,s,self.ScnParams[s])
-		if rOpts:
+			setattr(scn,s,self.ScnParams[s])
+		if render_options:
 			# Set filepath
-			if rOpts.BVPopts['BasePath'][-2:]!='%s':
+			if render_options.BVPopts['BasePath'][-2:]!='%s':
 				print('Warning! base path did not have room to add scene-specific file name. MODIFYING...')
-				rOpts.BVPopts['BasePath']+='%s'
-			Scn.render.filepath = rOpts.BVPopts['BasePath']%self.fPath
-			rOpts.ApplyOpts()
-	def GetOcclusion(self):
+				render_options.BVPopts['BasePath']+='%s'
+			scn.render.filepath = render_options.BVPopts['BasePath']%self.fpath
+			render_options.apply_opts()
+
+	def get_occlusion(self):
 		'''
-		Get occlusion matrix (% occlusion of each object by others)
+		Get occlusion matrix (Percent occlusion of each object by others)
 		TO COME (?)
 		'''
+		pass
 
 
-	def Create(self,rOpts=None,Scn=None):
+	def create(self,render_options=None,scn=None):
+		'''Creates the stored scene (imports bg, sky, lights, objects, shadows) in Blender
+
+		Optionally, applies rendering options 
+
+		Parameters
+		----------
+		render_options : bvp.RenderOptions instance
+			Class to store rendering options (e.g. size, base path, extra meta-information renders, etc.)
+		scn : string scene name
+			Scene to render within .blend file. Defaults to current scene.
 		'''
-		Creates scene (imports BG, sky, lights, objects, shadows) in Blender
-		'''
-		if not Scn:
-			Scn = bpy.context.scene
+		scn = bvp.utils.blender.set_scene(scn)
 		# set layers to correct setting
-		Scn.layers = [True]+[False]*19
+		scn.layers = [True]+[False]*19
 		# set cursort to center
-		SetCursor((0,0,0))
+		set_cursor((0,0,0))
 		# place bg
-		self.BG.PlaceBG()
-		if self.BG.realWorldSize<50. and 'indoor' in self.BG.semanticCat:
+		self.bg.PlaceBG()
+		if self.bg.realWorldSize<50. and 'indoor' in self.bg.semanticCat:
 			# Due to a problem with skies coming inside the corners of rooms
-			Scale = self.BG.realWorldSize*1.5
+			Scale = self.bg.realWorldSize*1.5
 		else:
-			Scale = self.BG.realWorldSize
-		self.Sky.PlaceSky(num=self.Num,Scale=Scale)
-		self.Cam.PlaceCam(IDname='Cam%03d'%self.Num)
-		if self.Shadow:
-			self.Shadow.PlaceShadow(Scale=self.BG.realWorldSize)
-		for o in self.Obj:
+			Scale = self.bg.realWorldSize
+		self.sky.PlaceSky(num=self.num,Scale=Scale)
+		self.cam.PlaceCam(IDname='cam%03d'%self.num)
+		if self.shadow:
+			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
+		for o in self.objects:
 			o.PlaceObj()
-		Scn.name = self.fPath
-		self.ApplyOpts(rOpts=rOpts)
-		Scn.layers = [True]*20
-	def CreateWorking(self,rOpts=None,Scn=None):
+		scn.name = self.fpath
+		self.apply_opts(render_options=render_options)
+		scn.layers = [True]*20
+	def create_working(self,render_options=None,scn=None):
+		'''Creates the stored scene, but allows for objects without set positions.
+
+		See bvpScene.create() help.
 		'''
-		Creates scene (imports BG, sky, lights, objects, shadows) in Blender
-		(Allows for objects without 3D pos / size yet!)
-		'''
-		if not Scn:
-			Scn = bpy.context.scene
+		if not scn:
+			scn = bpy.context.scene
 		# set layers to correct setting
-		Scn.layers = [True]+[False]*19
+		scn.layers = [True]+[False]*19
 		# set cursort to center
-		SetCursor((0,0,0))
+		set_cursor((0,0,0))
 		# place bg
-		self.BG.PlaceBG()
-		self.Sky.PlaceSky(num=self.Num,Scale=self.BG.realWorldSize)
-		self.Cam.PlaceCam(IDname='Cam%03d'%self.Num)
-		if self.Shadow:
-			self.Shadow.PlaceShadow(Scale=self.BG.realWorldSize)
-		for o in self.Obj:
+		self.bg.PlaceBG()
+		self.sky.PlaceSky(num=self.num,Scale=self.bg.realWorldSize)
+		self.cam.PlaceCam(IDname='cam%03d'%self.num)
+		if self.shadow:
+			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
+		for o in self.objects:
 			try:
 				o.PlaceObj()
 			except:
 				pass
-		Scn.name = self.fPath
-		self.ApplyOpts(rOpts=rOpts)
-		Scn.layers = [True]*20	
-	def Render(self,rOpts,Scn=None):
-		'''
-		Usage: Render(rOpts,Scn=None)
-
-		Renders the scene (immediately, in open instance of Blender)
+		scn.name = self.fpath
+		self.apply_opts(render_options=render_options)
+		scn.layers = [True]*20	
+	def render(self,render_options,scn=None):
+		'''Renders the scene (immediately, in open instance of Blender)
 		
-		rOpts (class RenderOptions) specifies rendering parameters.
-
-		ML 2011.10
+		Parameters
+		----------
+		render_options : RenderOptions instance
+			Class to specify rendering parameters
+		scn : string scene name
+			Scene to render. Defaults to current scene.
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
+		scn = bvp.utils.blender.set_scene(scn)
 		# Reset scene nodes (?)
 		
 		# Apply rendering options
-		Scn.render.filepath = rOpts.BVPopts['BasePath']%self.fPath
-		rOpts.ApplyOpts()
+		scn.render.filepath = render_options.BVPopts['BasePath']%self.fpath
+		render_options.apply_opts()
 		# Render all layers!
-		Scn.layers = [True]*20
-		if rOpts.BVPopts['Type'].lower()=='firstframe':
-			Scn.frame_step = Scn.frame_end+1 # so only one frame will render
-		elif rOpts.BVPopts['Type'].lower()=='firstandlastframe':
-			Scn.frame_step = Scn.frame_end-1
-		elif rOpts.BVPopts['Type'].lower()=='all':
-			Scn.frame_step = 1
-		elif rOpts.BVPopts['Type'].lower()=='every4th':
+		scn.layers = [True]*20
+		if render_options.BVPopts['Type'].lower()=='firstframe':
+			scn.frame_step = scn.frame_end+1 # so only one frame will render
+		elif render_options.BVPopts['Type'].lower()=='firstandlastframe':
+			scn.frame_step = scn.frame_end-1
+		elif render_options.BVPopts['Type'].lower()=='all':
+			scn.frame_step = 1
+		elif render_options.BVPopts['Type'].lower()=='every4th':
 			# Assure that scene starts with a multiple of 4 + 1
-			while not Scn.frame_start%4==1:
-				Scn.frame_start += 1
-			Scn.frame_step = 4
+			while not scn.frame_start%4==1:
+				scn.frame_start += 1
+			scn.frame_step = 4
 		else:
 			raise Exception("Invalid render type specified!\n   Please use 'FirstFrame','FirstAndLastFrame', or 'All'")
 		# Render animation
-		bpy.ops.render.render(animation=True,scene=Scn.name)
+		bpy.ops.render.render(animation=True,scene=scn.name)
 
-	def Clear(self,Scn=None):
-		'''
-		Usage: Clear(Scn=None)
+	def clear(self,scn=None):
+		'''Resets scene to empty, ready for next.
 
-		Removes all objects, lights, background; resets world settings; clears all nodes; readies scene for next import /render
-		
-		This is essential for memory saving in long render runs. Use with caution. Highly likely to crash Blender.
+		Removes all objects, lights, background; resets world settings; clears all nodes; 
+		readies scene for next import /render. This is essential for memory saving in long 
+		render runs. Use with caution. Highly likely to crash Blender.
 
-		ML 2011
+		Parameters
+		----------
+		scn : string scene name
+			Scene to clear of all elements.
 		'''
 		### --- Removing objects for next scene: --- ### 
-		if not Scn:
-			Scn = bpy.context.scene
+		scn = bvp.utils.blender.set_scene(scn)
 		# Remove all mesh objects		
 		Me = list()
 		for o in bpy.data.objects:
-			#ml.GrabOnly(o)
+			#ml.grab_only(o)
 			if o.type=='MESH': # Only mesh objects for now = cameras too?? Worlds??
 				Me.append(o.data)
-			if o.name in Scn.objects: # May not be... why?
-				Scn.objects.unlink(o)
+			if o.name in scn.objects: # May not be... why?
+				scn.objects.unlink(o)
 			o.user_clear()
 			bpy.data.objects.remove(o)		
 		# Remove mesh objects
@@ -332,8 +337,8 @@ class bvpScene(object):
 			g.user_clear()
 			bpy.data.groups.remove(g)
 		# Remove all rendering nodes
-		for n in Scn.node_tree.nodes:
-			Scn.node_tree.nodes.remove(n)
+		for n in scn.node_tree.nodes:
+			scn.node_tree.nodes.remove(n)
 		# Re-set (delete) all render layers
 		RL = bpy.context.scene.render.layers.keys()
 		bpy.ops.scene.render_layer_add()
@@ -343,4 +348,4 @@ class bvpScene(object):
 		# Rename newly-added layer (with default properties) to default name:
 		bpy.context.scene.render.layers[0].name = 'RenderLayer'
 		# Set only first layer to be active
-		Scn.layers = [True]+[False]*19
+		scn.layers = [True]+[False]*19

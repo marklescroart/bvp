@@ -44,7 +44,7 @@ G = bpy.context.object
 ObList = []
 scn = bpy.context.scene
 for o in G.dupli_group.objects:
-	bvp.utils.blender.GrabOnly(G)
+	bvp.utils.blender.grab_only(G)
 	bpy.ops.object.proxy_make(object=G.name,type=o.name)
 	NewOb = bpy.context.object
 	if NewOb.type=='MESH':
@@ -60,7 +60,7 @@ for o in ObList:
 	o.select = True
 bpy.ops.object.join()
 Ob = bpy.context.object
-bvp.utils.blender.GrabOnly(Ob)
+bvp.utils.blender.grab_only(Ob)
 # Export off
 OFFf = os.path.join(sk.OFFdir,grpName+'.off')
 off_export.write(OFFf)

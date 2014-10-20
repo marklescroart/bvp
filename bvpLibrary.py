@@ -11,7 +11,6 @@ So long as there is only one rig in the group, and that group has a pose library
 
 # Imports
 import subprocess,bvp,math,os,re,random,shutil,time
-from bvp.utils.blender import GetGroups
 from bvp.utils.basics import GetHostName,unique,loadPik,RunScriptForAllFiles#,dotDict
 from bvp.bvpObject import bvpObject as bvpObj
 if bvp.Is_Blender:
@@ -509,7 +508,7 @@ for f in fNm:
 									FrameRate=15)
 				try:
 					# Allow re-set of camera position with each attempt to populate scene
-					S.PopulateScene(ObL,ResetCam=True)
+					S.populate_scene(ObL,ResetCam=True)
 				except:
 					print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)
@@ -561,7 +560,7 @@ for f in fNm:
 									FrameRate=15)
 				#try:
 					# Allow re-set of camera position with each attempt to populate scene
-				S.PopulateScene(ObL,ResetCam=True)
+				S.populate_scene(ObL,ResetCam=True)
 				#except:
 				#	print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)

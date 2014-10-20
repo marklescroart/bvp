@@ -4,10 +4,10 @@ Couple handy-dandy functions:
 '''
 import bvp
 
-def setScn():
+def set_scn():
 	'''
 	Quickie camera + lighting for an object
 	'''
 	bvp.bvpCamera().PlaceCam()
 	bvp.bvpSky().PlaceSky()
-	bvp.RenderOptions().ApplyOpts()
+	bvp.RenderOptions().apply_opts()

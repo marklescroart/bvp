@@ -15,7 +15,6 @@ There is an annoying tradeoff between which parameters can be specified a priori
 
 # Imports
 import subprocess,bvp,math,os,pickle,copy,time,re
-from bvp.utils.blender import GetGroups
 from bvp.utils.basics import GetHostName,MakeBlenderSafe,loadPik,savePik,fixedKeyDict
 # For convenience
 if bvp.Is_Numpy:
