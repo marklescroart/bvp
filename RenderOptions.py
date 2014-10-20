@@ -3,7 +3,7 @@
 # Imports
 import bvp,os,sys
 import math as bnp
-from bvp.utils.blender import SetLayers
+from bvp.utils.blender import set_layers
 from bvp.utils.basics import fixedKeyDict
 if bvp.Is_Blender:
 	import bpy
@@ -57,7 +57,7 @@ class RenderOptions(object):
 		Update any of these values with rParams dictionary input
 
 		NOTE: RenderOptions no longer touches a scene's file path; it only provides the base file (parent directory) for all rendering.
-		bvpScene's "ApplyOpts" function should be the only one to mess with bpy.context.scene.filepath (!!) (2012.03.12)
+		bvpScene's "apply_opts" function should be the only one to mess with bpy.context.scene.filepath (!!) (2012.03.12)
 		'''
 		
 		self.use_freestyle = False # May need some clever if statement here - checking on version of blender
@@ -145,7 +145,7 @@ class RenderOptions(object):
 		S = 'Class "RenderOptions":\n'+self.__dict__.__repr__()
 		return S
 	
-	def ApplyOpts(self,Scn=None):
+	def apply_opts(self,Scn=None):
 		if not Scn:
 			# Get current scene if input not supplied
 			Scn = bpy.context.scene
@@ -279,12 +279,12 @@ class RenderOptions(object):
 					o.pass_index = PassCt
 					for po in o.dupli_group.objects:
 						po.pass_index = PassCt
-					SetLayers(o,[0,PassCt])
+					set_layers(o,[0,PassCt])
 					PassCt +=1
 			# Check for mesh objects:
 			elif o.type=='MESH':
 				o.pass_index = PassCt
-				SetLayers(o,[0,PassCt])
+				set_layers(o,[0,PassCt])
 				PassCt +=1
 			# Other types of objects?? 
 		
@@ -684,7 +684,7 @@ class RenderOptions(object):
 			# Create proxies for all objects within object
 			if bOb.dupli_group:
 				for o in bOb.dupli_group.objects:
-					bvp.utils.blender.GrabOnly(bOb)
+					bvp.utils.blender.grab_only(bOb)
 					bpy.ops.object.proxy_make(object=o.name) #,object=bOb.name,type=o.name)
 				# Get rid of linked group now that dupli group objects are imported
 				bpy.context.scene.objects.unlink(bOb)

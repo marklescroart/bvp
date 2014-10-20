@@ -1,11 +1,11 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import bvp,time,sys # Time and sys for debugging only!
+import bvp
 import math as bnp
 from bvp.bvpCamConstraint import bvpCamConstraint
 from bvp.utils.basics import fixedKeyDict
-from bvp.utils.blender import AddCameraWithTarget,GrabOnly,CreateAnim_Loc
+from bvp.utils.blender import AddCameraWithTarget,grab_only,CreateAnim_Loc
 from bvp.utils.bvpMath import vec2eulerXYZ
 # This won't work yet! Poop!
 
@@ -132,7 +132,7 @@ class bvpCamera(object):
 		CamL.data = CamBase.data # Keep same camera props as main camera
 		# I would prefer to use:
 		# CamL.parent = CamBase # But this doesn't work for some reason. Fucks up transformation of CamL.
-		GrabOnly(CamBase)
+		grab_only(CamBase)
 		CamL.select = True
 		bpy.ops.object.parent_set()
 
@@ -142,7 +142,7 @@ class bvpCamera(object):
 		#bpy.ops.transform.translate(value=(Disparity/2.,0,0),constraint_axis=(True,False,False),constraint_orientation='LOCAL')
 		CamR = bpy.context.object
 		CamR.data = CamBase.data
-		GrabOnly(CamBase)
+		grab_only(CamBase)
 		CamR.select = True
 		bpy.ops.object.parent_set()
 		return CamL,CamR

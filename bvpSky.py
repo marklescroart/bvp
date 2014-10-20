@@ -3,19 +3,15 @@
 # Imports
 import os,bvp
 from bvp.utils.basics import fixedKeyDict
-from bvp.utils.blender import AddGroup,AddLamp,AddObject,SetLayers,GrabOnly
+from bvp.utils.blender import add_group,AddLamp,set_layers,grab_only
 import math as bnp
 # Numpy imports
 # Blender imports
 if bvp.Is_Blender:
 	import bpy
-	import mathutils as bmu
 
 class bvpSky(object):
-	'''
-	Usage: bvpSky(skyID=None,Lib=None)
-
-	Class for skies and lighting (sun, lamps, world) for scenes
+	'''Class for skies and lighting (sun, lamps, world) for scenes
 
 	Fields in skyParams are:
 	  .parentFile - parent .blend file housing this sky
@@ -184,17 +180,17 @@ class bvpSky(object):
 		if not self.grpName is None:
 			# Add proxies of mesh objects
 			fDir,fNm = os.path.split(self.parentFile)
-			SkyOb = AddGroup(fNm,self.grpName,fDir)
+			SkyOb = add_group(self.grpName,fNm,fDir)
 			if not Scale is None:
 				print('Resizing...')
 				sz = Scale/self.realWorldSize # most skies are 100x100 in area
 				bpy.ops.transform.resize(value=(sz,sz,sz))
 			for o in SkyOb.dupli_group.objects:
-				GrabOnly(SkyOb)
+				grab_only(SkyOb)
 				bpy.ops.object.proxy_make(object=o.name) #,object=SkyOb.name,type=o.name)
 				NewOb = bpy.context.object
 				if NewOb.type=='MESH': # This better be the sky dome
-					SetLayers(NewOb,[9])
+					set_layers(NewOb,[9])
 					NewOb.name=SkyOb.name
 					NewOb.pass_index = 100
 				else:
@@ -221,7 +217,7 @@ class bvpSky(object):
 						bpy.context.scene.objects.unlink(L)
 				bpy.ops.object.lamp_add(type='SUN')
 				L = [lo for lo in bpy.context.scene.objects if lo.type=="LAMP"]
-				O = L[0] #GrabOnly(L[0]) 
+				O = L[0] #grab_only(L[0]) 
 				O.rotation_euler = (0.6503279805183411, 0.055217113345861435, 1.8663908243179321)
 				O.location = (0.,0.,35.) # Doesn't actually matter since it's a sun lamp
 		# (Other possibilities for lightType taken care of in initialization)
@@ -245,7 +241,7 @@ class bvpSky(object):
 		'''
 		Usage: AddWorld(self,bvpScn,Scn=None):
 		
-		Adds a specified world from a specified file, as in AddGroup()
+		Adds a specified world from a specified file, as in add_group()
 
 		NOTE! Currently (2012.02) worlds and sky groups must have the same (unique) name!
 		'''
