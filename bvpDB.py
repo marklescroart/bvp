@@ -81,7 +81,6 @@ class bvpDB(object):
 			           Backgrounds/ <Category_*.blend and Category_*.pik>
 			           Skies/ <Category_*.blend and Category_*.pik>
 					   Shadows/ <Category_*.blend and Category_*.pik>
-		
 		Parameters
 		----------
 		dbhost : string
@@ -90,6 +89,10 @@ class bvpDB(object):
 			Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
 		port : scalar
 			Port number for database. 
+		Notes
+		-----
+		start mongodb with "mongod --port 9194" or, if you are not using the 
+		default db directory, "mongod --dbpath /Users/mark/Projects/BVP_mongodb/ --port 9194"
 		'''		
 		#self.LibDir = LibDir
 		self.dbi = pymongo.MongoClient(host=dbhost,port=port)[dbname]
