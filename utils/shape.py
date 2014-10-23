@@ -4,14 +4,12 @@
 TO DO: generalize so that these can be used outside of Blender? Or do we care, because 
 Blender is our storage for all mesh geometry...?
 '''
-
+import bpy
 import numpy as np
 from scipy import sparse
 import scipy.sparse.linalg as la
-import bpy
 import mathutils as bmu
 
-# Currently not necessary...
 def _memo(fn):
     """Helper decorator memoizes the given zero-argument function.
     Really helpful for memoizing properties so they don't have to be recomputed
@@ -22,24 +20,24 @@ def _memo(fn):
         if id(fn) not in self._cache:
             self._cache[id(fn)] = fn(self)
         return self._cache[id(fn)]
-
     return memofn
 
 class Shape(object):
-class Surface(object):
-    """Represents a single cortical hemisphere surface. Can be the white matter surface,
-    pial surface, fiducial (mid-cortical) surface, inflated surface, flattened surface,
-    etc.
+    """Abstraction for manifold (?) mesh shape.
 
-    Implements some useful functions for dealing with functions across surfaces.
+    Based on Alex Huth's Surface class from cortex.polyutils.py (from pycortex). 
+
+    Implements some useful functions for dealing with functions across meshes.
+
+    TO BE MOVED to bvpObject. 
     """
     def __init__(self, pts, polys):
-        """Initialize Surface.
+        """Initialize Shape.
 
         Parameters
         ----------
         pts : 2D ndarray, shape (total_verts, 3)
-            Location of each vertex in space (mm). Order is x, y, z.
+            Location of each vertex in space (arbitrary units). Order is x, y, z.
         polys : 2D ndarray, shape (total_polys, 3)
             Indices of the vertices in each triangle in the surface.
         """
@@ -556,7 +554,25 @@ class Surface(object):
             return graph
 
         return make_surface_graph(self.polys)
+    # ML additions:
+    def evecs(self,k=None):
+        B, D, W, V = self.laplace_operator
+        A = V-W
+        if k is None:
+            n = int(len(self.pts)*.8)
+        else:
+            n = k
+        evals,evecs = la.eigsh(A,M=B,k=n,which="SM")
+        return evals,evecs
+    def add_shapekey(name='key'):
+        raise NotImplementedError('Need blender object attribute first')
+        # Define ob as self.bl_object?
+        ob.shape_key_add(name=nm)
+        skey = ob.data.shape_keys.key_blocks[nm]
+        for iv,loc in enumerate(newpts):
+            skey.data[iv].co = bmu.Vector(loc)
 
+    #/ML additions
     def get_graph(self):
         return self.graph
 
@@ -673,6 +689,7 @@ class Surface(object):
         raise NotImplementedError
         face1 = self.connected[p1]
         face2 = self.connected[p2]
+
 
 # ? 
 class _ptset(object):

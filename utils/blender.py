@@ -264,20 +264,6 @@ def get_scene(num,Scn=None,Lib=None):
 	S.Num = Num+1
 	print('Don''t forget to set sky and poses!')
 	return S
-def DeclareProperties():
-	'''
-	Declarations for extra object properties in Blender Vision Project
-	'''
-	# Real world size
-	bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
-	# Semantic Category (a string, w/ comma-separated descriptors/categories for the object in question)
-	bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
-	# Semantic Category of allowable objects (within scene)
-	bpy.types.Object.ObjectSemanticCat = bpy.props.StringProperty(name='ObjectSemanticCat',default='thing')
-	# Semantic Category of allowable skies (for scene)
-	bpy.types.Object.SkySemanticCat = bpy.props.StringProperty(name='SkySemanticCat',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
-	# Focal length of camera (for background)
-	bpy.types.Object.Lens = bpy.props.FloatProperty(name='Lens',min=25.,max=50.,default=50.) # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 
 def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 	'''
@@ -307,86 +293,6 @@ def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 			a.fcurves[iXYZ].keyframe_points[ifr].handle_right_type = hType[ifr][1]
 		a.fcurves[iXYZ].extrapolation = 'CONSTANT'
 	return a
-
-def SetUpGroup(*args,**kwargs):
-	warings.warn("Deprecated! Use set_up_group() instead!")
-	set_up_group(*args,**kwargs)
-
-def set_up_group(ObList=None,Scn=None):
-	'''Creates a group of Blender objects and standardizes the size.
-
-	Set a group of objects to canonical position (centered, max dimension = 10)
-	Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
-	box (maximal extent of vertices, irrespective of the object's origin) 
-
-	Origins of all objects are set to (0,0,0).
-
-	WARNING: NOT NECESSARILY RELIABLE. There is a great deal of variability in the way in which 3D 
-	models are stored in the myriad free 3D sites online; thus a GREAT MANY conditional statements
-	would be necesary to have a reliably working function. If you want to write such a function, 
-	be my guest. In the meantime, use with caution. 
-	
-	ML 2011.10.25
-	'''
-	
-	bvp.Verbosity_Level > 3
-	if not Scn:
-		Scn = bpy.context.scene # (NOTE: think about making this an input!)
-	if not ObList:
-		for o in Scn.objects:
-			# Clear out cameras and (ungrouped) 
-			if o.type in ['CAMERA','LAMP'] and not o.users_group:
-				Scn.objects.unlink(o)
-				Scn.update()
-		ObList = list(Scn.objects)
-	ToSet_Size = 10.0
-	ToSet_Loc = (0.0,0.0,0.0)
-	ToSet_Rot = 0.0
-	# FIRST: Clear parent relationships
-	p = [o for o in ObList if not o.parent and not 'ChildOf' in o.constraints.keys()]
-	if len(p)>1:
-		raise Exception('More than one parent in group! Now I commit Seppuku! Hi-YA!')
-	else:
-		p = p[0]
-	np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
-	if p:
-		for o in np:
-			grab_only(o)
-			bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
-			if 'ChildOf' in o.constraints.keys():
-				o.constraints.remove(o.constraints['ChildOf'])
-	
-	# SECOND: Reposition all object origins 
-	(MinXYZ,MaxXYZ) = get_group_bounding_box(ObList)
-	BotMid = [(MaxXYZ[0]+MinXYZ[0])/2,(MaxXYZ[1]+MinXYZ[1])/2,MinXYZ[2]]
-	set_cursor(BotMid)
-	
-	SzXYZ = []
-	for Dim in range(3):
-		SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
-	
-	if not ToSet_Size==max(SzXYZ):
-		ScaleF = ToSet_Size/max(SzXYZ)
-	if bvp.Verbosity_Level > 3:	
-		print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size,ScaleF,max(SzXYZ)))
-	
-	for o in ObList:
-		grab_only(o)
-		bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-		o.scale = o.scale * ScaleF
-		o.location = ToSet_Loc
-
-	Scn.update()
-	# Re-parent everything
-	for o in np:
-		grab_only(p)
-		o.select = True
-		bpy.ops.object.parent_set()
-	# Create group (if necessary) and name group
-	if not ObList[0].users_group:
-		for o in ObList:
-			o.select=True
-		bpy.ops.group.create(name=Scn.name)
 
 def AddSelectedToGroup(gNm):
 	'''
@@ -704,42 +610,6 @@ def getVoxelizedVertList(obj,size=10/96.,smooth=1,fNm=None,showVox=False):
 		t1=time.time()
 		print('getVoxelizedVertList took %d mins, %.2f secs'%divmod((t1-t0),60))
 	return verts,norms
-
-def GetGroupBoundingBox(ObList):
-	warnings.warn("Deprecated! Use get_group_bounding_box() instead!")
-	return get_group_bounding_box(ObList)
-def get_group_bounding_box(ObList):
-	'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
-
-	Parameters
-	----------
-	ObList : list or tuple 
-		list of Blender objects for which to get bounding box
-
-	Returns
-	-------
-	minxyz,maxxyz : lists
-		min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
-		more standard format for a bounding box. 
-	'''
-	BBx = list()
-	BBy = list()
-	BBz = list()
-	if not isinstance(ObList,(list,tuple)):
-			ObList = [ObList]
-	for ob in ObList: 
-		grab_only(ob)
-		if ob.type in ['MESH','LATTICE','ARMATURE']:
-			bpy.ops.object.transform_apply(rotation=True)
-		for ii in range(8):
-			BBx.append(ob.bound_box[ii][0] * ob.scale[0] + ob.location[0]) 
-			BBy.append(ob.bound_box[ii][1] * ob.scale[1] + ob.location[1])
-			BBz.append(ob.bound_box[ii][2] * ob.scale[2] + ob.location[2])
-			#bpy.ops.mesh.primitive_uv_sphere_add(location=[BBx[ii],BBy[ii],BBz[ii]])
-	MinXYZ = [min(BBx),min(BBy),min(BBz)]
-	MaxXYZ = [max(BBx),max(BBy),max(BBz)]
-	# 
-	return MinXYZ,MaxXYZ
 
 def add_img_material(name,imfile,imtype):
 	"""Add a texture containing an image to Blender.
