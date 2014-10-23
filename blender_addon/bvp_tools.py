@@ -53,6 +53,7 @@ dbport = bvp.Settings['db']['port']
 dbpath = bvp.Settings['db']['path'] # only necessary for creating client instances...
 
 act_parent_file = ""
+db_results = []
 
 ### --- BVP element properties --- ###
 class ObjectProps(bpy.types.PropertyGroup):
@@ -104,6 +105,12 @@ def enum_db_objects(self,context):
 	wm = context.window_manager
 	dbi = bvp.bvpDB(dbname=wm.active_db)
 	return [(o['grpName'],o['grpName'],"") for o in dbi.objects]
+
+def enum_db_results(self,context):
+	"""Enumerate all objects (group names) returned from a database query"""
+	wm = context.window_manager
+	dbi = bvp.bvpDB(dbname=wm.active_db)
+	return [(o['grpName'],o['grpName'],"") for o in db_results]
 
 def declare_properties():
 	'''Declarations of extra object properties
@@ -198,31 +205,31 @@ class PrevScene(bpy.types.Operator):
 # The next two should not be necessary; for whatever reason, I can't set grp.bvpObject.parent_file
 # or act.bvpAction.parent_file in a panel's callback, though I CAN set 
 # bpy.context.window_manager.active_group, which is ALSO a custom-defined property. WTF.
-class SetParentFileAction(bpy.types.Operator):
-	"""Modifies bvp-specific property parent_file, because for whatever reason 
-	it can't be modified in panel context like other props. WTF."""
-	bl_idname = "bvp.set_parent_file_action"
-	bl_label = "set property 'parent_file'"
-	bl_options = {'REGISTER','UNDO'}
+# class SetParentFileAction(bpy.types.Operator):
+# 	"""Modifies bvp-specific property parent_file, because for whatever reason 
+# 	it can't be modified in panel context like other props. WTF."""
+# 	bl_idname = "bvp.set_parent_file_action"
+# 	bl_label = "set property 'parent_file'"
+# 	bl_options = {'REGISTER','UNDO'}
 
-	def execute(self,context):
-		ob = context.object
-		act = ob.animation_data.action
-		act.bvpAction.parent_file = bpy.data.filepath
-		return {"FINISHED"}
+# 	def execute(self,context):
+# 		ob = context.object
+# 		act = ob.animation_data.action
+# 		act.bvpAction.parent_file = bpy.data.filepath
+# 		return {"FINISHED"}
 
-class SetParentFileObject(bpy.types.Operator):
-	"""Modifies bvp-specific property parent_file, because for whatever reason 
-	it can't be modified in panel context like other props. WTF."""
-	bl_idname = "bvp.set_parent_file_object"
-	bl_label = "set property 'parent_file'"
-	bl_options = {'REGISTER','UNDO'}
+# class SetParentFileObject(bpy.types.Operator):
+# 	"""Modifies bvp-specific property parent_file, because for whatever reason 
+# 	it can't be modified in panel context like other props. WTF."""
+# 	bl_idname = "bvp.set_parent_file_object"
+# 	bl_label = "set property 'parent_file'"
+# 	bl_options = {'REGISTER','UNDO'}
 
-	def execute(self,context):
-		wm = context.window_manager
-		grp = bpy.data.groups[wm.active_group]
-		grp.bvpObject.parent_file = bpy.data.filepath
-		return {"FINISHED"}
+# 	def execute(self,context):
+# 		wm = context.window_manager
+# 		grp = bpy.data.groups[wm.active_group]
+# 		grp.bvpObject.parent_file = bpy.data.filepath
+# 		return {"FINISHED"}
 
 class RescaleGroup(bpy.types.Operator):
 	"""Creates a group of Blender objects and standardizes the size.
@@ -423,6 +430,7 @@ class DBSearchDialog(bpy.types.Operator):
 	# Real world size min/max?
 
 	def execute(self, context):
+		global db_results
 		wm = context.window_manager
 		dbi = bvp.bvpDB(dbname=wm.active_db)
 		prop = ['semantic_cat','wordnet_label','grp_name']
@@ -436,11 +444,10 @@ class DBSearchDialog(bpy.types.Operator):
 			pp = getattr(self,p)
 			if pp:
 				query[pn] = pp
-		result = [r for r in dbi.objects.find(query)]
+		db_results = [r for r in dbi.objects.find(query)]
 		# Set to wm.query_result; by grp_name??
-		from pprint import pprint
-		print("found:")
-		pprint(result)
+		import pprint
+		pprint(db_results)
 		return {'FINISHED'}
  
 	def invoke(self, context, event):
@@ -501,6 +508,10 @@ class BVP_PANEL_db_tools(View3DPanel,Panel):
 		row.operator("bvp.db_search_object",text="Search DB")
 		# To come:
 		# DB results as selectable list, with buttons to import full or proxy
+		class barf(object):
+			db_res = bpy.props.EnumProperty(name='Search results',items=enum_db_results)
+		row = layout.row()
+		row.prop(barf,'db_res')
 
 class BVP_PANEL_object_tools(View3DPanel,Panel):
 	"""Creates a BVP panel in the Tools window"""
@@ -519,15 +530,13 @@ class BVP_PANEL_object_tools(View3DPanel,Panel):
 		ob = context.object
 		scene = context.scene	
 		wm = context.window_manager
-		# WHY does this work: 
-		wm.active_group = ob.groups
-		# But I need an operator to do this:
-		## WORKING
 		# Object or no
 		if ob is None: # better to use poll?
 			row = layout.row()
 			row.label('(No object selected)')
+			wm.active_group = ""
 		else:
+			wm.active_group = ob.groups
 			row = layout.row()
 			if len(ob.users_group)<1: #ob.dupli_groups is None:
 				row.label(text='(no BVP object group)')
