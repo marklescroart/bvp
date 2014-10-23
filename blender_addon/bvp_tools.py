@@ -54,10 +54,6 @@ dbpath = bvp.Settings['db']['path'] # only necessary for creating client instanc
 
 act_parent_file = ""
 
-active_db = "ModelNet"
-db_category_list = ""
-db_object_list = ""
-
 ### --- BVP element properties --- ###
 class ObjectProps(bpy.types.PropertyGroup):
 	"""Properties for bvpObjects"""
