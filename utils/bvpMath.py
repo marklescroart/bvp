@@ -3,6 +3,9 @@ BVP Math utilities
 
 Designed to work with either numpy or Blender's mathutils
 
+NOTE: Lots of this is out-dated, now we're running with numpy + other 3rd party packages.
+CLEAN ME UP!
+
 ML 2012.01.31
 '''
 
@@ -31,7 +34,6 @@ else:
 	GetInverse = lambda x: x.inverted()
 	lst = list
 
-
 # Math functions
 def listMean(a):
 	'''
@@ -46,6 +48,7 @@ def circ_avg(a,b):
 	Tmp = bnp.e**(1j*a/180.*bnp.pi)+bnp.e**(1j*b/180.*bnp.pi)
 	Mean = bnp.atan2(Tmp.imag,Tmp.real)/bnp.pi*180.
 	return Mean
+
 def circ_dst(a,b):
 	'''
 	Angle between two angles
@@ -73,8 +76,10 @@ def sind(theta):
 def tand(theta):
 	theta = bnp.radians(theta)
 	return bnp.tan(theta)
+
 def atand(theta):
 	return bnp.degrees(bnp.atan(theta))
+
 def sph2cart(r,az,elev):
 	'''
 	Usage: x,y,z = sph2cart(r,az,elev)
@@ -115,6 +120,7 @@ def AddLists(a,b):
 	#elif bvp.Is_Blender:
 	#	c = [list(bmu.Vector(aa)+bmu.Vector(bb)) for aa,bb in zip(a,b)]
 	return c
+
 def CirclePos(radius,nPos,x_center=0,y_center=0,Direction='BotCCW'):
 		'''
 		Usage: Pos = mlCirclePos(radius,nPos [,x_center,y_center,Direction])
@@ -184,6 +190,7 @@ def CirclePos(radius,nPos,x_center=0,y_center=0,Direction='BotCCW'):
 			#Pos(:,2) = -Pos(:,2);
 		Pos = [[x,y] for x,y in zip(PosX,PosY)]
 		return Pos
+
 def PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.)): 
 	'''
 	Usage: imPos_Top,imPos_Bot,imPos_L,imPos_R = PerspectiveProj(bvpObj,bvpCam,ImSz=(1.,1.))
@@ -431,7 +438,6 @@ def PerspectiveProj_Inv(ImPos,bvpCam,Z):
 	oPos = CamMatInv*d+cPos
 	return lst(oPos)
 
-
 # if bvp.Is_Blender:
 # 	def linePlaneInt(L0,L1,P0=(0.,0.,0.),n=(0.,0.,1.)):
 # 		'''
@@ -526,6 +532,7 @@ def concatVoxels(fDir,mode='sum'):
 			elif mode=='sum':
 				vox[idx] = np.sum(tmp)
 	return MakeBlenderSafe(vox,'float')
+
 class ImPosCount(object):
 	'''
 	Class to store a count of how many times objects have appeared in each of (n x n) bins in an image
@@ -558,6 +565,7 @@ class ImPosCount(object):
 			self.yBin = yBin
 		self.e = e
 		self.hst = np.zeros((len(self.xBin)-1,len(self.yBin)-1))
+
 	def updateXY(self,X,Y):
 		'''
 		Update 2D histogram count with one X,Y value pair
@@ -568,6 +576,7 @@ class ImPosCount(object):
 			Y = [Y]
 		hstNew = np.histogram2d(Y,X,(self.xBin,self.yBin))[0]
 		self.hst += hstNew
+
 	def sampleXYnoWt(self):
 		'''
 		DEPRECATED!
@@ -618,6 +627,7 @@ class ImPosCount(object):
 		else:
 			pInv = pI/np.sum(pI)
 			return pInv
+
 	@property
 	def adjP(self):
 		'''
@@ -628,11 +638,13 @@ class ImPosCount(object):
 		aa = (self.p**self.e)
 		bb = np.sum(self.p**self.e)
 		return aa/bb
+
 	@property
 	def adjPinv(self):
 		aa = (self.pInv**self.e)
 		bb = np.sum(self.pInv**self.e)
 		return aa/bb
+
 	@property
 	def noisyPinv(self):
 		# Add noise to allow not exactly flat distribution
@@ -643,6 +655,7 @@ class ImPosCount(object):
 		p -= np.min(p)
 		p /= np.sum(p)
 		return p
+
 	@property
 	def noisyAdjPinv(self):
 		p = self.adjPinv #.flatten()
@@ -681,6 +694,7 @@ def linePlaneInt(L0,L1,P0=(0.,0.,0.),n=(0.,0.,1.)):
 	# Take that, multiply it by L, add it to L0
 	Intersection = lst(L*d + L0)
 	return Intersection
+
 def mat2eulerXYZ(mat):
 	'''
 	Conversion from matrix to euler
@@ -724,6 +738,7 @@ def vec2eulerXYZ(vec):
 	yR = 0. # ASSUMED - no roll of camera
 	xR = np.degrees(np.arctan(-np.linalg.norm([X,Y])/Z))
 	return xR,yR,zR
+
 def mnrnd(d,p,n=1):
 	'''
 	sample distribution "d" w/ associated probabilities "p" "n" times

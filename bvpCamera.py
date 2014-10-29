@@ -69,9 +69,9 @@ class bvpCamera(object):
 			str(self.clip),str(self.frames),str([["%.2f"%x for x in Pos] for Pos in self.location]),str([["%.2f"%x for x in Pos] for Pos in self.fixPos]))
 		return S
 		
-	def PlaceCam(self,IDname='000',Scn=None):
+	def Place(self,IDname='000',Scn=None):
 		'''
-		Usage: PlaceCam(Scn=None,IDname='000')
+		Usage: Place(Scn=None,IDname='000')
 
 		Places camera into Blender scene (only works within Blender)
 

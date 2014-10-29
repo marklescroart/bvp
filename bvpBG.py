@@ -78,7 +78,7 @@ class bvpBG(object):
 			S+='%d Verts; %d Faces'%(self.nVertices,self.nFaces)
 		return(S)
 
-	def PlaceBG(self,Scn=None):
+	def Place(self,Scn=None):
 		'''
 		Adds background to Blender scene
 		'''

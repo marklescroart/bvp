@@ -1,10 +1,8 @@
 import bpy
 import bvp
 import os
-import pymongo
-from bpy.types import Panel,UIList
+from bpy.types import Panel
 
-from bpy.props import IntProperty, CollectionProperty
 """
 NOTES
 =====
@@ -31,6 +29,10 @@ Dynamic EnumProperty:
 http://blender.stackexchange.com/questions/10910/dynamic-enumproperty-by-type-of-selection
 
 Shit, there's a selected_objects value in bpy.context - who knew?
+
+
+see the following for bounding boxes:
+https://github.com/sambler/addonsByMe/blob/master/create_bound_box.py
 """
 
 
@@ -50,24 +52,47 @@ bl_info = {
 ### --- Misc parameters --- ###
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
 dbport = bvp.Settings['db']['port']
-dbpath = bvp.Settings['db']['path'] # only necessary for creating client instances...
-
+dbpath = bvp.Settings['Paths']['LibDir'] # only necessary for creating client instances...
+dbname = 'bvp_1_0' #bvp.Settings['db']['name']
 act_parent_file = ""
 db_results = []
+last_import = ""
+### --- Start BVP database server? --- ###
+
+try:
+	dbi = bvp.bvpDB(dbname=dbname)
+	del dbi
+except pymongo.errors.ConnectionError:
+	import warnings
+	warnings.warn()
+	# Subprocess start db server
+
+	# Insert at end if server is started: 
+	#import psutil
+	#PROCNAME = "mongod"
+	#for proc in psutil.process_iter():
+    #	if proc.name() == PROCNAME:
+    #    	proc.kill()
 
 ### --- BVP element properties --- ###
 class ObjectProps(bpy.types.PropertyGroup):
 	"""Properties for bvpObjects"""
-	grp_name = bpy.props.StringProperty(name='grp_name',default="")
-	parent_file = bpy.props.StringProperty(name='parent_file',default="")
+	fp = bpy.data.filepath
+	if fp=="":
+		pth = ""
+	else:
+		pth = os.path.split(bpy.data.filepath)[1][:-6]
+	name = bpy.props.StringProperty(name='name',default="")
+	parent_file = bpy.props.StringProperty(name='parent_file',default=pth)
 	real_world_size = bpy.props.FloatProperty(name="real_world_size",min=.001,max=300.,default=1.)
 	semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='thing')
 	basic_cat = bpy.props.StringProperty(name='basic_cat',default='thing')
 	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='entity.n.01')	
 	is_realistic = bpy.props.BoolProperty(name='is_realistic',default=False)
 	is_cycles = bpy.props.BoolProperty(name='is_cycles',default=False)
-	# Define computed properties (nVerts, nFaces, manifold, etc) here, too?
-
+	# Define computed properties (nverts, nfaces, manifold, etc) here, too?
+	del fp
+	del pth
 # To come:
 #class BGProps(bpy.types.PropertyGroup):
 #	pass
@@ -80,8 +105,10 @@ class ActionProps(bpy.types.PropertyGroup):
 	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='do.v.01')
 	fps = bpy.props.FloatProperty(name='fps',default=30.,min=15.,max=100.) # 100 is optimistic...
 	nframes = bpy.props.IntProperty(name='fps',default=30,min=2,max=1000) # 1000 is also optimistic...
+	is_cyclic = bpy.props.BoolProperty()
+	is_transitive = bpy.props.BoolProperty()
 	is_translating = bpy.props.BoolProperty()
-	is_armature = bpy.props.BoolProperty()
+	is_armature = bpy.props.BoolProperty(default=True)
 	# Define computed properties (compute from constraints?) (number of bones?)
 
 class SkyProps(bpy.types.PropertyGroup):
@@ -89,8 +116,15 @@ class SkyProps(bpy.types.PropertyGroup):
 	parent_file = bpy.props.StringProperty(name='parent_file',default="")
 	semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='sky')
 	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='sky.n.01')	
-	is_translating = bpy.props.BoolProperty()
-	is_armature = bpy.props.BoolProperty()
+
+'''
+# UI list option for displaying databases (more flexible, more space)
+class DBprop(bpy.types.PropertyGroup):
+	"""Grouped database properties"""
+	id = bpy.props.IntProperty()
+	port = bpy.props.IntProperty(name='port',default=bvp.Settings['db']['port'])
+	path = bpy.props.StringProperty(name='path',default=bvp.Settings['Paths']['LibDir'])
+'''
 
 ## -- For dynamic EnumProperties -- ##
 def enum_groups(self,context):
@@ -100,17 +134,11 @@ def enum_groups(self,context):
 	else:
 		return [(g.name,g.name,"") for g in ob.users_group]
 
-def enum_db_objects(self,context):
-	"""Enumerate all objects in a database"""
-	wm = context.window_manager
-	dbi = bvp.bvpDB(dbname=wm.active_db)
-	return [(o['grpName'],o['grpName'],"") for o in dbi.objects]
-
 def enum_db_results(self,context):
 	"""Enumerate all objects (group names) returned from a database query"""
-	wm = context.window_manager
-	dbi = bvp.bvpDB(dbname=wm.active_db)
-	return [(o['grpName'],o['grpName'],"") for o in db_results]
+	global db_results
+	out = [("","","")]+[(o['name'],o['name'],','.join(o['semantic_cat'])) for o in db_results]
+	return out
 
 def declare_properties():
 	'''Declarations of extra object properties
@@ -128,20 +156,20 @@ def declare_properties():
 	'''
 	### --- DEPRECATED --- ###
 
-	## -- For both object and background elements -- ##
-	# Real world size
-	bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
-	# Imprecise list of semantic labels for an object; for convenience 
-	# (a string, w/ comma-separated descriptors/categories for the object in question)
-	bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
-	# Precise definitional label for object
-	bpy.types.Object.wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='entity.n.01')
-	# Reasonably realistic-looking, not cartoony or otherwise bad.
-	bpy.types.Object.realistic = bpy.props.BoolProperty(name='realistic',default=False)
-	# Is configured with cycles materials, ready to render with cycles render engine
-	bpy.types.Object.is_cycles = bpy.props.BoolProperty(name='is_cycles',default=False)
-	# Parent file
-	bpy.types.Object.parentFile = bpy.props.StringProperty(name='parentFile',default="")
+	# ## -- For both object and background elements -- ##
+	# # Real world size
+	# bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
+	# # Imprecise list of semantic labels for an object; for convenience 
+	# # (a string, w/ comma-separated descriptors/categories for the object in question)
+	# bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
+	# # Precise definitional label for object
+	# bpy.types.Object.wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='entity.n.01')
+	# # Reasonably realistic-looking, not cartoony or otherwise bad.
+	# bpy.types.Object.realistic = bpy.props.BoolProperty(name='realistic',default=False)
+	# # Is configured with cycles materials, ready to render with cycles render engine
+	# bpy.types.Object.is_cycles = bpy.props.BoolProperty(name='is_cycles',default=False)
+	# # Parent file
+	# bpy.types.Object.parent_file = bpy.props.StringProperty(name='parent_file',default="")
 
 	## -- Specifically for background elements -- ##
 	# Semantic Category of allowable objects (within scene)
@@ -154,7 +182,7 @@ def declare_properties():
 	### --- /DEPRECATED --- ###
 
 	## -- By class -- ## 
-	bpy.types.Object.groups = bpy.props.EnumProperty(name='groups',description='a proper property for groups',items=enum_groups)
+	bpy.types.Object.groups = bpy.props.EnumProperty(name='groups',description='Groups using this object',items=enum_groups)
 	
 	bpy.types.Group.bvpObject = bpy.props.PointerProperty(type=ObjectProps)
 	bpy.types.Group.is_object = bpy.props.BoolProperty(name='is_object',default=True)
@@ -163,17 +191,16 @@ def declare_properties():
 	#bpy.types.Group.is_bg = bpy.props.BoolProperty(name='is_bg',default=True)
 	
 	bpy.types.Action.bvpAction = bpy.props.PointerProperty(type=ActionProps)
-	
 	## -- For database management -- ##
 	# active_db
-	dbc = pymongo.MongoClient(port=bvp.Settings['db']['port'])
-	dbnm = [tuple([d,d,'Database "%ss"'%d]) for d in dbc.database_names() if not d in ['local','admin']]
+	db_tmp = bvp.bvpDB(dbname=dbname)
+	dbnm = [(d,d,'') for d in db_tmp.dbi.connection.database_names() if not d in ['local','admin']]
 	# TO DO: Add ShapeNet / ModelNet to this list! 
-	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=dbnm,name='active_db',default=bvp.Settings['db']['name']) 
-	# active_group
-	# Add .WindowManager.bvp.active_xxx?
+	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=dbnm,name='active_db',default=dbname) 
 	bpy.types.WindowManager.active_group = bpy.props.StringProperty(name='active_group',default="") 
 	bpy.types.WindowManager.active_action = bpy.props.StringProperty(name='active_action',default="") 
+	bpy.types.WindowManager.query_results = bpy.props.EnumProperty(items=enum_db_results,name='Search results')
+	# Add .WindowManager.bvp.active_xxx?
 
 ### --- Operators --- ###
 class NextScene(bpy.types.Operator):
@@ -201,35 +228,6 @@ class PrevScene(bpy.types.Operator):
 		if ScnIdx>0:
 			context.screen.scene = ScnList[ScnIdx-1]
 		return {"FINISHED"}
-
-# The next two should not be necessary; for whatever reason, I can't set grp.bvpObject.parent_file
-# or act.bvpAction.parent_file in a panel's callback, though I CAN set 
-# bpy.context.window_manager.active_group, which is ALSO a custom-defined property. WTF.
-# class SetParentFileAction(bpy.types.Operator):
-# 	"""Modifies bvp-specific property parent_file, because for whatever reason 
-# 	it can't be modified in panel context like other props. WTF."""
-# 	bl_idname = "bvp.set_parent_file_action"
-# 	bl_label = "set property 'parent_file'"
-# 	bl_options = {'REGISTER','UNDO'}
-
-# 	def execute(self,context):
-# 		ob = context.object
-# 		act = ob.animation_data.action
-# 		act.bvpAction.parent_file = bpy.data.filepath
-# 		return {"FINISHED"}
-
-# class SetParentFileObject(bpy.types.Operator):
-# 	"""Modifies bvp-specific property parent_file, because for whatever reason 
-# 	it can't be modified in panel context like other props. WTF."""
-# 	bl_idname = "bvp.set_parent_file_object"
-# 	bl_label = "set property 'parent_file'"
-# 	bl_options = {'REGISTER','UNDO'}
-
-# 	def execute(self,context):
-# 		wm = context.window_manager
-# 		grp = bpy.data.groups[wm.active_group]
-# 		grp.bvpObject.parent_file = bpy.data.filepath
-# 		return {"FINISHED"}
 
 class RescaleGroup(bpy.types.Operator):
 	"""Creates a group of Blender objects and standardizes the size.
@@ -331,24 +329,52 @@ class DBSaveObject(bpy.types.Operator):
 	bl_label = "Save the active object to the active database"
 	bl_options = {'REGISTER','UNDO'}
 	def execute(self,context):
-		raise NotImplementedError('Still waiting on computed parameters nfaces,nverts,nposes, as well as database parameter name update')
 		wm = context.window_manager
 		ob = context.object
 		grp = bpy.data.groups[wm.active_group]
+		# Parent file nonsense because we can't set bvpObject.parent_file here:
+		pfile = grp.bvpObject.parent_file
+		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
+		if thisfile=="":
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Objects/')))		
+			# Need to check for over-writing file? 
+		if pfile=="":
+			pfile = os.path.split(bpy.data.filepath)[1][:-6]
+		
 		# Compute parameters
-		nfaces = 0
-		nverts = 0
-		nposes = 0
+		## Poses
+		rig = [o for o in grp.objects if o.type=='ARMATURE']
+		nposes = None # by default
+		if rig:
+			if len(rig)>1:
+				raise Exception('More than one rig present in group %s! Abort, abort!'%grp.name)
+			rig = rig[0]
+			if rig.pose_library:
+				nposes = len(rig.pose_library.pose_markers)
+		## Faces
+		try:
+			nfaces = sum([len(oo.data.faces) for oo in grp.objects if oo.type=='MESH'])
+		except:
+			# New for version 2.63 w/ bmeshes:
+			nfaces = sum([len(oo.data.polygons) for oo in grp.objects if oo.type=='MESH'])
+		## Vertices
+		nverts = sum([len(oo.data.vertices) for oo in grp.objects if oo.type=='MESH'])
+		## Semantic categories
+		semcat = [s.strip() for s in grp.bvpObject.semantic_cat.split(',')]
+		semcat = [s.lower() for s in semcat if s]
+		## WordNet labels
+		wordnet = [s.strip() for s in grp.bvpObject.wordnet_label.split(',')]
+		wordnet = [s.lower() for s in wordnet if s]
 		#is_manifold = False # worth it? 
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
 		# Construct object struct to save
 		to_save = dict(
 			# Edited through UI
-			grp_name=grp.bvpObject.grp_name,
-			parent_file=grp.bvpObject.parent_file,
-			wordnet_label=grp.bvpObject.wordnet_label,
-			semantic_cat=grp.bvpObject.semantic_cat,
+			name=wm.active_group, # also not great.
+			parent_file=pfile, # hacky. ugly. 
+			wordnet_label=wordnet,
+			semantic_cat=semcat,
 			basic_cat=grp.bvpObject.basic_cat,
 			real_world_size=grp.bvpObject.real_world_size,
 			is_realistic=grp.bvpObject.is_realistic,
@@ -359,11 +385,31 @@ class DBSaveObject(bpy.types.Operator):
 			nposes=nposes,
 			constraints=None,
 			#is_manifold=is_manifold, # worth it? 
-			#_id='tempX12345', # dbi.db.id? generate_id?
+			#_id='tempX12345', # dbi.db.id? generate_id? Look up ID? Check database for extant
 			)
 		dbi.objects.save(to_save)
-		# TO DO: save object in parent file, wherever that is. Separte instance of Blender? 
+		save_path = os.path.join(dbpath,'Objects',pfile+'.blend')
+		if save_path==thisfile:
+			bpy.ops.wm.save_as_mainfile(filepath=save_path)
+		else:
+			raise NotImplementedError('Still WIP! Just work inside your database files, you lazy bastard!')
+			tmpf = '/tmp/action_tempfile.blend' # Set in settings?
+			bpy.ops.wm.save_as_mainfile(filepath=tmpf,copy=True)
+			script = bvp.utils.basics.load_template('Save') # 'SaveGroup' instead? This script doesn't work yet. Edit <bvp>/Scripts/Template_Save.py
+			script.format() # Depends on script
+			bvp.blend(script,pfile)		
 		return {"FINISHED"}
+
+class WordNetLookup(bpy.types.Operator):
+	bl_idname = "bvp.wordnet_lookup"
+	bl_label = "Search wordnet for the synsets associated with a word"
+	bl_options = {'REGISTER','UNDO'}
+	def execute(self,context):
+		raise NotImplementedError('Not functioning yet! (Max, get to it!)')
+		# An on-the-fly import seems best, so to not insist on WordNet
+		# as a dependency outside of the use of this function
+		from nltk.corpus import wordnet as wn
+		# etc...
 
 ## TO DO: 
 # class DBSaveBG(bpy.types.Operator):
@@ -378,11 +424,26 @@ class DBSaveAction(bpy.types.Operator):
 		ob = context.object
 		act = bpy.data.actions[wm.active_action]
 		# Compute parameters
-		# (compute translation from constraints? from animated movement+bounding box?)
+
+		## Frames
+		FR = act.animation_data.action.frame_range
+		nframes = FR[1]-FR[0]
+
+		## Semantic categories
+		semcat = [s.strip() for s in act.bvpAction.semantic_cat.split(',')]
+		semcat = [s.lower() for s in semcat if s]
+		## WordNet labels
+		wordnet = [s.strip() for s in act.bvpAction.wordnet_label.split(',')]
+		wordnet = [s.lower() for s in wordnet if s]
+
 		# Get parent file, determine if it is THIS file.
 		pfile = act.bvpAction.parent_file
-		pfile = os.path.join(bvp.Settings['db']['path'],'Actions',pfile)
-		thisfile = bpy.data.filepath if len(bpy.data.filepath)>0 else pfile
+		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
+		if thisfile=="":
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
+			# Need to check for over-writing file? 
+		if pfile=="":
+			pfile = os.path.split(bpy.data.filepath)[1][:-6]
 
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
@@ -390,20 +451,23 @@ class DBSaveAction(bpy.types.Operator):
 		to_save = dict(
 			# Edited through UI
 			act_name=act.name,
-			parent_file=act.bvpAction.parent_file,
+			parent_file=pfile,
 			wordnet_label=act.bvpAction.wordnet_label,
 			semantic_cat=act.bvpAction.semantic_cat,
 			fps=act.bvpAction.fps,
-			nframes=act.bvpAction.nframes,
+			nframes=nframes,
+			is_cyclic=act.bvpAction.is_cyclic,
 			is_translating=act.bvpAction.is_translating,
+			is_transitive=act.bvpAction.is_transitive,
 			is_armature=act.bvpAction.is_armature,
 			is_verified=False, # Will be done through database later, once it's in there
 			# Computed
 			# Constraints?? Bounding box??
 			)
 		dbi.actions.save(to_save)
+		save_path = os.path.join(dbpath,'Actions',pfile+'.blend')
 		if pfile==thisfile:
-			bpy.ops.wm.save_as_mainfile(filepath=pfile)
+			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
 			raise NotImplementedError('Still WIP! Just work inside your database files, you lazy bastard!')
 			tmpf = '/tmp/action_tempfile.blend' # Set in settings?
@@ -413,65 +477,79 @@ class DBSaveAction(bpy.types.Operator):
 			bvp.blend(script,pfile)
 
 class DBSearchDialog(bpy.types.Operator):
-	bl_idname = "bvp.db_search_object"
+	bl_idname = "bvp.db_search"
 	bl_label = "Query database for:"
- 
-	#full_import = bpy.props.BoolProperty(name="full_import",default=False,text='Import full object')
+	bl_options = {'REGISTER','UNDO'}
+
 	active_db = bpy.props.StringProperty(name="active_db")
 	bvp_type = bpy.props.EnumProperty(name='BVP type',
 		items=[('action','action',""),
-			   ('object','object',""),
 			   ('background','background',""),
+			   ('object','object',""),
 			   ('sky','sky',""),
-			   ('shadow','shadow',"")])
+			   ('shadow','shadow',"")],
+		default='object')
 	semantic_cat = bpy.props.StringProperty(name='Loose semantic label',default="")
 	wordnet_label =  bpy.props.StringProperty(name='Precise WordNet label',default="")
-	grp_name = bpy.props.StringProperty(name='Group/Action name',default="")
+	ename = bpy.props.StringProperty(name='Group/Action name',default="")
 	# Real world size min/max?
 
 	def execute(self, context):
 		global db_results
+		global last_import
 		wm = context.window_manager
-		dbi = bvp.bvpDB(dbname=wm.active_db)
-		prop = ['semantic_cat','wordnet_label','grp_name']
-		pnm = ['semanticCat','wordnet_label']
-		if self.bvp_type=='action':
-			pnm+=['act_name']
-		else:
-			pnm+=['grpName']
-		query = dict()
-		for p,pn in zip(prop,pnm):
-			pp = getattr(self,p)
-			if pp:
-				query[pn] = pp
+		dbi = bvp.bvpDB(dbname=self.active_db)
+		props = ['semantic_cat','wordnet_label','ename']
+		query = dict((p,getattr(self,p)) for p in props if getattr(self,p))
+		print(query) # unnecessary
 		db_results = [r for r in dbi.objects.find(query)]
-		# Set to wm.query_result; by grp_name??
-		import pprint
-		pprint(db_results)
+		last_import = self.bvp_type
+		from pprint import pprint # unnecessary
+		pprint(db_results) # unnecessary
 		return {'FINISHED'}
  
 	def invoke(self, context, event):
 		wm = context.window_manager
 		self.active_db = wm.active_db
-		self.bvp_type='object'
 		return context.window_manager.invoke_props_dialog(self)
+
+class DBImport(bpy.types.Operator):
+	bl_idname = "bvp.db_import"
+	bl_label = "Import scene element from database"
+	bl_options = {'REGISTER','UNDO'}
+	proxy_import = False
+	def execute(self,context): 
+		global db_results
+		global last_import
+		
+		wm = bpy.context.window_manager
+		to_import = [d for d in db_results if d['name']==wm.query_results][0]
+		if last_import=='object':
+			print('--- importing: ---')
+			print(to_import)
+			O = bvp.bvpObject(**to_import)
+			O.Place(proxy=self.proxy_import)
+		elif last_import=='action':
+			raise NotImplementedError('Not yet! need to apply actions to objects!')
+		return {'FINISHED'}
+
+class DBImportProxy(DBImport,bpy.types.Operator):
+	bl_idname = "bvp.db_import_proxy"
+	bl_label = "Import scene element from database (proxy only)"
+	bl_options = {'REGISTER','UNDO'}
+
+	proxy_import = True
 
 ### --- Misc. supporting classes --- ###
 '''
 # UI list option for displaying databases (more flexible, more space)
 # Need database creation option (?)
-class BVP_DB_LIST(UIList):
+class BVP_DB_LIST(bpy.types.UIList):
 	"""List class to establish database list in DB tools panel"""
 	def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
 		split = layout.split(0.2)
 		split.label(str(item.id)) # item.name
 		split.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
-# (move up w/ other property definitions if we implement this)
-class DBprop(bpy.types.PropertyGroup):
-	"""Grouped database properties"""
-	id = bpy.props.IntProperty()
-	port = bpy.props.IntProperty(name='port',default=bvp.Settings['db']['port'])
-	path = bpy.props.StringProperty(name='path',default=bvp.Settings['db']['path'])
 '''
 
 ### --- Panels --- ###
@@ -495,8 +573,8 @@ class BVP_PANEL_db_tools(View3DPanel,Panel):
 		layout = self.layout
 		row = layout.row()
 		# # For extensible list of databases, maybe use the following line.
-		# # It's less compact but more flexible; requires definition of 'active_db'
-		# # property  maybe implement later
+		# # It's less compact but more flexible; requires definition of 'db_index'
+		# # property. Maybe implement later.
 		# row.template_list("BVP_DB_LIST", "", wm, "active_db",wm,"db_index")
 		spl = layout.split()
 		col = spl.column()
@@ -505,24 +583,23 @@ class BVP_PANEL_db_tools(View3DPanel,Panel):
 		col.prop(wm, "active_db",text='')
 
 		row = layout.row()
-		row.operator("bvp.db_search_object",text="Search DB")
-		# To come:
-		# DB results as selectable list, with buttons to import full or proxy
-		class barf(object):
-			db_res = bpy.props.EnumProperty(name='Search results',items=enum_db_results)
+		row.operator("bvp.db_search",text="Search DB")
 		row = layout.row()
-		row.prop(barf,'db_res')
+		row.prop(wm,'query_results')
+		if len(db_results)>0:
+			spl = layout.split()
+			col = spl.column()
+			col.operator('bvp.db_import',text='Place Full')
+			col = spl.column()
+			col.operator('bvp.db_import_proxy',text='Place Proxy')
+			#col.label('Import Full')
 
 class BVP_PANEL_object_tools(View3DPanel,Panel):
 	"""Creates a BVP panel in the Tools window"""
 	bl_label = "Object tools"
 	bl_idname = "BVP_object_tools"
 
-	#@classmethod
-	#def poll(self,context):
-	#	if context.object:
-	#		return len(context.object.users_group)
-	# I don't want to use poll, because I want to still display this window 
+	# NOTE: I don't want to use poll, because I want to still display this window 
 	# if there isn't an active object (for Create group / rescale button)
 	def draw(self, context):
 		layout = self.layout
@@ -551,6 +628,7 @@ class BVP_PANEL_object_tools(View3DPanel,Panel):
 				col.label("BVP object:")
 				col.label("File:")
 				col.label("Labels:")
+				col.label("Basic cat:")
 				col.label("WordNet:")
 				col.label('Real size:')
 				# Boolean properties
@@ -563,70 +641,59 @@ class BVP_PANEL_object_tools(View3DPanel,Panel):
 				col.prop(ob,'groups',text="")
 				col.prop(grp.bvpObject,'parent_file',text='')
 				col.prop(grp.bvpObject,'semantic_cat',text='')
+				col.prop(grp.bvpObject,'basic_cat',text='')
 				col.prop(grp.bvpObject,'wordnet_label',text='')
 				col.prop(grp.bvpObject,'real_world_size',text='')
 				col.prop(grp.bvpObject,'is_cycles',text='cycles')
 				# Button for re-scaling object groups 
 				col.operator('bvp.db_save_object',text='Save to DB')
 
-				# Button to clear all objects in group (and all traces from memory?) (including materials, etc...)
 class BVP_PANEL_action_tools(View3DPanel,Panel):
 	"""Creates a BVP actions panel in the Tools window"""
 	bl_label = "Action tools"
 	bl_idname = "BVP_action_tools"
 
+	# Don't display this dialog if there isn't an action available.
 	@classmethod
 	def poll(self,context):
 		if context.object:
 			if context.object.animation_data:
 				return True
-	# I don't want to use poll, because I want to still display this window 
-	# if there isn't an active object (for Create group / rescale button)
 	def draw(self, context):
-		global act_parent_file
-		layout = self.layout
-		row = layout.row()
-		row.label(act_parent_file)
 		# Get currently-selected object
 		ob = context.object	
 		wm = context.window_manager
 		act = ob.animation_data.action
 		wm.active_action = act.name
-
-		row = layout.row()
-		#act = bpy.data.actions[wm.active_action]
-		if act.bvpAction.parent_file=='':
-			act_parent_file = os.path.split(bpy.data.filepath)[1]
-		else:
-			# Default to saving to this file
-			act_parent_file = act.bvpAction.parent_file
-		if not act_parent_file[-6:]=='.blend':
-			act_parent_file+='.blend'
-			#bpy.ops.bvp.set_parent_file_action()
-			#act.bvpAction.parent_file = str(bpy.data.filepath)
-		
-		spl = layout.split()
-		
+		# Layout
+		layout = self.layout
+		spl = layout.split()	
 		## -- 1st column -- ##
 		col = spl.column()
-		col.label("BVP action:")
+		col.label("Name:")
 		col.label("File:")
 		col.label("Labels:")
 		col.label("WordNet:")
+		col.label("Frame rate:")
 		# Boolean properties
+		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
 		col.prop(act.bvpAction,'is_translating',text='translating')
-		
+		col.operator('bvp.wordnet_lookup',text='Search WordNet')
 		## -- 2nd column -- ##
 		col = spl.column()
 		col.prop(act,'name',text="")
 		col.prop(act.bvpAction,'parent_file',text='')
 		col.prop(act.bvpAction,'semantic_cat',text='')
 		col.prop(act.bvpAction,'wordnet_label',text='')
-		col.prop(act.bvpAction,'is_armature',text='arm. action')
+		col.prop(act.bvpAction,'fps',text="")
+		# Boolean properties
+		col.prop(act.bvpAction,'is_transitive',text='transitive')
+		col.prop(act.bvpAction,'is_armature',text='armature')
 		# Button for re-scaling object groups 
 		col.operator('bvp.db_save_action',text='Save to DB')
-
-		# Button to clear action (and all traces) from memory? (including fcurves, etc?)
+		if isinstance(ob.data,bpy.types.Armature):
+			row = layout.row()
+			row.label('%d bones'%len(ob.data.bones))
 
 class BVP_PANEL_scene_tools(View3DPanel,Panel):
 	"""Creates a BVP panel in the Tools window for scene actions"""
@@ -659,49 +726,32 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 
 def register():
 	# Order of registering props/object should perhaps be examined for optimality...
-	# It works this way, but it's not so clean.
-	for c in [ObjectProps,ActionProps]: #ActionProps, BGProps]: 
+	# It works this way, but it doesn't seem clean.
+	for c in [ObjectProps,ActionProps]: #, BGProps, SkyProps]: 
 		# Do these in a separate file? Imported, registered separately? 
 		bpy.utils.register_class(c)
 	declare_properties()
 	# Lists again for panels, operators?
 	bpy.utils.register_module(__name__)
-	# Invoke the dialog when loading
-	#bpy.ops.bvp.db_search_object('INVOKE_DEFAULT')
-
-	#bpy.types.WindowManager.db_list = CollectionProperty(type=DBprop) #name='ZoneCollection',
-	#bpy.types.WindowManager.db_index = IntProperty()
+	
+	#bpy.types.WindowManager.db_list = bpy.props.CollectionProperty(type=DBprop) #name='Databases',
+	#bpy.types.WindowManager.db_index = bpy.props.IntProperty()
 	#wm = bpy.context.window_manager
 	#wm.db_index = 0
-	
-	# # Operators to register (do in list?)
-	# bpy.utils.register_class(RescaleGroup)
-	# bpy.utils.register_class(PrevScene)
-	# bpy.utils.register_class(NextScene)
-	# # Lots of panels to register... (register __module__??)
-	# bpy.utils.register_class(BVP_PANEL_db_tools)
-	# bpy.utils.register_class(BVP_PANEL_object_tools)
-	# bpy.utils.register_class(BVP_PANEL_scene_tools)
-	# #bpy.utils.register_class(BVP_PANEL_action_tools)
 
 def unregister():
-	# Delete temp properties
-	bpy.utils.unregister_class(ObjectProps)
+	# Un-register classes(necessary?)
+	#for c in [ObjectProps,ActionProps]: #ActionProps, BGProps]: 
+	#	# Do these in a separate file? Imported, registered separately? 
+	#	bpy.utils.unregister_class(c)
 	bpy.utils.unregister_module(__name__)
+	# Delete temp properties
 	del bpy.types.WindowManager.active_db
 	del bpy.types.WindowManager.active_group
+	del bpy.types.WindowManager.active_action
+	del bpy.types.WindowManager.query_results
 	# More? 
 	
-	# # Operators
-	# bpy.utils.unregister_class(RescaleGroup)
-	# bpy.utils.unregister_class(PrevScene)
-	# bpy.utils.unregister_class(NextScene)
-	# # Panels
-	# bpy.utils.unregister_class(BVP_PANEL_db_tools)
-	# bpy.utils.unregister_class(BVP_PANEL_object_tools)
-	# bpy.utils.unregister_class(BVP_PANEL_scene_tools)
-	# #bpy.utils.register_class(BVP_PANEL_action_tools)
-
 if __name__ == "__main__":
 	# declare_properties() #(?)
 	register()

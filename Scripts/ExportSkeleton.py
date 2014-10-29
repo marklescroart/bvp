@@ -38,7 +38,7 @@ grpName = 'Reptile_005_Frog' #'Mammal_005_Cat'
 #for grpName in Lib.getGrpNames():
 # Get & add object
 O = bvp.bvpObject(grpName,Lib,size3D=10)
-O.PlaceObj()
+O.Place()
 G = bpy.context.object
 # Make proxy objects & create render mesh for all objects in group
 ObList = []

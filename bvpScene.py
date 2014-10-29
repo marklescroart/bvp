@@ -216,18 +216,18 @@ class bvpScene(object):
 		# set cursort to center
 		set_cursor((0,0,0))
 		# place bg
-		self.bg.PlaceBG()
+		self.bg.Place()
 		if self.bg.realWorldSize<50. and 'indoor' in self.bg.semanticCat:
 			# Due to a problem with skies coming inside the corners of rooms
 			Scale = self.bg.realWorldSize*1.5
 		else:
 			Scale = self.bg.realWorldSize
-		self.sky.PlaceSky(num=self.num,Scale=Scale)
-		self.cam.PlaceCam(IDname='cam%03d'%self.num)
+		self.sky.Place(num=self.num,Scale=Scale)
+		self.cam.Place(IDname='cam%03d'%self.num)
 		if self.shadow:
 			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
 		for o in self.objects:
-			o.PlaceObj()
+			o.Place()
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
 		scn.layers = [True]*20
@@ -243,14 +243,14 @@ class bvpScene(object):
 		# set cursort to center
 		set_cursor((0,0,0))
 		# place bg
-		self.bg.PlaceBG()
-		self.sky.PlaceSky(num=self.num,Scale=self.bg.realWorldSize)
-		self.cam.PlaceCam(IDname='cam%03d'%self.num)
+		self.bg.Place()
+		self.sky.Place(num=self.num,Scale=self.bg.realWorldSize)
+		self.cam.Place(IDname='cam%03d'%self.num)
 		if self.shadow:
 			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
 		for o in self.objects:
 			try:
-				o.PlaceObj()
+				o.Place()
 			except:
 				pass
 		scn.name = self.fpath
