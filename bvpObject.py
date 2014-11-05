@@ -326,3 +326,4 @@ class bvpObject(object):
 		# Set back to previous mode 
 		# (IMPORTANT: otherwise Blender may puke and die with next command)
 		bpy.ops.object.posemode_toggle()
+

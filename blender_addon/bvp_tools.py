@@ -13,6 +13,21 @@ type(bpy.data.scenes['Scene'].bl_rna.properties['frame_start'])
 
 http://blender.stackexchange.com/questions/15917/populate-a-list-with-custom-property-dictionary-data
 
+# Useful: latest builds by OS
+https://builder.blender.org/download/
+
+# Material library:
+https://sites.google.com/site/aleonserra/home/scripts/matlib-vx#TOC-Demo-Video:
+
+# Meta-Androcto / Peter Casseta libraries:
+# Meta: 
+http://blenderartists.org/forum/showthread.php?252957-Cycles_Matlib-Beta-Release!-Help-Wanted!/page4
+# Peter Casseta online/offline:
+http://blenderartists.org/forum/showthread.php?256334-An-Online-Material-Library-for-Cycles
+
+# Creating objects:
+http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Cookbook/Code_snippets/Three_ways_to_create_objects
+
 Dialog box example (for saving??)
 http://www.blender.org/documentation/blender_python_api_2_57_release/bpy.types.Operator.html
 

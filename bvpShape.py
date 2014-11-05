@@ -9,6 +9,8 @@ import numpy as np
 from scipy import sparse
 import scipy.sparse.linalg as la
 import mathutils as bmu
+import functools
+from bvp.utils.blender import grab_only
 
 def _memo(fn):
     """Helper decorator memoizes the given zero-argument function.
@@ -22,16 +24,16 @@ def _memo(fn):
         return self._cache[id(fn)]
     return memofn
 
-class Shape(object):
-    """Abstraction for manifold (?) mesh shape.
+class bvpShape(object):
+    """Class to hold geometric (triangulated manifold) information for bvpObjects.
+    Mostly useful WITHIN Blender for now.
 
-    Based on Alex Huth's Surface class from cortex.polyutils.py (from pycortex). 
+    Based on Alex Huth's Surface class from cortex.polyutils.py (from pycortex: 
+    see https://github.com/gallantlab/pycortex/). 
 
     Implements some useful functions for dealing with functions across meshes.
-
-    TO BE MOVED to bvpObject. 
     """
-    def __init__(self, pts, polys):
+    def __init__(self, pts, polys,edges=None,make_object=None):
         """Initialize Shape.
 
         Parameters
@@ -40,14 +42,97 @@ class Shape(object):
             Location of each vertex in space (arbitrary units). Order is x, y, z.
         polys : 2D ndarray, shape (total_polys, 3)
             Indices of the vertices in each triangle in the surface.
+        make_object : string | None
+            if a string is provided, a new Blender object with name `make_object` is created.
         """
-        self.pts = pts.astype(np.double)
+        if isinstance(pts,np.ndarray):
+            self.pts = pts.astype(np.double)
         self.polys = polys
-
+        self.edges = edges
+        # For now: demand bpy
+        if not make_object is None:
+            if edges is None:
+                raise Exception("Must supply edges to make new shape!")
+            self.me = bpy.data.meshes.new(make_object+'_mesh')
+            self.me.from_pydata(pts,edges,polys)
+            self.ob = bpy.data.objects.new(make_object,self.me)
+        else: 
+            self.me = None
+            self.ob = None
         self._cache = dict()
         self._rlfac_solvers = dict()
         self._nLC_solvers = dict()
 
+    @classmethod
+    def from_object(cls,obgrp,name=None,replace=True):
+        """Get pts,polys from blender object (i.e., a group of potentially many Blender objects)
+
+        Eventually:
+        Combines multiple meshes into one via (??), finds surface, maps surface to sphere (?)
+        
+        For now:
+        returns pts,polys iff mesh is already a single (g0?) manifold.
+
+        Parameters
+        ----------
+        obgrp : blender group instance
+            Should be the group defining a BVP object (for now: that has already been fully imported into the scene)
+            ALSO accepts blender object instances... for now?
+        name : string
+            Name for newly-formed shape object
+        Returns
+        -------
+        bvpShape : bvpShape instance
+            Having defined `pts` & `polys`
+
+        """
+        # Test for single (manifold?) mesh:
+        if isinstance(obgrp,bpy.types.Object):
+            obgrp = [obgrp]
+        elif isinstance(obgrp,bpy.types.Group):
+            obgrp = list(obgrp.objects)
+        if len(obgrp)>1:
+            # Ruh roh... (TEMP ERRROR for multiple objects) 
+            raise NotImplementedError("Can't handle multi-object groups yet!")
+        for ob in obgrp:
+            # Check for multiple meshes within group
+            grab_only(ob)
+            bpy.ops.mesh.separate(type='LOOSE')
+            nobjects = len(bpy.context.selected_objects)
+            if nobjects>1:
+                # Ruh roh... (TEMP ERROR for multiple meshes)
+                raise NotImplementedError("Can't handle multi-mesh objects yet!")
+            for oo in bpy.context.selected_objects:
+                print("Getting pts, polys, edges...")
+                #Get pts, polys
+                # Was np.array... (may need arrays for math in steps to be added)
+                pts = [v.co for v in oo.data.vertices]
+                polys = [p.vertices for p in oo.data.polygons]
+                edges = [e.vertices for e in oo.data.edges]
+
+            # EVENTUALLY, concatenate pts,polys,edges somehow...
+            # Power crust?
+            # Spherize?
+
+        # Make new object w/ concatenated pts, polys, edges
+        S = cls.__new__(cls)
+        S.__init__(pts,polys,edges=edges,make_object=name)
+       
+        # Triangulate mesh
+        S.triangulate()
+        # Re-compute pts, polys
+        S.pts = np.array([v.co for v in S.ob.data.vertices])
+        S.polys = np.array([p.vertices for p in S.ob.data.polygons])
+        S.edges = np.array([p.vertices for p in S.ob.data.edges])
+        # Replace current object(s)
+        if replace:
+            for ob in obgrp:
+                bpy.context.scene.objects.unlink(ob)
+            bpy.context.scene.objects.link(S.ob)
+            grab_only(S.ob)
+        # Output
+        return S
+        
     @property
     @_memo
     def ppts(self):
@@ -62,6 +147,8 @@ class Shape(object):
         """
         npt = len(self.pts)
         npoly = len(self.polys)
+        print(npt)
+        print(npoly)
         return sparse.coo_matrix((np.ones((3*npoly,)), # data
                                   (np.hstack(self.polys.T), # row
                                    np.tile(range(npoly),(1,3)).squeeze())), # col
@@ -84,7 +171,7 @@ class Shape(object):
     @property
     @_memo
     def face_normals(self):
-        """Normal vector for each face.
+        """Normal vector for each face. [keep?]
         """
         # Compute normal vector direction
         nnfnorms = np.cross(self.ppts[:,1] - self.ppts[:,0], 
@@ -97,7 +184,7 @@ class Shape(object):
     @property
     @_memo
     def vertex_normals(self):
-        """Normal vector for each vertex (average of normals for neighboring faces).
+        """Normal vector for each vertex (average of normals for neighboring faces). [keep?]
         """
         # Average adjacent face normals
         nnvnorms = np.nan_to_num(self.connected.dot(self.face_normals) / self.connected.sum(1)).A
@@ -107,7 +194,7 @@ class Shape(object):
     @property
     @_memo
     def face_areas(self):
-        """Area of each face.
+        """Area of each face. [keep?]
         """
         # Compute normal vector (length is face area)
         nnfnorms = np.cross(self.ppts[:,1] - self.ppts[:,0], 
@@ -176,7 +263,7 @@ class Shape(object):
         Be2 = sparse.coo_matrix((self.face_areas, (self.polys[:,2], self.polys[:,0])), (npt, npt))
         Be3 = sparse.coo_matrix((self.face_areas, (self.polys[:,0], self.polys[:,1])), (npt, npt))
         Bd = self.connected.dot(self.face_areas) / 6
-        dBd = scipy.sparse.dia_matrix((Bd,[0]), (len(D),len(D)))
+        dBd = sparse.dia_matrix((Bd,[0]), (len(D),len(D)))
         B = (Be1 + Be1.T + Be2 + Be2.T + Be3 + Be3.T)/12 + dBd
         return B, D, W, V
 
@@ -564,13 +651,82 @@ class Shape(object):
             n = k
         evals,evecs = la.eigsh(A,M=B,k=n,which="SM")
         return evals,evecs
-    def add_shapekey(name='key'):
-        raise NotImplementedError('Need blender object attribute first')
-        # Define ob as self.bl_object?
-        ob.shape_key_add(name=nm)
-        skey = ob.data.shape_keys.key_blocks[nm]
+
+    def evec_varexp(self,nevs=10):
+        """Compute the amount of variance in vertex position explained by each LBO eigenvector
+
+        STILL WIP. Unclear how best to turn this into a measure of variance explained. Currently
+        it's just error, which is not a great way to do it, and also seems broken...
+        """
+        B, D, W, V = self.laplace_operator
+        pts_sp = sparse.csr_matrix(self.pts)
+        eigvals,eigvecs = self.evecs(k=nevs)
+        ev_sp = sparse.csr_matrix(eigvecs)
+        err = np.zeros((nevs,))
+        for n in range(nevs):
+            c = (pts_sp.T.dot(B)).dot(ev_sp[:,:n])
+            newpts = ev_sp[:,:n].dot(c.T)
+            # Compare newpts to pts
+            err[n] = np.sum(np.sum(np.array((pts_sp-newpts).todense())**2,axis=1),axis=0)
+        return err
+
+    def _map_colors(self,v,cmap=None):
+        """Normalize a vector to 0-1, apply colormap to it, return list of colors"""
+        if cmap is None:
+            from matplotlib import cm
+            cmap = cm.RdBu_r
+        v -= np.min(v)
+        v /= np.max(v)
+        return cmap(v)
+
+    def _set_vertex_colors(self,col_list,name='Col'):
+        """Set mesh vertex colors to a specified color"""
+        from matplotlib import cm
+        # Get mesh
+        me = self.ob.data 
+        # Get vertex color
+        me.vertex_colors.new(name=name)
+        color_layer = me.vertex_colors[name]
+        i = 0
+        for poly in me.polygons:
+            for idx in poly.vertices: #loop_indices:
+                color_layer.data[i].color = col_list[idx,:3]
+                i += 1
+    def show_evecs(self,nevs=5,cmap=None,evs=None):
+        if evs is None:
+            evals,evs = self.evecs(k=nevs) # evals,evecs = 
+            #evs = evecs[:,:nevs]
+        else:
+            evs = evs[:,:nevs]
+        for iv,v in enumerate(evs.T):
+            clist = self._map_colors(v,cmap=cmap)
+            self._set_vertex_colors(clist,'EigenVec #%d'%iv)
+
+    def add_shapekey(newpts,name='key'):
+        """Add a shape key to a given the shape's blender object (self.shape), with vertices in 
+        position newpts (newpts is a list of vertices as long as self.pts)"""        
+        self.ob.shape_key_add(name=nm)
+        skey = self.ob.data.shape_keys.key_blocks[nm]
         for iv,loc in enumerate(newpts):
             skey.data[iv].co = bmu.Vector(loc)
+
+    def triangulate(self):
+        """Make sure mesh is triangular, and thus amenable to manifold shape analysis
+
+        This is a BLENDER OPERATOR.
+        """
+        # Set mode to object mode?
+        # Object must be in the current scene to apply modifiers.
+        bpy.context.scene.objects.link(self.ob)
+        grab_only(self.ob)
+        bpy.context.scene.update() # unnecessary?
+        # Create & apply modifier
+        self.ob.modifiers.new('tri','TRIANGULATE')
+        self.ob.modifiers['tri'].quad_method = 'BEAUTY' # do it the slow, pretty way
+        self.ob.modifiers['tri'].ngon_method = 'BEAUTY' # do it the slow, pretty way
+        bpy.ops.object.modifier_apply(modifier='tri',apply_as='DATA')
+        # Un-link again (?)
+        bpy.context.scene.objects.unlink(self.ob)
 
     #/ML additions
     def get_graph(self):
@@ -891,7 +1047,6 @@ def measure_volume(pts, polys):
     return mp.volume
 
 ### MARK(ish) CODE ###
-# TO DO: convert all 
 
 def _computeAB(pts,polys):
     """Finds the A and B terms for Laplace-Beltrami eigendecomposition...
@@ -960,49 +1115,26 @@ def _computeAB(pts,polys):
     B = B.tocsr()
     return A,B
 
-def pts_polys(ob):
-	pts = np.array([v.co for v in ob.data.vertices])
-	polys = np.array([p.vertices for p in ob.data.polygons])
-	return pts, polys
 
-def get_evecs(ob,k=None):
-	"""Get eigenvectors and eigenvalues of Laplace-Beltrami operator for a manifold mesh object.
+# def get_evecs(ob,k=None):
+# 	"""Get eigenvectors and eigenvalues of Laplace-Beltrami operator for a manifold mesh object.
 
-	k is the number of eigenvectors to compute.
+# 	k is the number of eigenvectors to compute.
 
-	"""
-	pts,polys = pts_polys(ob)
-	# Make shape object from 
-	A,B = _computeAB(pts,polys)
-	if k is None:
-		n = int(len(pts)*.8)
-	else:
-		n = k
-	evals,evecs = la.eigsh(A,M=B,k=n,which="SM")
-	return evals, evecs
+# 	"""
+# 	pts,polys = pts_polys(ob)
+# 	# Make shape object from 
+# 	A,B = _computeAB(pts,polys)
+# 	if k is None:
+# 		n = int(len(pts)*.8)
+# 	else:
+# 		n = k
+# 	evals,evecs = la.eigsh(A,M=B,k=n,which="SM")
+# 	return evals, evecs
 
-def map_colors(v,cmap=None):
-	"""Normalize a vector to 0-1, apply colormap to it"""
-	if cmap is None:
-		from matplotlib import cm
-		cmap = cm.RdBu_r
-	v -= np.min(v)
-	v /= np.max(v)
-	return cmap(v)
 
-def set_vertex_colors(ob,cmap,name='Col'):
-	"""Set mesh vertex colors to a specified color map"""
-	from matplotlib import cm
-	# Get mesh
-	me = ob.data 
-	# Get vertex color
-	me.vertex_colors.new(name=name)
-	color_layer = me.vertex_colors[name]
-	i = 0
-	for poly in me.polygons:
-		for idx in poly.vertices: #loop_indices:
-			color_layer.data[i].color = cmap[idx,:3]
-			i += 1
+
+
 def construct_evecs(ob,evecs,B,n):
 	pts,polys = pts_polys(ob)
 	#c = (v' * B)* evecs(:,1:Nmax) # matlab code
@@ -1018,12 +1150,6 @@ def construct_evecs(ob,evecs,B,n):
 	for iv,loc in enumerate(newpts):
 		skey.data[iv].co = bmu.Vector(loc)
 
-def triangulate(ob):
-	"""Make sure mesh is triangular, and thus amenable to manifold shape analysis"""
-	ob.modifiers.new('tri','TRIANGULATE')
-	ob.modifiers['tri'].quad_method = 'BEAUTY' # do it the slow, pretty way
-	ob.modifiers['tri'].ngon_method = 'BEAUTY' # do it the slow, pretty way
-	bpy.ops.object.modifier_apply(modifier='tri')
 
 
 def make_vertex_color_material(ob):
@@ -1060,17 +1186,7 @@ def make_vertex_color_material(ob):
 	 
 	my_object.materials.append(mat)
 
-def compute_eig_variance(eigvecs,B,pts,nevs=10):
-	"""Compute the amount of variance in vertex position explained by each LBO eigenvector"""
-	pts_sp = sparse.csr_matrix(pts)
-	ev_sp = sparse.csr_matrix(eigvecs)
-	err = np.zeros((nevs,))
-	for n in range(nevs):
-		c = (pts_sp.T.dot(B)).dot(ev_sp[:,:n])
-		newpts = ev_sp[:,:n].dot(c.T)
-		# Compare newpts to pts
-		err[n] = np.sum(np.sum(np.array((pts_sp-newpts).todense())**2,axis=1),axis=0)
-	return err
+
 
 def show_ica(ob,):
 	pass
