@@ -25,7 +25,7 @@ Dependencies - python 3.X (X depends on your version of blender):
 numpy 
 matplotlib 
 scipy
-pymongo
+pymongo # MOVE to optional dependency...
 
 #?# blenrig add-on scripts (available at jpbouza.com.ar/wp/downloads/blenrig/current-release/blenrig-4-0) for some models
 #?# OpenEXR for handling Z depth / normal images

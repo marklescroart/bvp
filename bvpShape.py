@@ -4,13 +4,17 @@
 TO DO: generalize so that these can be used outside of Blender? Or do we care, because 
 Blender is our storage for all mesh geometry...?
 '''
-import bpy
+import bvp
 import numpy as np
 from scipy import sparse
 import scipy.sparse.linalg as la
-import mathutils as bmu
 import functools
-from bvp.utils.blender import grab_only
+
+if bvp.Is_Blender:
+    from bvp.utils.blender import grab_only
+    import mathutils as bmu
+    import bpy
+
 
 def _memo(fn):
     """Helper decorator memoizes the given zero-argument function.
@@ -52,12 +56,12 @@ class bvpShape(object):
         # For now: demand bpy
         if not make_object is None:
             if edges is None:
-                raise Exception("Must supply edges to make new shape!")
-            self.me = bpy.data.meshes.new(make_object+'_mesh')
-            self.me.from_pydata(pts,edges,polys)
-            self.ob = bpy.data.objects.new(make_object,self.me)
+                #raise Exception("Must supply edges to make new shape!")
+                edges = []
+            me = bpy.data.meshes.new(make_object+'_mesh')
+            me.from_pydata(pts,edges,polys)
+            self.ob = bpy.data.objects.new(make_object,me)
         else: 
-            self.me = None
             self.ob = None
         self._cache = dict()
         self._rlfac_solvers = dict()
@@ -116,21 +120,31 @@ class bvpShape(object):
 
         # Make new object w/ concatenated pts, polys, edges
         S = cls.__new__(cls)
-        S.__init__(pts,polys,edges=edges,make_object=name)
-       
-        # Triangulate mesh
-        S.triangulate()
+        if replace:
+            S.__init__(pts,polys,edges=edges,make_object=name)
+        else:
+            if len(obgrp)>1:
+                raise NotImplementedError("Don't know what to do with multi-object groups!")
+            S.__init__(pts,polys,edges=edges,make_object=None)
+            S.ob = obgrp[0]
+        # Triangulate mesh (if necessary)
+        polytest = np.array([len(p.vertices) for p in S.ob.data.polygons])
+        if np.max(polytest)>3:
+            S.triangulate()
+        
         # Re-compute pts, polys
         S.pts = np.array([v.co for v in S.ob.data.vertices])
         S.polys = np.array([p.vertices for p in S.ob.data.polygons])
         S.edges = np.array([p.vertices for p in S.ob.data.edges])
-        # Replace current object(s)
+        
+        # (optionally) replace current object(s)
         if replace:
             for ob in obgrp:
                 bpy.context.scene.objects.unlink(ob)
             bpy.context.scene.objects.link(S.ob)
-            grab_only(S.ob)
+        
         # Output
+        grab_only(S.ob)
         return S
         
     @property
@@ -642,33 +656,42 @@ class bvpShape(object):
 
         return make_surface_graph(self.polys)
     # ML additions:
+    #@property
+    #@_memo
+    # Don't want _memo, b/c input k makes it complicated...?
     def evecs(self,k=None):
         B, D, W, V = self.laplace_operator
         A = V-W
         if k is None:
-            n = int(len(self.pts)*.8)
+            # All eigenvectors of LBO
+            n = int(len(self.pts)-1)
         else:
             n = k
         evals,evecs = la.eigsh(A,M=B,k=n,which="SM")
         return evals,evecs
 
-    def evec_varexp(self,nevs=10):
+    def evec_varexp(self,nevs=None):
         """Compute the amount of variance in vertex position explained by each LBO eigenvector
 
         STILL WIP. Unclear how best to turn this into a measure of variance explained. Currently
         it's just error, which is not a great way to do it, and also seems broken...
         """
-        B, D, W, V = self.laplace_operator
-        pts_sp = sparse.csr_matrix(self.pts)
+        if nevs is None:
+            nevs = len(self.pts)-1
+        # Possibly too expensive w/ large meshes...
         eigvals,eigvecs = self.evecs(k=nevs)
-        ev_sp = sparse.csr_matrix(eigvecs)
-        err = np.zeros((nevs,))
+        print("-- done computing eigenvalues --")
+        pt_cov = np.cov(self.pts)
+        varexp = np.zeros((nevs,))
         for n in range(nevs):
-            c = (pts_sp.T.dot(B)).dot(ev_sp[:,:n])
-            newpts = ev_sp[:,:n].dot(c.T)
+            newpts = self.reconstruct_evecs(n,eigvecs=eigvecs)
+            if n%5==0:
+                print('done with %d reconstructions'%n)
+            # Possibly too expensive w/ large meshes:
+            reconst_cov = np.cov(newpts.todense()) 
             # Compare newpts to pts
-            err[n] = np.sum(np.sum(np.array((pts_sp-newpts).todense())**2,axis=1),axis=0)
-        return err
+            varexp[n] = 1-(np.var(reconst_cov-pt_cov)/np.var(pt_cov))
+        return varexp
 
     def _map_colors(self,v,cmap=None):
         """Normalize a vector to 0-1, apply colormap to it, return list of colors"""
@@ -692,6 +715,7 @@ class bvpShape(object):
             for idx in poly.vertices: #loop_indices:
                 color_layer.data[i].color = col_list[idx,:3]
                 i += 1
+
     def show_evecs(self,nevs=5,cmap=None,evs=None):
         if evs is None:
             evals,evs = self.evecs(k=nevs) # evals,evecs = 
@@ -702,13 +726,32 @@ class bvpShape(object):
             clist = self._map_colors(v,cmap=cmap)
             self._set_vertex_colors(clist,'EigenVec #%d'%iv)
 
-    def add_shapekey(newpts,name='key'):
+    def reconstruct_evecs(self,n,eigvecs=None,opt='a'):
+        if eigvecs is None:
+            eigvals,eigvecs = self.evecs(k=n)
+        pts_sp = sparse.csr_matrix(self.pts)
+        ev_sp = sparse.csr_matrix(eigvecs)
+        B,D,W,V = self.laplace_operator
+        if opt=='a':
+            #c = (v' * B)* evecs(:,1:Nmax) # matlab code
+            c = (pts_sp.T.dot(B)).dot(ev_sp[:,:n])
+            #vsmooth = evecs(:,1:Nmax) * c'; # matlab code
+            newpts = ev_sp[:,:n].dot(c.T)
+        elif opt=='b':
+            ev2 = ev_sp[:,:n].dot(ev_sp[:,:n].T)
+            newpts = ev2.dot(B.T).dot(pts_sp)
+        return newpts
+
+    def add_shapekey(self,newpts,name='key',relative_to=None):
         """Add a shape key to a given the shape's blender object (self.shape), with vertices in 
-        position newpts (newpts is a list of vertices as long as self.pts)"""        
-        self.ob.shape_key_add(name=nm)
-        skey = self.ob.data.shape_keys.key_blocks[nm]
+        position newpts (newpts is a list of vertices as long as self.pts)"""
+        # Check for 'basis' shape key?
+        self.ob.shape_key_add(name=name)
+        skey = self.ob.data.shape_keys.key_blocks[name]
         for iv,loc in enumerate(newpts):
             skey.data[iv].co = bmu.Vector(loc)
+        if relative_to is not None:
+            skey.relative_key=self.ob.data.shape_keys.key_blocks[relative_to]
 
     def triangulate(self):
         """Make sure mesh is triangular, and thus amenable to manifold shape analysis
@@ -1136,21 +1179,23 @@ def _computeAB(pts,polys):
 
 
 def construct_evecs(ob,evecs,B,n):
-	pts,polys = pts_polys(ob)
-	#c = (v' * B)* evecs(:,1:Nmax) # matlab code
-	c = (pts.T.dot(B)).dot(evecs[:,:n])
-	#vsmooth = evecs(:,1:Nmax) * c'; # matlab code
-	newpts = evecs[:,:n].dot(c.T)
-	# Add as a shape key
-	#if ob.data.shape_keys is None:
-	#	ob.shape_key_add(name='Basis')
-	nm = "%d eigenvectors"%n
-	ob.shape_key_add(name=nm)
-	skey = ob.data.shape_keys.key_blocks[nm]
-	for iv,loc in enumerate(newpts):
-		skey.data[iv].co = bmu.Vector(loc)
+    pts,polys = pts_polys(ob)
+    #c = (v' * B)* evecs(:,1:Nmax) # matlab code
+    c = (pts.T.dot(B)).dot(evecs[:,:n])
+    #vsmooth = evecs(:,1:Nmax) * c'; # matlab code
+    newpts = evecs[:,:n].dot(c.T)
 
-
+    # or: 
+    ev2 = evecs[:,:n].dot(evecs[:,:n].T)
+    newpts = ev2.dot(B.T).dot(pts)
+    # Add as a shape key
+    #if ob.data.shape_keys is None:
+    #	ob.shape_key_add(name='Basis')
+    nm = "%d eigenvectors"%n
+    ob.shape_key_add(name=nm)
+    skey = ob.data.shape_keys.key_blocks[nm]
+    for iv,loc in enumerate(newpts):
+        skey.data[iv].co = bmu.Vector(loc)
 
 def make_vertex_color_material(ob):
 	# start in object mode
@@ -1185,8 +1230,6 @@ def make_vertex_color_material(ob):
 	mat.use_vertex_color_light = True  # material affected by lights
 	 
 	my_object.materials.append(mat)
-
-
 
 def show_ica(ob,):
 	pass
