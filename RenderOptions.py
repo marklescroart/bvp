@@ -1,5 +1,6 @@
-## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
-
+"""
+Class to control BVP Render options 
+"""
 # Imports
 import bvp,os,sys
 import math as bnp

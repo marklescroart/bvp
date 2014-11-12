@@ -264,20 +264,6 @@ def get_scene(num,Scn=None,Lib=None):
 	S.Num = Num+1
 	print('Don''t forget to set sky and poses!')
 	return S
-def DeclareProperties():
-	'''
-	Declarations for extra object properties in Blender Vision Project
-	'''
-	# Real world size
-	bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
-	# Semantic Category (a string, w/ comma-separated descriptors/categories for the object in question)
-	bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
-	# Semantic Category of allowable objects (within scene)
-	bpy.types.Object.ObjectSemanticCat = bpy.props.StringProperty(name='ObjectSemanticCat',default='thing')
-	# Semantic Category of allowable skies (for scene)
-	bpy.types.Object.SkySemanticCat = bpy.props.StringProperty(name='SkySemanticCat',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
-	# Focal length of camera (for background)
-	bpy.types.Object.Lens = bpy.props.FloatProperty(name='Lens',min=25.,max=50.,default=50.) # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 
 def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 	'''
@@ -307,86 +293,6 @@ def CreateAnim_Loc(Pos,Frames,aName='ObjectMotion',hType='VECTOR'):
 			a.fcurves[iXYZ].keyframe_points[ifr].handle_right_type = hType[ifr][1]
 		a.fcurves[iXYZ].extrapolation = 'CONSTANT'
 	return a
-
-def SetUpGroup(*args,**kwargs):
-	warings.warn("Deprecated! Use set_up_group() instead!")
-	set_up_group(*args,**kwargs)
-
-def set_up_group(ObList=None,Scn=None):
-	'''Creates a group of Blender objects and standardizes the size.
-
-	Set a group of objects to canonical position (centered, max dimension = 10)
-	Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
-	box (maximal extent of vertices, irrespective of the object's origin) 
-
-	Origins of all objects are set to (0,0,0).
-
-	WARNING: NOT NECESSARILY RELIABLE. There is a great deal of variability in the way in which 3D 
-	models are stored in the myriad free 3D sites online; thus a GREAT MANY conditional statements
-	would be necesary to have a reliably working function. If you want to write such a function, 
-	be my guest. In the meantime, use with caution. 
-	
-	ML 2011.10.25
-	'''
-	
-	bvp.Verbosity_Level > 3
-	if not Scn:
-		Scn = bpy.context.scene # (NOTE: think about making this an input!)
-	if not ObList:
-		for o in Scn.objects:
-			# Clear out cameras and (ungrouped) 
-			if o.type in ['CAMERA','LAMP'] and not o.users_group:
-				Scn.objects.unlink(o)
-				Scn.update()
-		ObList = list(Scn.objects)
-	ToSet_Size = 10.0
-	ToSet_Loc = (0.0,0.0,0.0)
-	ToSet_Rot = 0.0
-	# FIRST: Clear parent relationships
-	p = [o for o in ObList if not o.parent and not 'ChildOf' in o.constraints.keys()]
-	if len(p)>1:
-		raise Exception('More than one parent in group! Now I commit Seppuku! Hi-YA!')
-	else:
-		p = p[0]
-	np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
-	if p:
-		for o in np:
-			grab_only(o)
-			bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
-			if 'ChildOf' in o.constraints.keys():
-				o.constraints.remove(o.constraints['ChildOf'])
-	
-	# SECOND: Reposition all object origins 
-	(MinXYZ,MaxXYZ) = get_group_bounding_box(ObList)
-	BotMid = [(MaxXYZ[0]+MinXYZ[0])/2,(MaxXYZ[1]+MinXYZ[1])/2,MinXYZ[2]]
-	set_cursor(BotMid)
-	
-	SzXYZ = []
-	for Dim in range(3):
-		SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
-	
-	if not ToSet_Size==max(SzXYZ):
-		ScaleF = ToSet_Size/max(SzXYZ)
-	if bvp.Verbosity_Level > 3:	
-		print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size,ScaleF,max(SzXYZ)))
-	
-	for o in ObList:
-		grab_only(o)
-		bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-		o.scale = o.scale * ScaleF
-		o.location = ToSet_Loc
-
-	Scn.update()
-	# Re-parent everything
-	for o in np:
-		grab_only(p)
-		o.select = True
-		bpy.ops.object.parent_set()
-	# Create group (if necessary) and name group
-	if not ObList[0].users_group:
-		for o in ObList:
-			o.select=True
-		bpy.ops.group.create(name=Scn.name)
 
 def AddSelectedToGroup(gNm):
 	'''
@@ -582,7 +488,6 @@ def CommitModifiers(ObList,mTypes=['Mirror','EdgeSplit']):
 				print("Applying Subsurf modifier to %s"%(o.name))
 			bpy.ops.object.modifier_apply(modifier=m.name)
 
-
 def getVoxelizedVertList(obj,size=10/96.,smooth=1,fNm=None,showVox=False):
 	'''
 	Returns a list of surface point locations for a given object (or group of objects) in a regular grid. 
@@ -705,42 +610,6 @@ def getVoxelizedVertList(obj,size=10/96.,smooth=1,fNm=None,showVox=False):
 		print('getVoxelizedVertList took %d mins, %.2f secs'%divmod((t1-t0),60))
 	return verts,norms
 
-def GetGroupBoundingBox(ObList):
-	warnings.warn("Deprecated! Use get_group_bounding_box() instead!")
-	return get_group_bounding_box(ObList)
-def get_group_bounding_box(ObList):
-	'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
-
-	Parameters
-	----------
-	ObList : list or tuple 
-		list of Blender objects for which to get bounding box
-
-	Returns
-	-------
-	minxyz,maxxyz : lists
-		min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
-		more standard format for a bounding box. 
-	'''
-	BBx = list()
-	BBy = list()
-	BBz = list()
-	if not isinstance(ObList,(list,tuple)):
-			ObList = [ObList]
-	for ob in ObList: 
-		grab_only(ob)
-		if ob.type in ['MESH','LATTICE','ARMATURE']:
-			bpy.ops.object.transform_apply(rotation=True)
-		for ii in range(8):
-			BBx.append(ob.bound_box[ii][0] * ob.scale[0] + ob.location[0]) 
-			BBy.append(ob.bound_box[ii][1] * ob.scale[1] + ob.location[1])
-			BBz.append(ob.bound_box[ii][2] * ob.scale[2] + ob.location[2])
-			#bpy.ops.mesh.primitive_uv_sphere_add(location=[BBx[ii],BBy[ii],BBz[ii]])
-	MinXYZ = [min(BBx),min(BBy),min(BBz)]
-	MaxXYZ = [max(BBx),max(BBy),max(BBz)]
-	# 
-	return MinXYZ,MaxXYZ
-
 def add_img_material(name,imfile,imtype):
 	"""Add a texture containing an image to Blender.
 
@@ -773,6 +642,7 @@ def add_img_material(name,imfile,imtype):
 	mat.texture_slots.create(0)
 	mat.texture_slots[0].texture = tex
 	return mat
+
 def set_material(proxy_ob,mat):
 	"""Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
 	for g in proxy_ob.dupli_group.objects:
@@ -786,20 +656,6 @@ def set_material(proxy_ob,mat):
 		# Get rid of proxy now that material is set
 		bpy.context.scene.objects.unlink(o)
 
-def new_scene(scene_name=None):
-	"""Create new named scene, return scene object. 
-
-	For the record: This function only exists because Blender's scene creation function
-	is SOOPER lame. bpy.ops.scene.new() should take a name as an input argument and 
-	return a scene object. But it does not. 
-	"""
-	SL = list(bpy.data.scenes)
-	bpy.ops.scene.new()
-	new_scn = [s for s in bpy.data.scenes if not s in SL][0]
-	if not scene_name is None:
-		new_scn.name = scene_name
-	return new_scn
-
 def set_scene(scene_name=None):
 	"""Sets all blender screens in an open Blender session to scene_name
 	"""
@@ -812,7 +668,7 @@ def set_scene(scene_name=None):
 			for scr in bpy.data.screens:
 				scr.scene = Scn
 		else:
-			Scn = new_scene(scene_name)
+			Scn = bpy.data.scenes.new(scene_name)
 	return Scn
 def apply_action(target_object,action_file,action_name):
 	""""""
@@ -822,7 +678,82 @@ def apply_action(target_object,action_file,action_name):
 	# get list of matching bones
 	# for all matching bones, apply (matrix? position?) of first frame
 
-def get_collada_action(collada_file,act_name=None):
+def set_up_group(ObList=None,Scn=None):
+	'''
+	Usage: SetUpGroup(ObList=None,Scn=None)
+	
+	Set a group of objects to canonical position (centered, facing forward, max dimension = 10)
+	Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
+	box, irrespective of the object's origin) Origins are set to (0,0,0) as well.
+
+	WARNING: NOT SUPER RELIABLE. There is a great deal of variability in the way in which 3D model 
+	objects are stored in the myriad free 3D sites online; thus a GREAT MANY conditional statements
+	would be necesary to have a reliably working function. If you want to write such a function, 
+	be my guest. This works... OK. In many cases. Use with caution. ML
+	
+	ML 2011.10.25
+	'''
+	
+	bvp.Verbosity_Level > 3
+	if not Scn:
+		Scn = bpy.context.scene # (NOTE: think about making this an input!)
+	if not ObList:
+		for o in Scn.objects:
+			# Clear out cameras and (ungrouped) 
+			if o.type in ['CAMERA','LAMP'] and not o.users_group:
+				Scn.objects.unlink(o)
+				Scn.update()
+		ObList = list(Scn.objects)
+	ToSet_Size = 10.0
+	ToSet_Loc = (0.0,0.0,0.0)
+	ToSet_Rot = 0.0
+	# FIRST: Clear parent relationships
+	p = [o for o in ObList if not o.parent and not 'ChildOf' in o.constraints.keys()]
+	if len(p)>1:
+		raise Exception('More than one parent in group! Now I commit Seppuku! Hi-YA!')
+	else:
+		p = p[0]
+	np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
+	if p:
+		for o in np:
+			GrabOnly(o)
+			bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+			if 'ChildOf' in o.constraints.keys():
+				o.constraints.remove(o.constraints['ChildOf'])
+	
+	# SECOND: Reposition all object origins 
+	(MinXYZ,MaxXYZ) = GetGroupBoundingBox(ObList)
+	BotMid = [(MaxXYZ[0]+MinXYZ[0])/2,(MaxXYZ[1]+MinXYZ[1])/2,MinXYZ[2]]
+	SetCursor(BotMid)
+	
+	SzXYZ = []
+	for Dim in range(3):
+		SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
+	
+	if not ToSet_Size==max(SzXYZ):
+		ScaleF = ToSet_Size/max(SzXYZ)
+	if bvp.Verbosity_Level > 3:	
+		print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size,ScaleF,max(SzXYZ)))
+	
+	for o in ObList:
+		GrabOnly(o)
+		bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+		o.scale = o.scale * ScaleF
+		o.location = ToSet_Loc
+
+	Scn.update()
+	# Re-parent everything
+	for o in np:
+		GrabOnly(p)
+		o.select = True
+		bpy.ops.object.parent_set()
+	# Create group (if necessary) and name group
+	if not ObList[0].users_group:
+		for o in ObList:
+			o.select=True
+		bpy.ops.group.create(name=Scn.name)
+
+def get_collada_action(collada_file,act_name=None,scale=1.0):
 	"""Imports an armature and its associated action from a collada (.dae) file.
 
 	Imports armature and rescales it to be standard Blender size (when the armature 
@@ -834,10 +765,14 @@ def get_collada_action(collada_file,act_name=None):
 	collada_file : string filename
 		file name from which to import action(s)(?). 
 	act_name : string
-		name for action to create
+		name for action to create. defaults to title of collada file, without .dae extension
+	scale : float
+		amount by which to scale 
 	"""
+	if act_name is None:
+		act_name = os.path.split(collada_file)[1].strip('.dae')
 	# Work in a new scene
-	scn = new_scene(scene_name=act_name)
+	scn = bpy.data.scenes.new(act_name)
 	# Get list of extant actions, objects
 	ext_act = [a.name for a in bpy.data.actions]
 	ext_obj = [o.name for o in bpy.data.objects]
@@ -896,7 +831,11 @@ def get_collada_action(collada_file,act_name=None):
 
 	# Adjust size to standard 10 units (standing straight up in rest pose)
 	arm_ob.data.pose_position = "REST"
-	set_up_group()
+	try:
+		set_up_group()
+	except:
+		print('Automatic bounding box scaling failed for action;%s\nMultiplying by scale %.2f'%(act_name,scale))
+		arm_ob.scale*=scale
 	arm_ob.data.pose_position = "POSE"
 
 ###########################################################
@@ -1006,7 +945,7 @@ def add_action(action_name,fname,fPath=bvp.Settings['Paths']['LibDir']+'/Actions
 	a = bpy.data.actions[action_name]
 	return a
 
-def add_group(grpName, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
+def add_group(name, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/',proxy=True):
 	'''Add a proxy object for a Blender group to the current scene.	
 
 	Add a group of Blender objects (all the parts of a single object, most likely) from another 
@@ -1016,7 +955,7 @@ def add_group(grpName, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
 	----------
 	fname : string
 		.blend file name (including .blend extension)
-	grpName : string
+	name : string
 		Name of group to import 
 	fPath : string
 		Path of directory in which .blend file resides
@@ -1026,7 +965,12 @@ def add_group(grpName, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
 	Counts objects currently in scene and increments count.
 	''' 
 
-	if grpName in bpy.data.groups:
+	if name in bpy.data.groups:
+		
+		# TO DO: add:
+		# if proxy:
+		# else:
+
 		# Group already exists in file, for whatever reason
 		print('Found group! adding new object...')
 		# Add empty
@@ -1034,17 +978,18 @@ def add_group(grpName, fname, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/')
 		# Fill empty with dupli-group object of desired group
 		G = bpy.context.object
 		G.dupli_type = "GROUP"
-		G.dupli_group = bpy.data.groups[grpName]
-		G.name = grpName
+		G.dupli_group = bpy.data.groups[name]
+		G.name = name
 	else:
 		print('Did not find group! adding...')
-		bpy.ops.wm.link_append(
+		bpy.ops.wm.append(
 			directory=os.path.join(fPath,fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-			filepath="//"+fname+"\\Group\\"+grpName, # local filepath within .blend file to the scene to be imported
-			filename=grpName, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
-			link=True,
-			relative_path=False,
-			autoselect=True)
+			filepath="//"+fname+"\\Group\\"+name, # local filepath within .blend file to the scene to be imported
+			filename=name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
+			link=proxy,
+			#relative_path=False,
+			autoselect=True,
+			instance_groups=proxy)
 		G = bpy.context.object
 	return G
 def meshify(ob):

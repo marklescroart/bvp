@@ -13,27 +13,27 @@ as should (noisify),
 as should ... ? 
 
 
-
 Game plan: 
 
 Each item stored in the database will map to a particular bvp class:
 
 - Scene elements -
-bvp_object # Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
-bvp_bg # alias to bvp_background
-bvp_sky
-bvp_camera
-bvp_shadow
+bvpObject # Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
+bvpShape # OPTIONAL class, defined in bvpObject, for shape-related operations on objects.
+bvpBG 
+bvpSky
+bvpCamera
+bvpShadow
 
 - Actions - 
-bvp_action - must be linked to specific class of armatures (which will be a property of bvp_objects)
+bvpAction - must be linked to specific class of armatures (which will be a property of bvpObjects)
 	- Armature_class
 	- wordnet_label
 	- semantic_category
 	- 
 - Scenes - 
-bvp_scene # will contain links to bvp_objects, bvp_skies, etc..
-bvp_scene_list
+bvpScene # will contain links to bvpObjects, bvp_skies, etc..
+bvpSceneList
 
 
 -> What to do about constraints? store as db objects as well? (linked to other elements?)
@@ -50,24 +50,20 @@ real_world_size #
 grp_name # Name of group in .blend file. Should be unique. Meh. Maybe not. Has to at least be unique in file.
 
 -> Kill BVP library. 
+-> DO NOT kill BVP library. Modify it to read from a single JSON file stored at the top level, that has 
+a (static) view of all the elements in all the blend files.
 
 """
 
 # Imports
+import numpy as np
+# Make this an optional import, so not to demand pymongo compatibility
 import pymongo
 import subprocess
 import bvp
-import math
 import os
-import re
-import random
-import shutil
 import time
-from bvp.utils.basics import GetHostName,unique,loadPik,RunScriptForAllFiles#,dotDict
 #from bvp.bvpObject import bvpObject
-if bvp.Is_Blender:
-	import bpy
-
 
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
@@ -95,19 +91,55 @@ class bvpDB(object):
 		start mongodb with "mongod --port 9194" or, if you are not using the 
 		default db directory, "mongod --dbpath /Users/mark/Projects/BVP_mongodb/ --port 9194"
 		'''		
+
 	def __init__(self,dbname=bvp.Settings['db']['name'],dbhost=bvp.Settings['db']['host'],
-				port=bvp.Settings['db']['port']):
+				port=bvp.Settings['db']['port'],dbpath=bvp.Settings['Paths']['LibDir']):
 		'''Class to interact with (mongo) database'''
-		#self.LibDir = LibDir
-		self.dbi = pymongo.MongoClient(host=dbhost,port=port)[dbname]
+		
+		self.dbpath = dbpath
+		self.temp_instance = False
+		try:
+			# First look for already-running (possibly global) server
+			self.dbi = pymongo.MongoClient(host=dbhost,port=port)[dbname]
+		except pymongo.errors.ConnectionFailure: # Catch error
+			raise Exception("It appears that you have no MongoDB server running. \nPlease run mongod --dbpath <your path> --port 9194")
+		# 	try:
+		# 		# Try for localhost copy:
+		# 		self.dbi = pymongo.MongoClient(host='localhost',port=port)[dbname]
+		# 		print("Established local database server")
+		# 	except:
+		# 		# Start local server instance running
+		# 		# Add verbosity flag?
+		# 		print('== Starting database server from localhost ==\n   directory: %s\n   port: %d'%(self.dbpath,port))
+		# 		spcmd = ['mongod','--port',str(port),'--dbpath',self.dbpath]
+		# 		self.dbproc = subprocess.Popen(spcmd,
+		# 			stdin=subprocess.PIPE,
+		# 			stdout=subprocess.PIPE,
+		# 			stderr=subprocess.PIPE)
+		# 		# Pause for db to get up and running
+		# 		time.sleep(1.0)
+		# 		# Get client to this instance
+		# 		self.dbi = pymongo.MongoClient(host='localhost',port=port)[dbname]
+		# 		self.temp_instance=True
 		# Make bvpDB fields (objects, backgrounds, skies, etc) the actual database collections (?)
 		for sc in ['objects','backgrounds','skies','shadows','actions']: # More? Better not to enumerate? 
 			setattr(self,sc,self.dbi[sc])
+	
+	#def __del__(self):
+	#	"""Cleanup method: shut down any locally-running servers"""
+	#	if self.temp_instance:
+	#		# Add verbosity flag?
+	#		print('== Shutting down database server from localhost')
+	#		self.dbproc.terminate()
+	
+	#def __exit__(self):
+	#	print('Exiting bvpDB instance. IDKWTF that means.')
+
 	def query(self,sctype,**query_dict):
 		'''Query the database for particular scene elements (objects, backgrounds, skies, etc)
 		
 		dict for query is in... mongodb language? (commit hard? or back off with some abstraction?)
-
+		Necessary? No? 
 		Parameters
 		----------
 
@@ -120,8 +152,34 @@ class bvpDB(object):
 		if sctype == 'objects':
 			out = [bvp.bvpObject(dbi=None,**params) for params in result]
 		else:
-			raise Exception('Not ready yet!')
+			raise NotImplementedError('Scene types besides objects are not ready yet!')
 		return out
+
+	def _cleanup(self):
+		"""Remove all .blend1 and .blend2 backup files from database"""
+		for root,_,files in os.walk(self.dbpath,topdown=True):
+			ff = [f for f in files if 'blend1' in f or 'blend2' in f]
+			for f in ff:
+				os.unlink(os.path.join(root,f))
+
+	def _update(self,ClassToUpdate=('object','background','sky','shadow'),direction='blend->db'):
+		'''Update library to be consistent with extant groups in files 
+
+		Removes missing files, (adds files?), (Updates changed properties for db objects in archival blend files)
+
+		Need direction argument, because database could be updated either way - blend->db or db->blend
+
+		This will probably be expensive
+		'''
+		raise NotImplementedError('Still WIP')
+		for cls in ClassToUpdate:
+			fDir = os.path.join(self.LibDir,cls.capitalize().replace('y','ie')+'s')
+			fList = [os.path.join(fDir,f) for f in os.listdir(fDir) if f[-3:]=='end' and 'Category_' in f]
+			if bvp.Verbosity_Level > 1:
+				print('%s files to update:'%cls.capitalize())
+				print(fList)
+			# Check on files...
+			# RunScriptForAllFiles(scriptF,fList)
 
 	def print_list(self,fname,params,sctype=('objects',),qdict=None):
 		'''Prints a semicolon-separated list of all groups (and parameters??) to a text file
@@ -152,128 +210,16 @@ class bvpDB(object):
 				ss = o['grpName'] + ("; %s"*len(params))%tuple([repr(o[p]) for p in params])
 				fid.write(ss+'\n')
 		fid.close()
+
 	def read_list(self,fname):
 		"""Reads in a list in the same format as print_list, uses it to update many database fields
 
 		Optionally print list of stuff to be updated before running update? 
 		"""
 		pass
-
-	def add_file(self,fname,sctype): 
-		'''Adds groups in file to database, moves file?
 		
-		NOT UPDATED YET. STILL WORKING.
-		.blend files -> *Props.txt files
-
-		Update text files (objectProps.txt,backgroundProps.txt,etc) that 
-		store meta-information about objects / backgrounds / etc. in 
-		archival .blend files. This file READS the .blend files and WRITES
-		to the text files. 
-
-		Input ClassToUpdate specifies which class(es) to update. It is a tuple;
-		default is all classes ('object','background','sky','shadow')
-		
-		** USE WITH CAUTION - this makes changes to your archival file info! ** 
-		(as a precaution, this renames old *Props.txt' files to *Props_<date+time>.txt)
-		'''
-		if bvp.Verbosity_Level > 1:
-			print('Updating *Props.txt files!')
-		for cls in ClassToUpdate:
-			# One: move old prop files to new file names:
-			PropfNm = os.path.join(self.LibDir,cls+'Props.txt')
-			if os.path.exists(PropfNm):
-				os.rename(PropfNm,PropfNm.replace('.txt',time.strftime('_%Y%m%d_%H%M.txt')))
-			# Two: get all files on which to operate and script
-			fDir = os.path.join(self.LibDir,cls.capitalize().replace('y','ie')+'s')
-			fList = [os.path.join(fDir,f) for f in os.listdir(fDir) if f[-3:]=='end' and 'Category_' in f]
-			fList.sort()
-			scriptF = os.path.join(bvp.__path__[0],'Scripts','List'+cls.capitalize()+'Props.py')
-			# Three: Run script
-			RunScriptForAllFiles(scriptF,fList,Inpts=[self.LibDir])
-
-	##########################################################
-	### --- FROM HERE: OLD FUNCTIONS. Replace? Update? --- ###
-	##########################################################
-	def UpdateBlendFiles(self,ClassToUpdate=('object','background','sky','shadow')):
-		'''
-		NOTES:
-		For maximum portability of files, it should be possible to 
-		store within each .blend file all the necessary information to
-		upload it to another database. Thus this function should be 
-		converted to something like a pack_blends file, that would 
-		write all database information to blender-defined properties
-		of each group in each .blend file.
-
-		*Props.txt files -> .blend files
-
-		Update .blend files based on information in *Props.txt files 
-		(objectProps.txt,backgroundProps.txt,etc) that store meta-information 
-		about objects / backgrounds / etc. in the archival .blend files. 
-		This file READS the *Props.txt files and WRITES	to the blend files. 
-		
-		Input ClassToUpdate specifies which class(es) to update. It is a tuple;
-		default is all classes ('object','background','sky','shadow')
-
-		** USE WITH CAUTION - this makes changes to your archival files! ** 
-		** THESE CHANGES ARE NOT REVERSIBLE without considerable effort! **
-		** (depending on the size of your library, of course) **
-		'''
-		if bvp.Verbosity_Level > 1:
-			print('Updating .blend files!')
-		for cls in ClassToUpdate:
-			fDir = os.path.join(self.LibDir,cls.capitalize().replace('y','ie')+'s')
-			fList = [os.path.join(fDir,f) for f in os.listdir(fDir) if f[-3:]=='end' and 'Category_' in f]
-			fList.sort()
-			if bvp.Verbosity_Level > 1:
-				print('%s files to update:'%cls.capitalize())
-				print(fList)
-			scriptF = os.path.join(bvp.__path__[0],'Scripts','Set'+cls.capitalize()+'Props.py')
-			RunScriptForAllFiles(scriptF,fList,Inpts=[self.LibDir])
-
-
-	def UpdateLibrary(self,ClassToUpdate=('object','background','sky','shadow')):
-		'''
-		.blend files -> .pik files
-
-		Update all .pik files that store properties for all object, background, 
-		sky, and shadow properties in the library directory
-
-		Input ClassToUpdate specifies which class(es) to update. It is a tuple;
-		default is to update all classes ('object','background','sky','shadow')
-		
-		** USE WITH CAUTION - this makes changes to your archival file info! ** 		
-		'''
-		if bvp.Verbosity_Level > 1:
-			print('Updating library .pik files!')
-		for cls in ClassToUpdate:
-			fDir = os.path.join(self.LibDir,cls.capitalize().replace('y','ie')+'s')
-			fList = [os.path.join(fDir,f) for f in os.listdir(fDir) if f[-3:]=='end' and 'Category_' in f]
-			if bvp.Verbosity_Level > 1:
-				print('%s files to update:'%cls.capitalize())
-				print(fList)
-			scriptF = os.path.join(bvp.__path__[0],'Scripts','Get'+cls.capitalize()+'Props.py')
-			RunScriptForAllFiles(scriptF,fList)
-	def UpdateAll(self,ClassToUpdate=('object','background','sky','shadow')):
-		'''
-		Updates (1) Blend files from Prop files
-				(2) Prop files from Blend files (to remove any instructions to change semantic categories / names, e.g.)
-				(3) .py (lib) files from Blend files
-
-		NOTE: if you add objects to the archival .blend files, you should first call "UpdatePropFiles" (if there is nothing
-				else to update), and THEN call UpdateAll()
-		'''
-		# First: Apply any changes in Prop files to Blend files 
-		# (This will ignore any new objects in Blend files)
-		self.UpdateBlendFiles(ClassToUpdate)
-		# Second: Re-apply committed changes to prop files. This re-creates
-		# the Prop files, with changes applied and any new objects added.
-		self.UpdatePropFiles(ClassToUpdate)
-		# Third: Update library file from newly-updated .blend files.
-		self.UpdateLibrary(ClassToUpdate)
-		
-	def PosedObList(self):
-		'''
-		Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
+	def posed_object_list(self):
+		'''Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
 		'''
 		ObList = []
 		for o in self.objects:
@@ -285,8 +231,6 @@ class bvpDB(object):
 		return ObList
 
 	def render_objects(self,query_dict,rtype=('Image',),rot_list=(0,),render_pose=True,render_group_size=1,is_overwrite=False,scale_obj=None):
-
-	#def RenderObjects(self,Type=('Image',),subCat=None,rotList=(0,),render_Pose=True,renderGroupSize=1,Is_Overwrite=False,scaleObj=None):
 		'''
 		Render (all) objects in bvpLibrary
 
@@ -347,110 +291,6 @@ class bvpDB(object):
 		SL = bvp.bvpSceneList(ScnList=ScnL,RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=renderGroupSize,RenderType=Type)
 		#SL.Render(RenderGroupSize=renderGroupSize,RenderType=Type)
-
-	def RenderObjectVox(self,nGrid=10,xL=(-5,5),yL=(-5,5),zL=(0,10),maxFilesPerDir=5000,
-						subCat=None,render_Pose=True,Is_Overwrite=False):
-		'''
-		Render (all) objects in bvpLibrary in voxelized 3D form
-
-		TODO: longer help!
-		ScaleObj = optional scale object to render along with this object (NOT FINISHED!)
-		'''
-		if bvp.Is_Blender:
-			print('Sorry, this won''t run inside Blender; it requires access to slurm!')
-			return
-		RO = bvp.RenderOptions()
-		RO.BVPopts['Voxels'] = True # This will over-ride all other options...
-		RO.BVPopts['BasePath'] = os.path.join(self.LibDir,'Images','Objects','Voxels','%s')
-		RO.BVPopts['Type'] = 'all'
-		RO.resolution_x = RO.resolution_y = 5 # itty-bitty images for inside/outside test
-		
-		if subCat:
-			ToRender = self.getSCL(subCat,'objects')
-		else:
-			ToRender = self.objects # all objects
-		
-		ObCt = 0
-		for o in ToRender:
-			ScnL = []
-			# Get all object variations to add as separate scenes
-			ObToAdd = []
-			if o['nPoses'] and render_Pose:
-				for p in range(o['nPoses']):
-					O = bvp.bvpObject(obID=o['grpName'],Lib=self,pos3D=(0,0,0),size3D=10,pose=p)
-					ObToAdd.append(O)
-			else:
-				O = bvp.bvpObject(obID=o['grpName'],Lib=self,pos3D=(0,0,0),size3D=10)
-				ObToAdd.append(O)
-			# Lights (Sky) & Background
-			Sky = bvp.bvpSky()
-			Sky.WorldParams['horizon_color'] = (0,0,0)
-			BG = bvp.bvpBG()
-			# Get all (nGrid**3) camera positions
-			cPos = bvp.utils.basics.gridPos(nGrid,xL,yL,zL)
-			# Center (fixation) Position
-			fPos = [[0,0,0] for x in range(len(cPos))]
-			fr = range(1,nGrid**3+1)
-			# break up into multiple directories with <maxFilesPerDir> files each
-			nDirs = int(math.ceil((nGrid**3)/float(maxFilesPerDir)))
-			# Loop over objects to render each <maxFilesPerDir> files
-			for Obj in ObToAdd:
-				# Loop to create a separate scene for each <maxFilesPerDir> files
-				for d in range(nDirs):
-					# Create Scene
-					ObCt+=1
-					if Obj.pose or Obj.pose==0:
-						pNum = Obj.pose+1
-					else:
-						pNum = 1
-					# Frame range
-					FR = (d*maxFilesPerDir+1,min(nGrid**3,maxFilesPerDir*(d+1)))
-					Cam = bvp.bvpCamera(location=cPos[FR[0]-1:FR[1]],fixPos=fPos[FR[0]-1:FR[1]],frames=fr[FR[0]-1:FR[1]])
-					fPath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semanticCat[0],Obj.grpName,pNum,nGrid,d*maxFilesPerDir,'#'*len(str(nGrid**3)))
-					ScnL.append(bvp.bvpScene(Num=ObCt,Obj=(Obj,),BG=BG,Sky=Sky,
-										Shadow=None,Cam=Cam,FrameRange=FR,
-										fPath=fPath))
-			# Convert list of scenes to SceneList	
-			SL = bvp.bvpSceneList(ScnList=ScnL,RenderOptions=RO)
-			#return SL
-			jIDs = SL.RenderSlurm(RenderGroupSize=1,RenderType=('Voxels',),Is_Overwrite=True)
-			ConcatCmd = """import bvp,pickle,os
-fD = '{fD}'
-vox = bvp.utils.math.concatVoxels(fD)
-sName = fD+'.pik'
-bvp.utils.basics.savePik(vox,sName)
-for f in os.listdir(fD): os.unlink(os.path.join(fD,f))
-os.rmdir(fD)
-			"""
-			cjIDs = []
-			for jID,S in zip(jIDs,ScnL):
-				DepStr = 'afterok:%s'%jID # Dependencies for job
-				fD,xx = S.fPath.split('/') # last part of filepath from scene
-				fD = RO.BVPopts['BasePath']%fD
-				cjID = bvp.utils.basics.pySlurm(ConcatCmd.format(fD=fD),dep=DepStr,memory=2000,)
-				cjIDs.append(cjID)
-				# Up priority... (base is 5000 as of 2012.12.31)
-				subprocess.call(['sudo','scontrol','update','jobID='+jID,'Priority=5010'])
-			# Final concatenation and clean-up
-			ConcatAllCmd = """import bvp,os
-import numpy as np
-I = np.zeros({res}**3)
-fD = "{fD}"
-fNm = sorted([os.path.join(fD,f) for f in os.listdir(fD) if 'pik' in f and "{key}" in f])
-for f in fNm:
-	I+=np.array(bvp.utils.basics.loadPik(f))
-I = bvp.utils.basics.MakeBlenderSafe(I,'float')
-sName = os.path.join(fD,"{key}"+".pik")
-bvp.utils.basics.savePik(I,sName)
-for f in fNm:
-	os.unlink(f)
-"""
-			DepStr = ('afterok'+':%s'*len(cjIDs))%tuple(cjIDs) # Depends on all other concat jobs
-			fD,key = os.path.split(fD)
-			key = key[:-11] # Cut "_f000000000" part
-			bvp.utils.basics.pySlurm(ConcatAllCmd.format(res=nGrid,fD=fD,key=key),dep=DepStr,memory=2000,)
-		#SL.Render(RenderGroupSize=1,RenderType=Type)
-		# Set up secondary slurm job to concatenate all voxelization images to t/f voxels.
 
 	def RenderBGs(self,subCat=None,dummyObjects=(),nCamLoc=5,Is_Overwrite=False):
 		'''

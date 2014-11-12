@@ -1,26 +1,36 @@
-'''
-bvp (B.lender V.ision P.roject) is a module of functions and classes for creating and 
-manipulating scenes within Blender. bvp functions are intended to allow creation of 
-arbitrary scenes using libraries of objects and backgrounds (and skies/lighting setups). 
+"""
+bvp (B.lender V.ision P.roject) is a module of functions and classes for creating visual 
+stimuli within Blender. bvp functions are intended to allow creation of arbitrary scenes 
+using libraries of "scene elements" (objects, backgrounds, skies/lighting setups, shadows,
+and cameras). 
 
-Objects (class bvpObject), backgrounds (class bvpBG), skies (class bvpSky) and shadows 
-(class bvpShadow) are imported from archival .blend files. A database of all available 
-objects / bgs / skies / shadows is stored in the bvpLibrary class. All of these 
-elements are contained in a bvpScene class, which has methods to to place the objects
-in random locations, 
+Scene elements are all managed by classes that wrap functionality of native Blender 
+objects and store meta-data about each element (for example, the semantic category or
+size of an object). Each individual scene element is stored in a archival .blend files, 
+and managed by a database system based on mongodb (http://www.mongodb.com/).
 
-All relevant information for a set of stimuli (scenes) is stored in the bvpSceneList 
+Scene elements can be combined using a bvpScene class, which has methods to populate a 
+given scene with objects in random locations, render the scene, and more.
+
+All relevant information for a set of scenes is stored in the bvpSceneList 
 class, which has* methods for permanent storage* / write-out of stimulus lists to 
 archival hf5 files*. 
 
-*Still to come 2012.02.12
+*Still to come 2014.10.23
 
-Dependencies:
-Numpy (for use outside of Blender's python interpreter)
-Pylab (for plot functions, which are not strictly necessary)
-blenrig add-on scripts (available at jpbouza.com.ar/wp/downloads/blenrig/current-release/blenrig-4-0) for some models
-OpenEXR for handling Z depth / normal images
-'''
+Dependencies - non python:
+mongodb server (binaries avialable for *nix, OSX, and windows at )
+
+Dependencies - python 3.X (X depends on your version of blender):
+numpy 
+matplotlib 
+scipy
+pymongo # MOVE to optional dependency...
+
+#?# blenrig add-on scripts (available at jpbouza.com.ar/wp/downloads/blenrig/current-release/blenrig-4-0) for some models
+#?# OpenEXR for handling Z depth / normal images
+
+"""
 ## -- Startup stuff -- ##
 version = '1.0' # Read from git repo??
 Verbosity_Level = 3 # 0=none, 1=minimal, 2=informative status outputs, 3=basic debugging, ... 10=everything you never wanted to know
@@ -114,10 +124,13 @@ def blend(script,blend_file=None,is_local=True,tmpdir='/tmp/',**kwargs):
 	# Check for existence of script
 	if not os.path.exists(script):
 		# TO DO: look into doing this with pipes??
+		del_tmp_script = True
 		tmpf = os.path.join(tmpdir,'blender_temp_%s.py'%_getuuid())
 		with open(tmpf,'w') as fid:
 			fid.writelines(script)
 		script = tmpf
+	else:
+		del_tmp_script = False
 	# Run 
 	blender = Settings['Paths']['BlenderCmd']
 	blender_cmd = [blender,'-b',blend_file,'-P',script]
@@ -130,7 +143,10 @@ def blend(script,blend_file=None,is_local=True,tmpdir='/tmp/',**kwargs):
 			stdout=subprocess.PIPE,
 			stderr=subprocess.PIPE)
 		stdout,stderr = proc.communicate()
+		if del_tmp_script and not stderr:
+			os.unlink(tmpf)
 		return stdout,stderr
+		# Raise exception if stderr? Or leave that to calling function? Optional?
 	else:
 		# Call via cluster
 		if Verbosity_Level>3:

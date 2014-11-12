@@ -10,7 +10,7 @@ import random
 import warnings
 # Get rid of these - import from local directories
 from bvp.utils.basics import fixedKeyDict 
-from bvp.utils.blender import add_group,add_action,grab_only,set_cursor,new_scene
+from bvp.utils.blender import add_group,add_action,grab_only,set_cursor
 from bvp.utils.bvpMath import PerspectiveProj
 # Blender imports # GET RID OF this too! find a better way to set a global variable...
 from . import Verbosity_Level, Is_Blender
@@ -48,12 +48,12 @@ class bvpObject(object):
 		
 		Other Parameters
 		----------------		
-		grpName : string
+		name : string
 			ID for object (unique name for an object in the database, which is also (as of 2014.09, but
 			this may change) the name for the Blender group in the archival .blend file)
-		semanticCat : string | list
+		semantic_cat : string | list
 			semantic category of object
-		realWorldSize : float
+		real_world_size : float
 			Size of object in meters
 		...
 
@@ -77,7 +77,7 @@ class bvpObject(object):
 		if isinstance(dbi,dict):
 			dbi = bvp.bvpDB(**dbi)
 		# Default attribute fields
-		dbob = dict(realWorldSize=5.0,grpName='default_sphere',parentFile=None,semanticCat=None)
+		dbob = dict(real_world_size=5.0,name='default_sphere',parent_file=None,semantic_cat=None,wordnet_label=None)
 		if dbi is None:
 			dbob.update(kwargs)
 		else:
@@ -88,7 +88,7 @@ class bvpObject(object):
 			dbob.update(result)
 		# Set attributes based on database object fields. (Too flexible??)
 		for k,v in dbob.items():
-			# Should set at least: grpName,parentFile,semanticCat,wordnet_label,realWorldSize,
+			# Should set at least: name,parent_file,semantic_cat,wordnet_label,real_world_size,
 			# nVertices, nFaces,
 			setattr(self,k,v)
 		# Set input attributes
@@ -100,17 +100,17 @@ class bvpObject(object):
 		# Misc Cleanup - remove?
 		self.pos2D=None # location in the image plane (normalized 0-1)
 		# uuuuh... lame. Fix?
-		if isinstance(self.realWorldSize,(list,tuple)):
-			self.realWorldSize = self.realWorldSize[0]
+		if isinstance(self.real_world_size,(list,tuple)):
+			self.real_world_size = self.real_world_size[0]
 
 	def __repr__(self):
 		"""Display string"""
-		S = '\n ~O~ bvpObject "%s" ~O~\n'%(self.grpName)
-		if self.parentFile:
-			S+='Parent File: %s\n'%self.parentFile
-		if self.semanticCat:
-			S+=self.semanticCat[0]
-			for s in self.semanticCat[1:]: S+=', %s'%s
+		S = '\n ~O~ bvpObject "%s" ~O~\n'%(self.name)
+		if self.parent_file:
+			S+='Parent File: %s\n'%self.parent_file
+		if self.semantic_cat:
+			S+=self.semantic_cat[0]
+			for s in self.semantic_cat[1:]: S+=', %s'%s
 			S+='\n'
 		if self.pos3D:
 			S+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
@@ -120,24 +120,24 @@ class bvpObject(object):
 			S+='Pose: #%d'%self.pose
 		if self.pos3D or self.size3D or self.pose:
 			S+='\n'
-		if self.nVertices:
-			S+='%d Verts; %d Faces'%(self.nVertices,self.nFaces)
+		if self.nvertices:
+			S+='%d Verts; %d Faces'%(self.nvertices,self.nFaces)
 		return(S)
 
-	def PlaceObj(self,Scn=None):
+	def Place(self,scn=None,proxy=True):
 		'''Places object into Blender scene, with pose & animation information
 
 		Parameters
 		----------
-		Scn : string scene name | None
+		scn : string scene name | None
 			If provided, the object will be linked to the named scene. If a scene
-			named "Scn" does not exist, it will be created.
+			named `scn` does not exist, it will be created.
 		
 		'''
 		# Optionally link to a specific scene
-		Scn = bvp.utils.blender.set_scene(Scn)
+		scn = bvp.utils.blender.set_scene(scn)
 
-		if self.grpName=='default_sphere':
+		if self.name=='default_sphere':
 			uv = bpy.ops.mesh.primitive_uv_sphere_add
 			default_diameter=10.
 			uv(size=default_diameter/2.)
@@ -147,8 +147,8 @@ class bvpObject(object):
 			set_cursor((0,0,0))
 			G = bpy.context.object
 		else:
-			obLibDir,obFile = os.path.split(self.parentFile)
-			G = add_group(self.grpName,obFile,obLibDir)
+			fdir = os.path.join(bvp.Settings['Paths']['LibDir'],'Objects/')
+			G = add_group(self.name,self.parent_file,fdir,proxy=proxy)
 		# Eliminate any other currently-selected objects
 		grab_only(G) 
 
@@ -215,14 +215,14 @@ class bvpObject(object):
 					# NOTE: This doesn't work, since many particle systems are modified
 					# after creation (e.g., hair is commonly styled). Again, avoid if 
 					# possible...
-		Scn.update()
+		scn.update()
 		# Update scene, because some poses / effects don't seem to take effect until the frame changes:
-		Scn.frame_current+=1
-		Scn.update()
-		Scn.frame_current-=1
-		Scn.update()
+		scn.frame_current+=1
+		scn.update()
+		scn.frame_current-=1
+		scn.update()
 
-	def PlaceObjFull(self,Scn=None,objects=True,materials=True,textures=True):
+	def PlaceFull(self,scn=None,objects=True,materials=True,textures=True):
 		"""Import full copy of object (all meshes, materials, etc)
 
 		PROBABLY BROKEN CURRENTLY (2014.09)
@@ -231,13 +231,13 @@ class bvpObject(object):
 
 		Parameters
 		----------
-		Scn : scene within file (?) | None
+		scn : scene within file (?) | None
 			Don't know if this is even usable (2014.02.05)
 		"""
 		# Optionally link to a differet scene
-		Scn = bvp.utils.blender.set_scene(Scn)
+		scn = bvp.utils.blender.set_scene(scn)
 
-		if self.grpName is None:
+		if self.name is None:
 			print('Empty object! Using sphere instead!')
 			uv = bpy.ops.mesh.primitive_uv_sphere_add
 			uv(size=5)
@@ -246,8 +246,8 @@ class bvpObject(object):
 			bpy.ops.transform.translate(value=(0,0,5))
 			set_cursor((0,0,0))
 		else:
-			obLibDir,obFile = os.path.split(self.parentFile)
-			add_group(self.grpName,obFile,obLibDir)
+			fdir = os.path.join(bvp.Settings['Paths']['LibDir'],'Objects/')
+			add_group(self.name,self.parent_file,fdir)
 			# 
 		G = bpy.context.object
 		Sz = float(self.size3D)/10. # Objects are stored at max dim. 10 for easier viewability /manipulation
@@ -261,7 +261,7 @@ class bvpObject(object):
 			Arm,Pose = self.GetPoses(G)
 			self.ApplyPose(Arm,self.pose)
 		# Deal with particle systems:
-		if not self.grpName is None:
+		if not self.name is None:
 			for o in G.dupli_group.objects:
 				# Get the MODIFIER object that contains the particle system
 				PartSystModf = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
@@ -273,18 +273,20 @@ class bvpObject(object):
 						psm.show_viewport = False
 					# Option 2: shorten / lengthen w/ object size
 					#psm.particle_system (set hair normal lower doesn't seem to work...s)
-		Scn.update()
+		scn.update()
 		# Because some poses / effects don't seem to take effect until the frame changes:
-		Scn.frame_current+=1
-		Scn.update()
-		Scn.frame_current-=1
-		Scn.update()
+		scn.frame_current+=1
+		scn.update()
+		scn.frame_current-=1
+		scn.update()
 
 	def ApplyAction(self,arm,action):
 		'''Apply an action to an armature.
 
 		Kept separate from bvpObject __init__ function so to be able to interactively apply actions 
 		in an open Blender session.
+
+		Make this a method of bvpAction instead??
 
 		Parameters
 		----------
@@ -294,7 +296,8 @@ class bvpObject(object):
 			Action to be applied. Must have file_name and path attributes
 		'''
 		# 
-		act = add_action(action.name,action.file_name,action.path)
+		fdir = os.path.join(bvp.Settings['Paths']['LibDir'],'Actions/')
+		act = add_action(action.name,action.parent_file,fdir)
 		if arm.animation_data is None:
 			arm.animation_data_create()
 		arm.animation_data.action = act
@@ -323,3 +326,4 @@ class bvpObject(object):
 		# Set back to previous mode 
 		# (IMPORTANT: otherwise Blender may puke and die with next command)
 		bpy.ops.object.posemode_toggle()
+

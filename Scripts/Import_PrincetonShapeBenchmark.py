@@ -71,7 +71,7 @@ off_object_import = """
 import bpy
 import bvp
 # Set scene
-scn = bvp.utils.blender.new_scene('{new_name}')
+scn = bpy.data.scenes.new('{new_name}')
 # Import object & rename
 bpy.ops.import_mesh.off(filepath='{off_file}')
 ob = bpy.data.objects['{old_name}']
@@ -80,7 +80,7 @@ ob.name = '{new_name}'
 bpy.ops.object.shade_smooth()
 # Link to new scene? Unnecessary? 
 # Establish a blender group
-bvp.utils.blender.SetUpGroup([ob])
+bvp.utils.blender.set_up_group([ob])
 # Save file
 bpy.ops.wm.save_mainfile(filepath='{blend_file}')
 # Done!

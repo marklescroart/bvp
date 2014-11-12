@@ -89,6 +89,7 @@ def MakeBlenderSafe(Array,Type='int'):
 		Type = 'float32'
 	Out = np.cast[Type](Array).tolist()
 	return Out
+	
 def RunScriptForAllFiles(scriptF,fNm,Is_Cluster=False,Inpts=None):
 	'''
 	Run a script in all files in in some list (fNm)
@@ -132,6 +133,7 @@ def RunScriptForAllFiles(scriptF,fNm,Is_Cluster=False,Inpts=None):
 			#SlurmCmd = ['sbatch','-c',nCPUs,'-w','ibogaine',TempScriptName,'-o',SlurmOut]
 			subprocess.call(SlurmCmd)
 			print('Slurm call done for file %s'%BlendFile)
+
 def loadPik(pikFile):
 	'''
 	Lazy function for simple loading of pickled files (stored with ".pik" extension by ML convention)
@@ -140,6 +142,7 @@ def loadPik(pikFile):
 	with open(pikFile,'rb') as fid:
 		d = bvp.pickle.load(fid)
 	return d
+
 def savePik(d,pikFile,protocol=2):
 	'''
 	Lazy function for simple saving of pickled files (stored with ".pik" extension by ML convention)
@@ -148,6 +151,14 @@ def savePik(d,pikFile,protocol=2):
 	'''
 	with open(pikFile,'wb') as fid:
 		bvp.pickle.dump(d,fid,protocol=2)
+
+def load_template(template_type):
+	bvp_path = os.path.split(os.path.abspath(bvp.__file__))[0]
+	fpath = os.path.join(bvp_path,'Scripts','Template_%s.py'%template_type)
+	with open(fpath,'r') as fid:
+		f = fid.readlines()
+	return ''.join(f)
+
 def readEXR(fNm,isZ=True):
 	'''
 	Reading EXR files to numpy arrays. Principally used for Z depth files in BVP, 

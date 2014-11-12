@@ -170,7 +170,7 @@ class bvpSky(object):
 						'environment_color':'SKY_COLOR',
 						})
 
-	def PlaceSky(self,num=0,Scn=None,Scale=None):
+	def Place(self,num=0,Scn=None,Scale=None):
 		'''
 		Adds sky to Blender scene
 		'''
