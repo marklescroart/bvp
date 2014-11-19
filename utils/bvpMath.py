@@ -13,26 +13,27 @@ import bvp,random
 import math as bnp
 from bvp.utils.basics import MakeBlenderSafe
 # Alternative runtime environments
-if bvp.Is_Numpy:
-	import numpy as np
-	MatrixFn = np.matrix
-	def VectorFn(a):
-		b = np.array(a)
-		b.shape = (len(a),1)
-		return b
-	GetInverse = np.linalg.pinv
-	def lst(a):
-		a = np.array(a)
-		return list(a.flatten())
-	pi = np.pi
-else:
-	# Better be working within Blender...
-	import mathutils as bmu
-	from math import pi
-	MatrixFn = bmu.Matrix
-	VectorFn = bmu.Vector
-	GetInverse = lambda x: x.inverted()
-	lst = list
+# if bvp.Is_Numpy:
+# always numpy now (as of 2014.11 [or much earlier...])
+import numpy as np
+MatrixFn = np.matrix
+def VectorFn(a):
+	b = np.array(a)
+	b.shape = (len(a),1)
+	return b
+GetInverse = np.linalg.pinv
+def lst(a):
+	a = np.array(a)
+	return list(a.flatten())
+pi = np.pi
+# else:
+# 	# Better be working within Blender...
+# 	import mathutils as bmu
+# 	from math import pi
+# 	MatrixFn = bmu.Matrix
+# 	VectorFn = bmu.Vector
+# 	GetInverse = lambda x: x.inverted()
+# 	lst = list
 
 # Math functions
 def listMean(a):
