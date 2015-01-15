@@ -2,6 +2,7 @@ import bpy
 import bvp
 import os
 from bpy.types import Panel
+import numpy as np
 
 """
 NOTES
@@ -68,26 +69,35 @@ bl_info = {
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
 dbport = bvp.Settings['db']['port']
 dbpath = bvp.Settings['Paths']['LibDir'] # only necessary for creating client instances...
-dbname = 'bvp_1_0' #bvp.Settings['db']['name']
-act_parent_file = ""
+dbname = bvp.Settings['db']['name']
+to_save = {}
 db_results = []
 last_import = ""
-### --- Start BVP database server? --- ###
+wn_results = []
 
+### --- Start BVP database server? --- ###
 try:
 	dbi = bvp.bvpDB(dbname=dbname)
 	del dbi
 except pymongo.errors.ConnectionError:
 	import warnings
-	warnings.warn()
-	# Subprocess start db server
+	warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
 
-	# Insert at end if server is started: 
-	#import psutil
-	#PROCNAME = "mongod"
-	#for proc in psutil.process_iter():
-    #	if proc.name() == PROCNAME:
-    #    	proc.kill()
+## -- Base properties for property groups -- ##
+class WordNet_Label(bpy.types.PropertyGroup):
+    name = bpy.props.StringProperty(name="label", default = "")
+    frame = bpy.props.IntProperty(default=1)
+    id = bpy.props.IntProperty() # necessary?
+
+class WordNet_Label_List(bpy.types.UIList):
+## -- Display UI list -- ##
+    """List class to set up display of WordNet label list"""
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        split = layout.split(0.2)
+        split.label(str(item.frame)) # item.name
+        split.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
+        #row = layout.row()
+        #row.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
 
 ### --- BVP element properties --- ###
 class ObjectProps(bpy.types.PropertyGroup):
@@ -114,14 +124,19 @@ class ObjectProps(bpy.types.PropertyGroup):
 
 class ActionProps(bpy.types.PropertyGroup):
 	"""Properties for bvpActions"""
-	act_name = bpy.props.StringProperty(name='act_name',default="")
-	parent_file = bpy.props.StringProperty(name='parent_file',default="")
-	semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='do')
-	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='do.v.01')
+	# Set act_name default to bpy.context.object.animation_data.action.name? Will that dynamically update? 
+	# Or: new wisdom: these necessarily depend on the current action & file, so just read those properties
+	# rather than creating duplicate properties just to have everything in the same place.
+	#act_name = bpy.props.StringProperty(name='act_name',default="")
+	#parent_file = bpy.props.StringProperty(name='parent_file',default="")
+	#semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='')
+	wordnet_label = bpy.props.CollectionProperty(type=WordNet_Label)
 	fps = bpy.props.FloatProperty(name='fps',default=30.,min=15.,max=100.) # 100 is optimistic...
 	nframes = bpy.props.IntProperty(name='fps',default=30,min=2,max=1000) # 1000 is also optimistic...
 	is_cyclic = bpy.props.BoolProperty()
-	is_transitive = bpy.props.BoolProperty()
+	is_broken = bpy.props.BoolProperty()
+	bg_interaction = bpy.props.BoolProperty()
+	obj_interaction = bpy.props.BoolProperty()
 	is_translating = bpy.props.BoolProperty()
 	is_armature = bpy.props.BoolProperty(default=True)
 	# Define computed properties (compute from constraints?) (number of bones?)
@@ -154,6 +169,13 @@ def enum_db_results(self,context):
 	global db_results
 	out = [("","","")]+[(o['name'],o['name'],','.join(o['semantic_cat'])) for o in db_results]
 	return out
+
+def enum_wn_results(self,context):
+	"""Enumerate all WordNet synsets (WordNet labels) returned from the most recent lemma query"""
+	global wn_results
+	out = [("","","")]+[(o['synset'],o['synset']+': '+o['definition'],o['hypernyms']) for o in wn_results]
+	return out
+
 
 def declare_properties():
 	'''Declarations of extra object properties
@@ -213,8 +235,10 @@ def declare_properties():
 	# TO DO: Add ShapeNet / ModelNet to this list! 
 	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=dbnm,name='active_db',default=dbname) 
 	bpy.types.WindowManager.active_group = bpy.props.StringProperty(name='active_group',default="") 
-	bpy.types.WindowManager.active_action = bpy.props.StringProperty(name='active_action',default="") 
+	#bpy.types.WindowManager.active_action = bpy.props.StringProperty(name='active_action',default="") 
 	bpy.types.WindowManager.query_results = bpy.props.EnumProperty(items=enum_db_results,name='Search results')
+	bpy.types.WindowManager.wn_results = bpy.props.EnumProperty(items=enum_wn_results,name='WordNet search results')
+	bpy.types.WindowManager.wn_label_index = bpy.props.IntProperty(default=0)
 	# Add .WindowManager.bvp.active_xxx?
 
 ### --- Operators --- ###
@@ -415,81 +439,113 @@ class DBSaveObject(bpy.types.Operator):
 			bvp.blend(script,pfile)		
 		return {"FINISHED"}
 
-class WordNetLookup(bpy.types.Operator):
-	bl_idname = "bvp.wordnet_lookup"
-	bl_label = "Search wordnet for the synsets associated with a word"
-	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context):
-		raise NotImplementedError('Not functioning yet! (Max, get to it!)')
-		# An on-the-fly import seems best, so to not insist on WordNet
-		# as a dependency outside of the use of this function
-		from nltk.corpus import wordnet as wn
-		# etc...
-
 ## TO DO: 
 # class DBSaveBG(bpy.types.Operator):
 # 	pass
 
 class DBSaveAction(bpy.types.Operator):
 	bl_idname = "bvp.db_save_action"
-	bl_label = "Save the active object to the active database"
+	bl_label = "Save action to active database"
 	bl_options = {'REGISTER','UNDO'}
+	# Properties
+	do_save = bpy.props.BoolProperty(name='overwrite',default=True)
+	# Methods
 	def execute(self,context):
+		global to_save
 		wm = context.window_manager
-		ob = context.object
-		act = bpy.data.actions[wm.active_action]
-		# Compute parameters
-
-		## Frames
-		FR = act.animation_data.action.frame_range
-		nframes = FR[1]-FR[0]
-
-		## Semantic categories
-		semcat = [s.strip() for s in act.bvpAction.semantic_cat.split(',')]
-		semcat = [s.lower() for s in semcat if s]
-		## WordNet labels
-		wordnet = [s.strip() for s in act.bvpAction.wordnet_label.split(',')]
-		wordnet = [s.lower() for s in wordnet if s]
-
-		# Get parent file, determine if it is THIS file.
-		pfile = act.bvpAction.parent_file
-		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
-		if thisfile=="":
-			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
-			# Need to check for over-writing file? 
-		if pfile=="":
-			pfile = os.path.split(bpy.data.filepath)[1][:-6]
-
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
-		# Construct action struct to save
-		to_save = dict(
-			# Edited through UI
-			act_name=act.name,
-			parent_file=pfile,
-			wordnet_label=act.bvpAction.wordnet_label,
-			semantic_cat=act.bvpAction.semantic_cat,
-			fps=act.bvpAction.fps,
-			nframes=nframes,
-			is_cyclic=act.bvpAction.is_cyclic,
-			is_translating=act.bvpAction.is_translating,
-			is_transitive=act.bvpAction.is_transitive,
-			is_armature=act.bvpAction.is_armature,
-			is_verified=False, # Will be done through database later, once it's in there
-			# Computed
-			# Constraints?? Bounding box??
-			)
-		dbi.actions.save(to_save)
-		save_path = os.path.join(dbpath,'Actions',pfile+'.blend')
-		if pfile==thisfile:
+
+		if self.do_save:
+			print('Saving %s in database'%repr(to_save))
+			# Save in database
+			dbi.actions.save(to_save)
+			# Save parent file
+			save_path = os.path.join(dbpath,'Actions',to_save['parent_file'])
+			print('saving %s'%save_path)
 			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
-			raise NotImplementedError('Still WIP! Just work inside your database files, you lazy bastard!')
-			tmpf = '/tmp/action_tempfile.blend' # Set in settings?
-			bpy.ops.wm.save_as_mainfile(filepath=tmpf,copy=True)
-			script = bvp.utils.basics.load_template('Save') # This script doesn't work yet. Edit <bvp>/Scripts/Template_Save.py
-			script.format() # Depends on script
-			bvp.blend(script,pfile)
+			# NOOOOOO!
+			print("Aborting - nothing saved!")
+		# Cleanup
+		to_save = {}
+		# 	# Eventually, I would like to add the ability to append the active action to another file
+		#	raise NotImplementedError('Still WIP! Just work inside your database files, you lazy bastard!')
+		#	tmpf = '/tmp/action_tempfile.blend' # Set in settings?
+		#	bpy.ops.wm.save_as_mainfile(filepath=tmpf,copy=True)
+		#	script = bvp.utils.basics.load_template('Save') # This script doesn't work yet. Edit <bvp>/Scripts/Template_Save.py
+		#	script.format() # Depends on script
+		#	bvp.blend(script,pfile)
+		return {'FINISHED'}
+	def invoke(self,context,event):
+		global to_save
+		wm = context.window_manager
+		ob = context.object
+		act = ob.animation_data.action
+		## -- Compute parameters -- ##
+		## Frames
+		nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
+		## WordNet labels
+		wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
+		wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
+		## Bounding box
+		if isinstance(ob.data,bpy.types.Armature):
+			# Get child objects, armatures have no position information
+			ob_list = [ob]+list(ob.children)
+		scn = context.scene
+		mn,mx = [],[]
+		for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
+		    scn.frame_set(fr)
+		    scn.update()
+		    mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
+		    mn.append(mntmp)
+		    mx.append(mxtmp)
+		min_xyz = np.min(np.vstack(mn),axis=0).tolist()
+		max_xyz = np.max(np.vstack(mx),axis=0).tolist()
+		#bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
+		bvp.utils.blender.grab_only(ob)
+		## Parent file
+		#pfile = act.bvpAction.parent_file
+		# The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
+		# of the current file (group/action/whatever) and save them (append them) to another specfied file
+		# in the database. Currently NOT IMPLEMENTED.
+		thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
+		if thisfile=="":
+			# Require saving in db-appropriate location 
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
+
+		# Construct action struct to save
+		to_save = dict(
+			# Edited through UI 
+			act_name=act.name,
+			parent_file=thisfile,
+			wordnet_label=wordnet_labels,
+			wordnet_frames=wordnet_frames,
+			is_cyclic=act.bvpAction.is_cyclic,
+			is_translating=act.bvpAction.is_translating,
+			is_broken=act.bvpAction.is_broken,
+			is_armature=act.bvpAction.is_armature,
+			bg_interaction=act.bvpAction.bg_interaction,
+			obj_interaction=act.bvpAction.obj_interaction,
+			# Computed / assumed
+			nframes=nframes,
+			fps=act.bvpAction.fps,
+			min_xyz=min_xyz,
+			max_xyz=max_xyz,
+			)
+		# Create database instance
+		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		# Check for existence of to_save in database
+		chk = dbi.actions.find_one(dict(act_name=to_save['act_name']))
+		print("chk is: ")
+		print(chk)
+		if chk is None:
+			self.do_save = True
+		else:
+			self.do_save = False
+			to_save['_id'] = chk['_id']
+		return wm.invoke_props_dialog(self)
+
 
 class DBSearchDialog(bpy.types.Operator):
 	bl_idname = "bvp.db_search"
@@ -512,7 +568,7 @@ class DBSearchDialog(bpy.types.Operator):
 	def execute(self, context):
 		global db_results
 		global last_import
-		wm = context.window_manager
+		wm = context.window_manager # Not necessary??
 		dbi = bvp.bvpDB(dbname=self.active_db)
 		props = ['semantic_cat','wordnet_label','ename']
 		query = dict((p,getattr(self,p)) for p in props if getattr(self,p))
@@ -527,6 +583,67 @@ class DBSearchDialog(bpy.types.Operator):
 		wm = context.window_manager
 		self.active_db = wm.active_db
 		return context.window_manager.invoke_props_dialog(self)
+
+		# etc...
+
+class WordNetSearchDialog(bpy.types.Operator):
+	bl_idname = "bvp.wn_search"
+	bl_label = "Query WordNet for existence of lemma:"
+	bl_options = {'REGISTER','UNDO'}
+	lemma = bpy.props.StringProperty(name='Search word (lemma)',default="")
+	# Real world size min/max?
+	
+	def get_wn_synsets(self,lemma):
+		"""Get all synsets for a word, return a list of [wordnet_label,definition, hypernym_string]
+		for all synsets returned."""
+		from nltk.corpus import wordnet as wn
+		synsets = wn.synsets(lemma)
+		out = []
+		for s in synsets:
+			if not '.v.' in s.name(): continue # only verbs!
+			hyp = ''
+			for ii,ss in enumerate(s.hypernym_paths()):
+				try:
+					hyp+=(repr([hn.name() for hn in ss])+'\n')
+				except:
+					hyp+='FAILED for %dth hypernym\n'%ii
+			out.append(dict(synset=s.name(), definition=s.definition(),hypernyms=hyp))
+		return out
+
+	def execute(self, context):
+		global wn_results
+		wm = bpy.context.window_manager
+		wn_results = self.get_wn_synsets(self.lemma)
+		return {'FINISHED'}
+ 
+	def invoke(self, context, event):
+		print("Invoking WordNetSearchDialog!")
+		return context.window_manager.invoke_props_dialog(self)
+
+# to clear:
+# wm.categories.clear()
+class WordNetAddLabel(bpy.types.Operator):
+	bl_idname = "bvp.wn_addlabel"
+	bl_label = "Add current wordnet result as a label for group/action"
+	bl_options = {'REGISTER','UNDO'}
+	def execute(self,context): 
+		# Add current label at current frame
+		wm = context.window_manager
+		act = context.object.animation_data.action
+		added = act.bvpAction.wordnet_label.add()
+		added.name = wm.wn_results
+		added.frame = bpy.context.scene.frame_current
+		return {'FINISHED'}
+
+class WordNetRemoveLabel(bpy.types.Operator):
+	bl_idname = 'bvp.wn_removelabel'
+	bl_label = "remove currently highlighted label"
+	bl_options = {'REGISTER','UNDO'}
+	def execute(self,context): 
+		wm = context.window_manager
+		act = context.object.animation_data.action
+		act.bvpAction.wordnet_label.remove(wm.wn_label_index)
+		return {'FINISHED'}
 
 class DBImport(bpy.types.Operator):
 	bl_idname = "bvp.db_import"
@@ -555,6 +672,16 @@ class DBImportProxy(DBImport,bpy.types.Operator):
 
 	proxy_import = True
 
+class ClipFrames(bpy.types.Operator):
+	bl_idname = "bvp.clip_to_action"
+	bl_label = "Clip scene frames to begin/end of action"
+	bl_options = {'REGISTER','UNDO'}
+	def execute(self,context): 		
+		scn = bpy.context.scene
+		act = bpy.context.object.animation_data.action
+		scn.frame_start = np.floor(act.frame_range[0])
+		scn.frame_end = np.ceil(act.frame_range[1])
+		return {'FINISHED'}
 ### --- Misc. supporting classes --- ###
 '''
 # UI list option for displaying databases (more flexible, more space)
@@ -679,32 +806,48 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		ob = context.object	
 		wm = context.window_manager
 		act = ob.animation_data.action
-		wm.active_action = act.name
+		#wm.active_action = act.name
 		# Layout
 		layout = self.layout
-		spl = layout.split()	
+		spl = layout.split()
 		## -- 1st column -- ##
 		col = spl.column()
 		col.label("Name:")
-		col.label("File:")
-		col.label("Labels:")
-		col.label("WordNet:")
-		col.label("Frame rate:")
-		# Boolean properties
-		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
-		col.prop(act.bvpAction,'is_translating',text='translating')
-		col.operator('bvp.wordnet_lookup',text='Search WordNet')
+		#col.label("File:") # dead
+		#col.label("Labels:") # dead
+		col.operator('bvp.wn_search',text='Search WordNet')
+		col.label("WordNet labels:")
+		
 		## -- 2nd column -- ##
 		col = spl.column()
 		col.prop(act,'name',text="")
-		col.prop(act.bvpAction,'parent_file',text='')
-		col.prop(act.bvpAction,'semantic_cat',text='')
-		col.prop(act.bvpAction,'wordnet_label',text='')
-		col.prop(act.bvpAction,'fps',text="")
-		# Boolean properties
-		col.prop(act.bvpAction,'is_transitive',text='transitive')
+		#col.prop(act.bvpAction,'parent_file',text='')
+		#col.prop(act.bvpAction,'semantic_cat',text='')
+		row = col.row(align=True)
+		row.prop(wm,'wn_results',text="")
+		#row.prop(wm,'label_frame',text="")
+		row.operator('bvp.wn_addlabel',text="Add label")
+		row = layout.row()
+		row.template_list("WordNet_Label_List", "wordnet labels", act.bvpAction, "wordnet_label",wm,"wn_label_index")
+		col = row.column(align=True)
+		col.operator("bvp.wn_removelabel", icon='ZOOMOUT', text="")
+		#col.operator("object.material_slot_remove", icon='ZOOMOUT', text="")
+
+		row = layout.row()
+		# Boolean properties - column 1
+		spl = layout.split()		
+		col = spl.column()
+		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
+		col.prop(act.bvpAction,'bg_interaction',text='needs bg')
+		col.prop(act.bvpAction,'is_translating',text='translating')
+		# Clip frames
+		col.operator('bvp.clip_to_action',text='Clip frames')
+		# Boolean properties - column 2
+		col = spl.column()
+		col.prop(act.bvpAction,'is_broken',text='broken')
+		col.prop(act.bvpAction,'obj_interaction',text='needs obj.')
 		col.prop(act.bvpAction,'is_armature',text='armature')
-		# Button for re-scaling object groups 
+		# Save to DB when done
 		col.operator('bvp.db_save_action',text='Save to DB')
 		if isinstance(ob.data,bpy.types.Armature):
 			row = layout.row()
@@ -742,7 +885,7 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 def register():
 	# Order of registering props/object should perhaps be examined for optimality...
 	# It works this way, but it doesn't seem clean.
-	for c in [ObjectProps,ActionProps]: #, BGProps, SkyProps]: 
+	for c in [WordNet_Label,ObjectProps,ActionProps]: #, BGProps, SkyProps]: 
 		# Do these in a separate file? Imported, registered separately? 
 		bpy.utils.register_class(c)
 	declare_properties()
@@ -763,8 +906,9 @@ def unregister():
 	# Delete temp properties
 	del bpy.types.WindowManager.active_db
 	del bpy.types.WindowManager.active_group
-	del bpy.types.WindowManager.active_action
+	#del bpy.types.WindowManager.active_action
 	del bpy.types.WindowManager.query_results
+	del bpy.types.WindowManager.wn_results
 	# More? 
 	
 if __name__ == "__main__":
