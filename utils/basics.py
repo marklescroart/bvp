@@ -9,6 +9,7 @@ Modified by ML 2013.09.18
 '''
 
 import os,random,subprocess,time,bvp
+import numpy as np
 # if bvp.Is_Numpy:
 # 	np = bvp.np
 # 	from numpy import mod,floor
