@@ -383,7 +383,7 @@ def set_layers(Ob,LayerList):
 	bpy.ops.object.move_to_layer(layers=LL)
 
 def GetCursor():	
-	warings.warn("Deprecated! Use get_cursor() instead!")
+	warnings.warn("Deprecated! Use get_cursor() instead!")
 	return get_cursor()
 def get_cursor():
 	'''Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
@@ -398,7 +398,7 @@ def get_cursor():
 	return V.spaces[0].cursor_location
 
 def SetCursor(CursorPos):
-	warings.warn("Deprecated! Use set_cursor() instead!")
+	warnings.warn("Deprecated! Use set_cursor() instead!")
 	set_cursor(CursorPos)
 def set_cursor(CursorPos):
 	'''Sets 3D cursor to specified location in VIEW_3D window
@@ -663,12 +663,14 @@ def set_scene(scene_name=None):
 		Scn = bpy.context.scene
 	else:
 		SL = [s.name for s in bpy.data.scenes]
-		if scene_name in SL:
-			Scn = bpy.data.scenes[scene_name]
-			for scr in bpy.data.screens:
-				scr.scene = Scn
-		else:
+		if not scene_name in SL:
 			Scn = bpy.data.scenes.new(scene_name)
+		else:
+			Scn = bpy.data.scenes[scene_name]
+		# Set all screens to this scene
+		for scr in bpy.data.screens:
+			scr.scene = Scn
+			
 	return Scn
 def apply_action(target_object,action_file,action_name):
 	""""""
@@ -722,9 +724,9 @@ def set_up_group(ObList=None,Scn=None):
 				o.constraints.remove(o.constraints['ChildOf'])
 	
 	# SECOND: Reposition all object origins 
-	(MinXYZ,MaxXYZ) = GetGroupBoundingBox(ObList)
+	(MinXYZ,MaxXYZ) = get_group_bounding_box(ObList)
 	BotMid = [(MaxXYZ[0]+MinXYZ[0])/2,(MaxXYZ[1]+MinXYZ[1])/2,MinXYZ[2]]
-	SetCursor(BotMid)
+	set_cursor(BotMid)
 	
 	SzXYZ = []
 	for Dim in range(3):
@@ -753,6 +755,39 @@ def set_up_group(ObList=None,Scn=None):
 			o.select=True
 		bpy.ops.group.create(name=Scn.name)
 
+def get_group_bounding_box(ob_list=None):
+	'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
+
+	Parameters
+	----------
+	ob_list : list or tuple 
+		list of Blender objects for which to get bounding box
+
+	Returns
+	-------
+	minxyz,maxxyz : lists
+		min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
+		more standard format for a bounding box. 
+	'''
+	bb_types = ['MESH','LATTICE','ARMATURE'] 
+	if ob_list is None:
+		ob_list = [o for o in bpy.context.scene.objects if o.select]
+	BBx = list()
+	BBy = list()
+	BBz = list()
+	for ob in ob_list: 
+		bvp.utils.blender.grab_only(ob)
+		if ob.type in bb_types:
+			bpy.ops.object.transform_apply(rotation=True)
+		for ii in range(8):
+			BBx.append(ob.bound_box[ii][0] * ob.scale[0] + ob.location[0]) 
+			BBy.append(ob.bound_box[ii][1] * ob.scale[1] + ob.location[1])
+			BBz.append(ob.bound_box[ii][2] * ob.scale[2] + ob.location[2])
+	MinXYZ = [min(BBx),min(BBy),min(BBz)]
+	MaxXYZ = [max(BBx),max(BBy),max(BBz)]
+	# Done
+	return MinXYZ,MaxXYZ
+
 def get_collada_action(collada_file,act_name=None,scale=1.0):
 	"""Imports an armature and its associated action from a collada (.dae) file.
 
@@ -770,24 +805,24 @@ def get_collada_action(collada_file,act_name=None,scale=1.0):
 		amount by which to scale 
 	"""
 	if act_name is None:
-		act_name = os.path.split(collada_file)[1].strip('.dae')
+		act_name = os.path.split(collada_file)[1].replace('.dae','')
 	# Work in a new scene
-	scn = bpy.data.scenes.new(act_name)
+	scn = set_scene(act_name)
 	# Get list of extant actions, objects
 	ext_act = [a.name for a in bpy.data.actions]
 	ext_obj = [o.name for o in bpy.data.objects]
-
 	# Import new armature
 	bpy.ops.wm.collada_import(filepath=collada_file)
-	
-	# Find new object	
+	# Find new objects (armature & parented meshes)
 	arm_ob = [o for o in bpy.data.objects if isinstance(o.data,bpy.types.Armature) and not o.name in ext_obj]
+	mesh_ob = [o for o in bpy.data.objects if isinstance(o.data,bpy.types.Mesh) and not o.name in ext_obj]
+	print(mesh_ob)
 	if len(arm_ob)>1:
 		# Perhaps more subtlety will be required
 		from pprint import pprint
 		print('=========================================')
 		print('Multiple armatures found for %s:'%act_name)
-		pprint('New armatures:')
+		print('New armatures:')
 		pprint(arm_ob)
 		print('=========================================')
 		#raise Exception("WTF! TOO MANY NEW ARMATURES!")
@@ -816,26 +851,25 @@ def get_collada_action(collada_file,act_name=None,scale=1.0):
 					xx = 0
 				b.name = b.name[xx:]
 				#print(b.name)
-	
 	# Find new action
 	arm_act = [a for a in bpy.data.actions if not a.name in ext_act]
 	if len(arm_act)>1:
 		# Perhaps more subtlety will be required
 		#raise Exception("WTF! TOO MANY NEW ACTIONS!")
 		print('Keeping first action only!')
-		arm_act = arm_act[0]
-	else:
-		arm_act = arm_act[0]
+	arm_act = arm_act[0]
+	arm_ob = arm_ob[0]
 	# Rename new action
 	arm_act.name = act_name
-
 	# Adjust size to standard 10 units (standing straight up in rest pose)
 	arm_ob.data.pose_position = "REST"
-	try:
-		set_up_group()
-	except:
-		print('Automatic bounding box scaling failed for action;%s\nMultiplying by scale %.2f'%(act_name,scale))
-		arm_ob.scale*=scale
+	#try:
+	# Create parent relationship btw. armature and object
+
+	set_up_group()
+	#except:
+	#	print('Automatic bounding box scaling failed for action;%s\nMultiplying by scale %.2f'%(act_name,scale))
+	#	arm_ob.scale*=scale
 	arm_ob.data.pose_position = "POSE"
 
 ###########################################################
@@ -1019,3 +1053,24 @@ def meshify(ob):
 			new_obs.append(N.name)
 		except:
 			print("Failed for %s"%oo.name)
+
+def make_cube(name,mn,mx):
+	xn,yn,zn = mn
+	xx,yx,zx = mx
+	
+	#Define vertices, faces, edges
+	verts = [(xn,yn,zn),(xn,yx,zn),(xx,yx,zn),(xx,yn,zn),(xn,yn,zx),(xn,yx,zx),(xx,yx,zx),(xx,yn,zx)]
+	faces = [(0,1,2,3), (4,5,6,7), (0,4,5,1), (1,5,6,2), (2,6,7,3), (3,7,4,0)]
+	 
+	#Define mesh and object
+	mesh = bpy.data.meshes.new(name)
+	ob = bpy.data.objects.new(name, mesh)
+	 
+	#Set location and scene of object
+	#ob.location = bpy.context.scene.cursor_location
+	bpy.context.scene.objects.link(ob)
+	 
+	#Create mesh
+	mesh.from_pydata(verts,[],faces)
+	mesh.update(calc_edges=True)
+
