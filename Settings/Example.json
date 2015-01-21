@@ -5,7 +5,7 @@
     "LibDir": "/path/to/your/Library"
   }, 
   "db": {
-    "name": "bvp_1_0", 
+    "name": "bvp_2_0", 
     "host": "localhost", 
     "port": 9194
   },

@@ -5,50 +5,28 @@ from bpy.types import Panel
 import numpy as np
 
 """
+This is the graphical interface add-on to Blender for the B.lender V.ision P.roject (bvp) python module. 
+
+It's possible to use bvp without actually opening Blender, but if you want to, this GUI is designed to 
+make it easier to:
+- modify scene elements (objects, backgrounds, actions, skies, and shadows) in your bvp database
+- create, edit, modify, and save scenes
+- label certian properties of new scene elements
+"""
+
+"""
 NOTES
 =====
 
-Useful: 
-# To show property type:
-type(bpy.data.scenes['Scene'].bl_rna.properties['frame_start'])
+TO DO: 
+- Start/stop database buttons from top DBtools pane
+- Mechanism to add new databases from DBtools pane (with setup of folders??)
+- Break this ridiculous file up into multiple files. This is approaching 1,000 lines long. 
 
-http://blender.stackexchange.com/questions/15917/populate-a-list-with-custom-property-dictionary-data
-
-# Useful: latest builds by OS
-https://builder.blender.org/download/
-
-# Material library:
-https://sites.google.com/site/aleonserra/home/scripts/matlib-vx#TOC-Demo-Video:
-
-# Meta-Androcto / Peter Casseta libraries:
-# Meta: 
-http://blenderartists.org/forum/showthread.php?252957-Cycles_Matlib-Beta-Release!-Help-Wanted!/page4
-# Peter Casseta online/offline:
-http://blenderartists.org/forum/showthread.php?256334-An-Online-Material-Library-for-Cycles
-
-# Creating objects:
-http://wiki.blender.org/index.php/Dev:2.5/Py/Scripts/Cookbook/Code_snippets/Three_ways_to_create_objects
-
-Dialog box example (for saving??)
-http://www.blender.org/documentation/blender_python_api_2_57_release/bpy.types.Operator.html
-
-The interface for database selection would benefit from not being fixed - we could add a 
-mechanism to add a new database without too much trouble. This would involve changing the 
-property type to something other than EnumProperty (which as I understand is fixed)
-
-Useful for lists:
-Will need to define a collection property, define the property type with which to populate the list,
-and then add the new type and collection type (?) I think...
-http://blender.stackexchange.com/questions/15917/populate-a-list-with-custom-property-dictionary-data
-
-Dynamic EnumProperty:
-http://blender.stackexchange.com/questions/10910/dynamic-enumproperty-by-type-of-selection
+Check out http://www/wiki/Useful_Blender_Links for misc. tips on objects, material libraries, etc - 
+need to compile those into a list of useful Blenderization on a public web page
 
 Shit, there's a selected_objects value in bpy.context - who knew?
-
-
-see the following for bounding boxes:
-https://github.com/sambler/addonsByMe/blob/master/create_bound_box.py
 """
 
 
@@ -76,12 +54,12 @@ last_import = ""
 wn_results = []
 
 ### --- Start BVP database server? --- ###
-try:
-	dbi = bvp.bvpDB(dbname=dbname)
-	del dbi
-except pymongo.errors.ConnectionError:
-	import warnings
-	warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
+# try:
+# 	dbi = bvp.bvpDB(dbname=dbname)
+# 	del dbi
+# except pymongo.errors.ConnectionError:
+# 	import warnings
+# 	warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
 
 ## -- Base properties for property groups -- ##
 class WordNet_Label(bpy.types.PropertyGroup):
@@ -96,8 +74,6 @@ class WordNet_Label_List(bpy.types.UIList):
         split = layout.split(0.2)
         split.label(str(item.frame)) # item.name
         split.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
-        #row = layout.row()
-        #row.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
 
 ### --- BVP element properties --- ###
 class ObjectProps(bpy.types.PropertyGroup):
@@ -139,6 +115,8 @@ class ActionProps(bpy.types.PropertyGroup):
 	obj_interaction = bpy.props.BoolProperty()
 	is_translating = bpy.props.BoolProperty()
 	is_armature = bpy.props.BoolProperty(default=True)
+	is_interactive = bpy.props.BoolProperty()
+	is_animal = bpy.props.BoolProperty()
 	# Define computed properties (compute from constraints?) (number of bones?)
 
 class SkyProps(bpy.types.PropertyGroup):
@@ -176,7 +154,17 @@ def enum_wn_results(self,context):
 	out = [("","","")]+[(o['synset'],o['synset']+': '+o['definition'],o['hypernyms']) for o in wn_results]
 	return out
 
+def enum_dbs(self,context):
+	"""Enumerate all active databases for pymongo server (if running)"""
+	try:
+		# TO DO: Add ShapeNet / ModelNet to this list?
+		dbi = bvp.bvpDB(port=dbport)
+		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
+	except:
+		dbnm = [('(none)','(none)','')]
+	return dbnm
 
+## -- General property declarations -- ##
 def declare_properties():
 	'''Declarations of extra object properties
 
@@ -229,11 +217,7 @@ def declare_properties():
 	
 	bpy.types.Action.bvpAction = bpy.props.PointerProperty(type=ActionProps)
 	## -- For database management -- ##
-	# active_db
-	db_tmp = bvp.bvpDB(dbname=dbname)
-	dbnm = [(d,d,'') for d in db_tmp.dbi.connection.database_names() if not d in ['local','admin']]
-	# TO DO: Add ShapeNet / ModelNet to this list! 
-	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=dbnm,name='active_db',default=dbname) 
+	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=enum_dbs,name='active_db') 
 	bpy.types.WindowManager.active_group = bpy.props.StringProperty(name='active_group',default="") 
 	#bpy.types.WindowManager.active_action = bpy.props.StringProperty(name='active_action',default="") 
 	bpy.types.WindowManager.query_results = bpy.props.EnumProperty(items=enum_db_results,name='Search results')
@@ -527,6 +511,8 @@ class DBSaveAction(bpy.types.Operator):
 			is_armature=act.bvpAction.is_armature,
 			bg_interaction=act.bvpAction.bg_interaction,
 			obj_interaction=act.bvpAction.obj_interaction,
+			is_interactive=act.bvpAction.is_interactive,
+			is_animal=act.bvpAction.is_animal,
 			# Computed / assumed
 			nframes=nframes,
 			fps=act.bvpAction.fps,
@@ -541,18 +527,19 @@ class DBSaveAction(bpy.types.Operator):
 		print(chk)
 		if chk is None:
 			self.do_save = True
+			return self.execute(context) #{'RUNNING_MODAL'} #wm.invoke_props_dialog(self)
 		else:
 			self.do_save = False
 			to_save['_id'] = chk['_id']
-		return wm.invoke_props_dialog(self)
+			return wm.invoke_props_dialog(self)
 
 
 class DBSearchDialog(bpy.types.Operator):
 	bl_idname = "bvp.db_search"
 	bl_label = "Query database for:"
 	bl_options = {'REGISTER','UNDO'}
-
-	active_db = bpy.props.StringProperty(name="active_db")
+	# Use wm.active_db?? But we probably can't change that here.
+	active_db = bpy.props.StringProperty(name="Current database")
 	bvp_type = bpy.props.EnumProperty(name='BVP type',
 		items=[('action','action',""),
 			   ('background','background',""),
@@ -714,10 +701,6 @@ class BVP_PANEL_db_tools(View3DPanel,Panel):
 		# Head title
 		layout = self.layout
 		row = layout.row()
-		# # For extensible list of databases, maybe use the following line.
-		# # It's less compact but more flexible; requires definition of 'db_index'
-		# # property. Maybe implement later.
-		# row.template_list("BVP_DB_LIST", "", wm, "active_db",wm,"db_index")
 		spl = layout.split()
 		col = spl.column()
 		col.label('Active DB:')
@@ -840,14 +823,20 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
 		col.prop(act.bvpAction,'bg_interaction',text='needs bg')
 		col.prop(act.bvpAction,'is_translating',text='translating')
-		# Clip frames
-		col.operator('bvp.clip_to_action',text='Clip frames')
+		col.prop(act.bvpAction,'is_interactive',text='interactive')
 		# Boolean properties - column 2
 		col = spl.column()
 		col.prop(act.bvpAction,'is_broken',text='broken')
 		col.prop(act.bvpAction,'obj_interaction',text='needs obj.')
 		col.prop(act.bvpAction,'is_armature',text='armature')
-		# Save to DB when done
+		col.prop(act.bvpAction,'is_animal',text='animal/unique')
+		## -- Break -- ##
+		spl = layout.split()
+		col = spl.column()
+		# Column 1: Clip frames
+		col.operator('bvp.clip_to_action',text='Clip frames')
+		# Column 2: Save to DB when done
+		col = spl.column()
 		col.operator('bvp.db_save_action',text='Save to DB')
 		if isinstance(ob.data,bpy.types.Armature):
 			row = layout.row()
@@ -864,8 +853,8 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 		layout.label(text="Navigation")
 		# Buttons for scene navigation
 		row = layout.row(align=True)
-		row.operator('bvp.nextscene',text='Prev')
-		row.operator('bvp.prevscene',text='Next')
+		row.operator('bvp.prevscene',text='Prev')
+		row.operator('bvp.nextscene',text='Next')
 		# Select by list? (template_ID?) This will make it easier 
 		# to work in the full-screen 3D view window
 		# Get current scene
