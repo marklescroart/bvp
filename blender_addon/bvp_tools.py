@@ -94,9 +94,6 @@ class ObjectProps(bpy.types.PropertyGroup):
 	# Define computed properties (nverts, nfaces, manifold, etc) here, too?
 	del fp
 	del pth
-# To come:
-#class BGProps(bpy.types.PropertyGroup):
-#	pass
 
 class ActionProps(bpy.types.PropertyGroup):
 	"""Properties for bvpActions"""
@@ -119,11 +116,25 @@ class ActionProps(bpy.types.PropertyGroup):
 	is_animal = bpy.props.BoolProperty()
 	# Define computed properties (compute from constraints?) (number of bones?)
 
+class BGProps(bpy.types.PropertyGroup):
+	"""Properties for bvpSkies"""
+	parent_file = bpy.props.StringProperty(name='parent_file',default="")
+	semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='sky')
+	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='sky.n.01')	
+
 class SkyProps(bpy.types.PropertyGroup):
 	"""Properties for bvpSkies"""
 	parent_file = bpy.props.StringProperty(name='parent_file',default="")
 	semantic_cat = bpy.props.StringProperty(name='semantic_cat',default='sky')
 	wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='sky.n.01')	
+
+class RenderOptions(bpy.types.PropertyGroup):
+	"""Properties for bvpSkies"""
+	do_image = bpy.props.BoolProperty(default=True)
+	do_zdepth = bpy.props.BoolProperty(default=False)
+	do_masks = bpy.props.BoolProperty(default=False)
+	do_normals = bpy.props.BoolProperty(default=False)
+
 
 '''
 # UI list option for displaying databases (more flexible, more space)
@@ -212,10 +223,12 @@ def declare_properties():
 	bpy.types.Group.bvpObject = bpy.props.PointerProperty(type=ObjectProps)
 	bpy.types.Group.is_object = bpy.props.BoolProperty(name='is_object',default=True)
 
-	#bpy.types.Group.bvpBG = bpy.props.PointerProperty(BGProps)
-	#bpy.types.Group.is_bg = bpy.props.BoolProperty(name='is_bg',default=True)
+	bpy.types.Group.bvpBG = bpy.props.PointerProperty(type=BGProps)
+	#bpy.types.Group.is_bg = bpy.props.BoolProperty(name='is_bg',default=False)
 	
 	bpy.types.Action.bvpAction = bpy.props.PointerProperty(type=ActionProps)
+	
+	bpy.types.Scene.bvpRenderOptions = bpy.props.PointerProperty(type=RenderOptions)
 	## -- For database management -- ##
 	bpy.types.WindowManager.active_db = bpy.props.EnumProperty(items=enum_dbs,name='active_db') 
 	bpy.types.WindowManager.active_group = bpy.props.StringProperty(name='active_group',default="") 
@@ -690,6 +703,14 @@ class View3DPanel():
 	bl_category = 'BVP'
 	bl_context = "objectmode"
 
+class RenderPanel():
+	"""SettingProperties for all child classes"""
+	bl_space_type = 'NODE_EDITOR'
+	bl_region_type = 'TOOLS'
+	bl_category = 'BVP'
+	#bl_context = "objectmode"
+
+
 class BVP_PANEL_db_tools(View3DPanel,Panel):
 	"""Creates a BVP panel in the Tools window for database actions"""
 	bl_label = "Database tools"
@@ -871,10 +892,46 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 		# Buttons to test constraints / reset scene
 		# Buttons to add sky
 
+class BVP_PANEL_render(RenderPanel,Panel):
+	"""Creates a BVP panel in the Tools window for scene actions"""
+	bl_label = "BVP rendering tools"
+	bl_idname = "BVP_render_tools"
+
+	def draw(self, context):
+		scn = context.scene
+		layout = self.layout
+		# Head title
+		layout.label(text="BVP rendering tools")
+		# Buttons for scene navigation
+		row = layout.row()
+		spl = layout.split()
+		# Column 1		
+		col = spl.column()
+		col.prop(scn.bvpRenderOptions,'do_image',text='image')
+		col.prop(scn.bvpRenderOptions,'do_masks',text='masks')
+		col = spl.column()
+		col.prop(scn.bvpRenderOptions,'do_zdepth',text='z depth')
+		col.prop(scn.bvpRenderOptions,'do_normals',text='normals')
+		#row.operator('bvp.prevscene',text='Prev')
+		#row.operator('bvp.nextscene',text='Next')
+		# Select by list? (template_ID?) This will make it easier 
+		# to work in the full-screen 3D view window
+		row = layout.row()
+		row.label('BVP stuff properties:')
+		row = layout.row()
+		row.label('for scene: %s'%context.scene.name)
+		# Search through scene objects to determine if any are BVP bg objects
+		# Display bvpBG properties (constraints,realworldsize,wordnet_label,etc...)
+		# Editing:
+		# Buttons to add constraints of different types
+		# Buttons to test constraints / reset scene
+		# Buttons to add sky
+
+
 def register():
 	# Order of registering props/object should perhaps be examined for optimality...
 	# It works this way, but it doesn't seem clean.
-	for c in [WordNet_Label,ObjectProps,ActionProps]: #, BGProps, SkyProps]: 
+	for c in [WordNet_Label,ObjectProps,ActionProps, BGProps, SkyProps,RenderOptions]: 
 		# Do these in a separate file? Imported, registered separately? 
 		bpy.utils.register_class(c)
 	declare_properties()

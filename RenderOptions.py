@@ -8,7 +8,7 @@ from bvp.utils.blender import set_layers
 from bvp.utils.basics import fixedKeyDict
 if bvp.Is_Blender:
 	import bpy
-	import mathutils as bmu # "B lender M ath U tilities"
+	#import mathutils as bmu # "B lender M ath U tilities"
 # The "type" input for compositor node creation has been arbitrarily changed 
 # numerous times throughout Blender API development. This is EXTREMELY 
 # IRRITATING. Nonetheless, the format may change again, so I've collected
@@ -46,17 +46,14 @@ IDmaskNode = 'CompositorNodeIDMask'
 MathNode = 'CompositorNodeMath'
 
 class RenderOptions(object):
-	'''
-	Class for storing render options for a scene. 
+	'''Class for storing render options for a scene. 
 		
 	'''
-	def __init__(self,rParams={}):
-		'''
-		Usage: RenderOptions(rParams={})
-		Class for storing render options for a scene (or scenes).
+	def __init__(self,**rParams):
+		'''Class for storing render options for a scene (or scenes).
+		
 		See code for default rendering options.
-		Update any of these values with rParams dictionary input
-
+		
 		NOTE: RenderOptions no longer touches a scene's file path; it only provides the base file (parent directory) for all rendering.
 		bvpScene's "apply_opts" function should be the only one to mess with bpy.context.scene.filepath (!!) (2012.03.12)
 		'''
@@ -146,32 +143,32 @@ class RenderOptions(object):
 		S = 'Class "RenderOptions":\n'+self.__dict__.__repr__()
 		return S
 	
-	def apply_opts(self,Scn=None):
-		if not Scn:
+	def apply_opts(self,scn=None):
+		if not scn:
 			# Get current scene if input not supplied
-			Scn = bpy.context.scene
+			scn = bpy.context.scene
 		# Backwards compatibility:
 		if not 'Voxels' in self.BVPopts:
 			self.BVPopts['Voxels'] = False
 		if not 'Motion' in self.BVPopts:
 			self.BVPopts['Motion'] = False
-		Scn.use_nodes = True
+		scn.use_nodes = True
 		# Set only first layer to be active
-		Scn.layers = [True]+[False]*19
+		scn.layers = [True]+[False]*19
 		# Get all non-function attributes
 		ToSet = [x for x in self.__dict__.keys() if not hasattr(self.__dict__[x],'__call__') and not x in ['BVPopts','DefaultLayerOpts','image_settings']]
 		for s in ToSet:
 			try:
-				setattr(Scn.render,s,self.__dict__[s])
+				setattr(scn.render,s,self.__dict__[s])
 			except:
 				print('Unable to set attribute %s!'%s)
 		# Set image settings:
-		Scn.render.image_settings.file_format = self.image_settings['file_format']
-		Scn.render.image_settings.color_mode = self.image_settings['color_mode']
+		scn.render.image_settings.file_format = self.image_settings['file_format']
+		scn.render.image_settings.color_mode = self.image_settings['color_mode']
 
 		# Re-set all nodes and render layers:
-		for n in Scn.node_tree.nodes:
-			Scn.node_tree.nodes.remove(n)
+		for n in scn.node_tree.nodes:
+			scn.node_tree.nodes.remove(n)
 		RL = bpy.context.scene.render.layers.keys()
 		bpy.ops.scene.render_layer_add()
 		for ii,n in enumerate(RL):
@@ -180,60 +177,60 @@ class RenderOptions(object):
 		# Rename newly-added layer (with default properties) to default name:
 		bpy.context.scene.render.layers[0].name = 'RenderLayer'
 		# Add basic node setup:
-		RL = Scn.node_tree.nodes.new(type=RLayerNode)
-		CompOut = Scn.node_tree.nodes.new(type=CompositorNode)
-		Scn.node_tree.links.new(RL.outputs['Image'],CompOut.inputs['Image'])
-		Scn.node_tree.links.new(RL.outputs['Alpha'],CompOut.inputs['Alpha'])
+		RL = scn.node_tree.nodes.new(type=RLayerNode)
+		CompOut = scn.node_tree.nodes.new(type=CompositorNode)
+		scn.node_tree.links.new(RL.outputs['Image'],CompOut.inputs['Image'])
+		scn.node_tree.links.new(RL.outputs['Alpha'],CompOut.inputs['Alpha'])
 		# Decide whether we're only rendering one type of output:
 		SingleOutput = sum([self.BVPopts['Image'],self.BVPopts['ObjectMasks'],self.BVPopts['Zdepth'],
 						self.BVPopts['Contours'],self.BVPopts['Axes'],self.BVPopts['Normals']])==1
 		# Add compositor nodes for optional outputs:
 		if self.BVPopts['Voxels']:
 			self.SetUpVoxelization()
-			Scn.update()
+			scn.update()
 			return # Special case! no other node-based options can be applied!
 		if self.BVPopts['ObjectMasks']:
-			self.AddObjectMaskLayerNodes(Is_RenderOnlyMasks=SingleOutput)
+			self.AddObjectMaskLayerNodes(single_output=SingleOutput)
 		if self.BVPopts['Motion']:
-			self.AddMotionLayerNodes(Is_RenderOnlyMotion=SingleOutput)
+			self.AddMotionLayerNodes(single_output=SingleOutput)
 		if self.BVPopts['Zdepth']:
-			self.AddZdepthLayerNodes(Is_RenderOnlyZ=SingleOutput)
+			self.AddZdepthLayerNodes(single_output=SingleOutput)
 		if self.BVPopts['Contours']:
 			raise Exception('Not ready yet!')
 		if self.BVPopts['Axes']:
 			raise Exception('Not ready yet!')
 		if self.BVPopts['Normals']:
-			self.AddNormalLayerNodes(Is_RenderOnlyNormal=SingleOutput)
+			self.AddNormalLayerNodes(single_output=SingleOutput)
 		if self.BVPopts['Clay']:
 			raise Exception('Not ready yet!')
 			#self.AddClayLayerNodes(Is_RenderOnlyClay=SingleOutput)
 		if not self.BVPopts['Image']:
 			# Switch all properties from one of the file output nodes to the composite output
 			# Grab a node
-			aa = [N for N in Scn.node_tree.nodes if N.type==OutputFileNodeX]
-			print([a.type for a in Scn.node_tree.nodes])
+			aa = [N for N in scn.node_tree.nodes if N.type==OutputFileNodeX]
+			print([a.type for a in scn.node_tree.nodes])
 			fOut = aa[0]
 			# Find input to this node
-			Lnk = [L for L in Scn.node_tree.links if L.to_node == fOut][0]
+			Lnk = [L for L in scn.node_tree.links if L.to_node == fOut][0]
 			Input = Lnk.from_socket
 			# Remove all input to composite node:
-			NodeComposite = [N for N in Scn.node_tree.nodes if N.type==CompositorNodeX][0]
-			L = [L for L in Scn.node_tree.links if L.to_node==NodeComposite]
+			NodeComposite = [N for N in scn.node_tree.nodes if N.type==CompositorNodeX][0]
+			L = [L for L in scn.node_tree.links if L.to_node==NodeComposite]
 			for ll in L:
-				Scn.node_tree.links.remove(ll)
+				scn.node_tree.links.remove(ll)
 			# Make link from input to file output to composite output:
-			Scn.node_tree.links.new(Input,NodeComposite.inputs['Image'])
+			scn.node_tree.links.new(Input,NodeComposite.inputs['Image'])
 			# Update Scene info to reflect node info:
-			Scn.render.filepath = fOut.base_path+fOut.file_slots[0].path
-			Scn.render.image_settings.file_format = fOut.format.file_format
+			scn.render.filepath = fOut.base_path+fOut.file_slots[0].path
+			scn.render.image_settings.file_format = fOut.format.file_format
 			# Get rid of old file output
-			Scn.node_tree.nodes.remove(fOut)
+			scn.node_tree.nodes.remove(fOut)
 			# Get rid of render layer that renders image:
-			RL = Scn.render.layers['RenderLayer']
-			Scn.render.layers.remove(RL)
+			RL = scn.render.layers['RenderLayer']
+			scn.render.layers.remove(RL)
 			# Turn off raytracing??
 
-		Scn.update()
+		scn.update()
 	'''
 	Notes on nodes: The following functions add various types of compositor nodes to a scene in Blender.
 	These allow output of other image files that represent other "meta-information" (e.g. Z depth, 
@@ -241,15 +238,15 @@ class RenderOptions(object):
 	To add nodes: NewNode = NT.nodes.new(type=NodeType) 
 	See top of code for list of node types used.
 	'''
-	def AddObjectMaskLayerNodes(self,Scn=None,Is_RenderOnlyMasks=False):
+	def AddObjectMaskLayerNodes(self,scn=None,single_output=False):
 		'''Adds compositor nodes to render out object masks.
 
 		Parameters
 		----------
-		Scn : bpy.data.scene | None (default=None)
+		scn : bpy.data.scene | None (default=None)
 			Leave as default (None) for now. Placeholder for future code updates.
-		Is_RenderOnlyMasks : bool
-
+		single_output : bool
+			Whether to render ONLY masks.
 
 		Notes
 		-----
@@ -263,10 +260,10 @@ class RenderOptions(object):
 		
 		ML 2012.01
  		'''
-		if not Scn:
-			Scn = bpy.context.scene
-		Scn.use_nodes = True
-		Scn.render.use_compositing = True
+		if not scn:
+			scn = bpy.context.scene
+		scn.use_nodes = True
+		scn.render.use_compositing = True
 		########################################################################
 		### --- First: Allocate all objects' pass indices (and groups??) --- ### 
 		########################################################################
@@ -304,16 +301,17 @@ class RenderOptions(object):
 		#####################################################################
 		### ---            Second: Set up render layers:              --- ### 
 		#####################################################################
-		RL = Scn.render.layers.keys()
+		RL = scn.render.layers.keys()
 		if not 'ObjectMasks1' in RL:
 			for iOb in range(PassCt-1):
-				bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-				ObLayer = [x for x in Scn.render.layers.keys() if not x in RL]
-				ObLayer = Scn.render.layers[ObLayer[0]]
-				for k in self.DefaultLayerOpts.keys():
-					ObLayer.__setattr__(k,self.DefaultLayerOpts[k])
-				ObLayer.name = 'ObjectMasks%d'%(iOb+1)
-				RL.append('ObjectMasks%d'%(iOb+1))
+				ObLayer =scn.render.layers.add('ObjectMasks%d'%(iOb+1))
+				#bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
+				#ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
+				#ObLayer = scn.render.layers[ObLayer[0]]
+				for k,v in self.DefaultLayerOpts.items():
+					ObLayer.__setattr__(k,v)
+				#ObLayer.name = 'ObjectMasks%d'%(iOb+1)
+				#RL.append('ObjectMasks%d'%(iOb+1))
 				Lay = [False for x in range(20)];
 				Lay[iOb+1] = True 
 				ObLayer.layers = tuple(Lay)
@@ -324,9 +322,9 @@ class RenderOptions(object):
 		########################################################################
 		### ---            Third: Set up compositor nodes:               --- ### 
 		########################################################################
-		NT = Scn.node_tree
+		NT = scn.node_tree
 		# Object index nodes:
-		PassIdx = [o.pass_index for o in Scn.objects if o.pass_index < 100] # 100 is for skies!
+		PassIdx = [o.pass_index for o in scn.objects if o.pass_index < 100] # 100 is for skies!
 		MaxPI = max(PassIdx)
 		if bvp.Verbosity_Level > 3:
 			print('I think there are %d pass indices'%(MaxPI))
@@ -349,7 +347,7 @@ class RenderOptions(object):
 			NT.links.new(NewIDNode.outputs['Alpha'],NewIDOut.inputs[0])
 			NT.links.new(NewIDNode.outputs['Alpha'],NewVwNode.inputs['Image'])
 			NewIDOut.format.file_format = 'PNG'
-			NewIDOut.base_path = Scn.render.filepath.replace('/Scenes/','/Masks/')
+			NewIDOut.base_path = scn.render.filepath.replace('/Scenes/','/Masks/')
 			endCut = NewIDOut.base_path.index('Masks/')+len('Masks/')
 			# Set unique name per frame
 			NewIDOut.file_slots[0].path = NewIDOut.base_path[endCut:]+'_m%02d'%(iObIdx+1)
@@ -364,30 +362,31 @@ class RenderOptions(object):
 			NewIDNode.location = Loc
 			NewVwNode.location = Loc - bvp.bmu.Vector((0.,100))
 			NewIDOut.location = Loc - bvp.bmu.Vector((-150.,100))
-	def AddZdepthLayerNodes(self,Scn=None,Is_RenderOnlyZ=False):
-		'''
-		Usage: AddZdepthLayerNodes(Scn=None,Is_RenderOnlyZ=False)
+
+	def AddZdepthLayerNodes(self,scn=None,single_output=False):
+		'''Add Z depth node configuration to scene
 
 		Adds compositor nodes to render out Z buffer
 
 		ML 2012.01
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
-		Scn.use_nodes = True
-		Scn.render.use_compositing = True
+		if not scn:
+			scn = bpy.context.scene
+		scn.use_nodes = True
+		scn.render.use_compositing = True
 		#####################################################################
 		### ---                Set up render layers:                  --- ### 
 		#####################################################################
-		RL = Scn.render.layers.keys()
+		RL = scn.render.layers.keys()
 		if not 'Zdepth' in RL:
-			bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-			ObLayer = [x for x in Scn.render.layers.keys() if not x in RL]
-			ObLayer = Scn.render.layers[ObLayer[0]]
+			#bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
+			#ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
+			#ObLayer = scn.render.layers[ObLayer[0]]
+			ObLayer = scn.render.layers.new('Zdepth')
 			for k in self.DefaultLayerOpts.keys():
 				ObLayer.__setattr__(k,self.DefaultLayerOpts[k])
-			ObLayer.name = 'Zdepth'
-			RL.append('Zdepth')
+			#ObLayer.name = 'Zdepth'
+			#RL.append('Zdepth')
 			ObLayer.use_ztransp = True # Necessary for z depth to work for transparent materials ?
 			ObLayer.use_pass_z = True # Principal interest
 			ObLayer.use_pass_object_index = True # for masking out depth of sky dome 
@@ -396,7 +395,7 @@ class RenderOptions(object):
 		########################################################################
 		### ---                Set up compositor nodes:                  --- ### 
 		########################################################################
-		NT = Scn.node_tree
+		NT = scn.node_tree
 		# Get all node names (keys)
 		NodeRL = NT.nodes.new(type=RLayerNode)
 		NodeRL.layer = 'Zdepth'
@@ -431,17 +430,17 @@ class RenderOptions(object):
 		DepthOut = NT.nodes.new(OutputFileNode)
 		DepthOut.location =  bvp.bmu.Vector((900.,300.))
 		DepthOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
-		if '/Masks/' in Scn.render.filepath: 
-			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
+		if '/Masks/' in scn.render.filepath: 
+			DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
 			DepthOut.base_path = DepthOut.base_path.replace('/Masks/','/Zdepth/')+'_z'
-		elif '/Motion/' in Scn.render.filepath:
-			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_mot"
+		elif '/Motion/' in scn.render.filepath:
+			DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_mot"
 			DepthOut.base_path = DepthOut.base_path.replace('/Motion/','/Zdepth/')+'_z'
-		elif '/Normals/' in Scn.render.filepath:
-			DepthOut.base_path = Scn.render.filepath[0:-4] # get rid of "_nor"
+		elif '/Normals/' in scn.render.filepath:
+			DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_nor"
 			DepthOut.base_path = DepthOut.base_path.replace('/Normals/','/Zdepth/')+'_z'
 		else:
-			DepthOut.base_path = Scn.render.filepath.replace('/Scenes/','/Zdepth/')
+			DepthOut.base_path = scn.render.filepath.replace('/Scenes/','/Zdepth/')
 			# Set unique name per frame
 			endCut = DepthOut.base_path.index('Zdepth/')+len('Zdepth/')
 			DepthOut.file_slots[0].path = DepthOut.base_path[endCut:]+'_z'
@@ -450,26 +449,26 @@ class RenderOptions(object):
 
 		NT.links.new(NodeAdd1000.outputs[0],DepthOut.inputs[0])
 			
-	def AddNormalLayerNodes(self,Scn=None,Is_RenderOnlyNormal=False):
+	def AddNormalLayerNodes(self,scn=None,single_output=False):
 		'''
-		Usage: AddNormalLayerNodes(Scn=None,Is_RenderOnlyNormal=False)
+		Usage: AddNormalLayerNodes(scn=None,single_output=False)
 
 		Adds compositor nodes to render out Normals
 
 		ML 2012.01
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
-		Scn.use_nodes = True
-		Scn.render.use_compositing = True
+		if not scn:
+			scn = bpy.context.scene
+		scn.use_nodes = True
+		scn.render.use_compositing = True
 		#####################################################################
 		### ---                Set up render layers:                  --- ### 
 		#####################################################################
-		RL = Scn.render.layers.keys()
+		RL = scn.render.layers.keys()
 		if not 'Normals' in RL:
 			bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-			ObLayer = [x for x in Scn.render.layers.keys() if not x in RL]
-			ObLayer = Scn.render.layers[ObLayer[0]]
+			ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
+			ObLayer = scn.render.layers[ObLayer[0]]
 			for k in self.DefaultLayerOpts.keys():
 				ObLayer.__setattr__(k,self.DefaultLayerOpts[k])
 			ObLayer.name = 'Normals'
@@ -483,7 +482,7 @@ class RenderOptions(object):
 		### ---                 Set up compositor nodes:                 --- ### 
 		########################################################################
 		# TO DO: Make a sensible layout for these, i.e. set .location field for all nodes (not urgent...)
-		NT = Scn.node_tree
+		NT = scn.node_tree
 		NodeRL = NT.nodes.new(type=RLayerNode)
 		NodeRL.layer = 'Normals'
 		# Normal output nodes
@@ -530,17 +529,17 @@ class RenderOptions(object):
 		NorOut.name = 'fOutput Normals'
 		NT.links.new(NorCom.outputs['Image'],NorOut.inputs[0])
 		# If any other node is the principal node, replace (output folder) with /Normals/:
-		if '/Masks/' in Scn.render.filepath:
-			NorOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
+		if '/Masks/' in scn.render.filepath:
+			NorOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
 			NorOut.base_path = NorOut.base_path.replace('/Masks/','/Normals/')+'_z'
-		elif '/Motion/' in Scn.render.filepath:
-			NorOut.base_path = Scn.render.filepath[0:-4] # get rid of "_mot"
+		elif '/Motion/' in scn.render.filepath:
+			NorOut.base_path = scn.render.filepath[0:-4] # get rid of "_mot"
 			NorOut.base_path = NorOut.base_path.replace('/Motion/','/Normals/')+'_mot'
-		elif '/Zdepth/' in Scn.render.filepath:
+		elif '/Zdepth/' in scn.render.filepath:
 			NorOut.base_path = NorOut.base_path[0:-2] # remove '_z'	
-			NorOut.base_path = Scn.render.filepath.replace('/Zdepth/','/Scenes/')+'_nor'
+			NorOut.base_path = scn.render.filepath.replace('/Zdepth/','/Scenes/')+'_nor'
 		else:
-			NorOut.base_path = Scn.render.filepath.replace('/Scenes/','/Normals/')
+			NorOut.base_path = scn.render.filepath.replace('/Scenes/','/Normals/')
 			# Set unique name per frame
 			print(NorOut.base_path)
 			endCut = NorOut.base_path.index('Normals/')+len('Normals/')
@@ -548,29 +547,29 @@ class RenderOptions(object):
 			# Set base path
 			NorOut.base_path = NorOut.base_path[:endCut]
 		NT.links.new(NorCom.outputs['Image'],NorOut.inputs[0])
-	def AddMotionLayerNodes(self,Scn=None,Is_RenderOnlyMotion=False):
+	def AddMotionLayerNodes(self,scn=None,single_output=False):
 		'''Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
 
 		Parameters
 		----------
-		Scn : bpy scene instance | None. default = None
+		scn : bpy scene instance | None. default = None
 			Leave as default (None) for now. For potential future code upgrades
-		Is_RenderOnlyMotion : bool
+		single_output : bool
 			Set True if optical flow is the only desired output of the render
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
-		Scn.use_nodes = True
-		Scn.render.use_compositing = True
+		if not scn:
+			scn = bpy.context.scene
+		scn.use_nodes = True
+		scn.render.use_compositing = True
 		#####################################################################
 		### ---                Set up render layers:                  --- ### 
 		#####################################################################
-		RL = Scn.render.layers.keys()
+		RL = scn.render.layers.keys()
 		if not 'Motion' in RL:
 			bpy.ops.scene.render_layer_add() 
 			# Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-			ObLayer = [x for x in Scn.render.layers.keys() if not x in RL]
-			ObLayer = Scn.render.layers[ObLayer[0]]
+			ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
+			ObLayer = scn.render.layers[ObLayer[0]]
 			# /Hacky
 			# Set default layer options
 			for k in self.DefaultLayerOpts.keys():
@@ -587,7 +586,7 @@ class RenderOptions(object):
 		########################################################################
 		### ---                Set up compositor nodes:                  --- ### 
 		########################################################################
-		NT = Scn.node_tree
+		NT = scn.node_tree
 		# Get all node names (keys)
 		NodeRL = NT.nodes.new(type=RLayerNode)
 		NodeRL.layer = 'Motion'
@@ -625,17 +624,17 @@ class RenderOptions(object):
 		MotionOut = NT.nodes.new(OutputFileNode)
 		MotionOut.location =  bvp.bmu.Vector((0.,300.))
 		MotionOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
-		if '/Masks/' in Scn.render.filepath: 
-			MotionOut.base_path = Scn.render.filepath[0:-4] # get rid of "_m01"
+		if '/Masks/' in scn.render.filepath: 
+			MotionOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
 			MotionOut.base_path = DepthOut.base_path.replace('/Masks/','/Motion/')+'_mot'
-		elif '/Normals/' in Scn.render.filepath:
-			MotionOut.base_path = Scn.render.filepath[0:-4] # get rid of "_nor"
+		elif '/Normals/' in scn.render.filepath:
+			MotionOut.base_path = scn.render.filepath[0:-4] # get rid of "_nor"
 			MotionOut.base_path = DepthOut.base_path.replace('/Normals/','/Motion/')+'_mot'
-		elif '/Zdepth/' in Scn.render.filepath:
-			MotionOut.base_path = Scn.render.filepath[0:-2] # get rid of "_z"
+		elif '/Zdepth/' in scn.render.filepath:
+			MotionOut.base_path = scn.render.filepath[0:-2] # get rid of "_z"
 			MotionOut.base_path = DepthOut.base_path.replace('/Zdepth/','/Motion/')+'_mot'
 		else:
-			MotionOut.base_path = Scn.render.filepath.replace('/Scenes/','/Motion/')
+			MotionOut.base_path = scn.render.filepath.replace('/Scenes/','/Motion/')
 			# Set unique name per frame
 			endCut = MotionOut.base_path.index('Motion/')+len('Motion/')
 			MotionOut.file_slots[0].path = MotionOut.base_path[endCut:]+'_mot'
@@ -644,17 +643,17 @@ class RenderOptions(object):
 
 		NT.links.new(NodeRL.outputs['Speed'],MotionOut.inputs[0])
 
-	def SetUpVoxelization(self,Scn=None):
+	def SetUpVoxelization(self,scn=None):
 		"""
 		Set up Blender for rendering images to create 3D voxelization of an object
 		NOTE: This sets up camera, rendering engine, and materials - NOT camera trajectory!
 		"""
 		#,xL=(-5,5),yL=(-5,5),zL=(0,10),nGrid=10,fix=None
 		import math
-		if Scn is None:
-			Scn = bpy.context.scene
+		if scn is None:
+			scn = bpy.context.scene
 		# Set renderer to cycles
-		Scn.render.engine = 'CYCLES'
+		scn.render.engine = 'CYCLES'
 		# Set camera to cycles, fisheye equisolid, 360 deg fov
 		Cam = [o for o in bpy.context.scene.objects if o.type=='CAMERA']
 		if len(Cam)==1:
