@@ -53,13 +53,6 @@ db_results = []
 last_import = ""
 wn_results = []
 
-### --- Start BVP database server? --- ###
-# try:
-# 	dbi = bvp.bvpDB(dbname=dbname)
-# 	del dbi
-# except pymongo.errors.ConnectionError:
-# 	import warnings
-# 	warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
 
 ## -- Base properties for property groups -- ##
 class WordNet_Label(bpy.types.PropertyGroup):
@@ -95,8 +88,8 @@ class ObjectProps(bpy.types.PropertyGroup):
 	del fp
 	del pth
 # To come:
-#class BGProps(bpy.types.PropertyGroup):
-#	pass
+class BGProps(bpy.types.PropertyGroup):
+	pass
 
 class ActionProps(bpy.types.PropertyGroup):
 	"""Properties for bvpActions"""
@@ -533,6 +526,15 @@ class DBSaveAction(bpy.types.Operator):
 			to_save['_id'] = chk['_id']
 			return wm.invoke_props_dialog(self)
 
+# Eventual class to start up mongo database server (or other server...)
+# Look into SQLite!
+# class DBStartup(bpy.types.Operator):
+# 	try:
+#  		dbi = bvp.bvpDB(dbname=dbname)
+#  		del dbi
+# 	except pymongo.errors.ConnectionError:
+# 		import warnings
+# 		warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
 
 class DBSearchDialog(bpy.types.Operator):
 	bl_idname = "bvp.db_search"

@@ -51,10 +51,15 @@ pymongo
 	# <your_bvp_path> should be something like ~/Code/bvp, or wherever you like keeping code
 	cd <your_bvp_path>
 	#POSSIBLY check out some working branch:
-	git fetch 
+	git fetch origin <branchname>
 	git checkout <branchname>
 	# Make sure the folder above <your_bvp_path> is on your PYTHONPATH in your .bashrc file, so you can successfully import bvp from a python session
 	# (the path requirement will go away once bvp is properly packaged...) -*-
+	#For example, include the following line in your .bashrc file:
+	# (if you already have a PYTHONPATH environment variable set:)
+	export PYTHONPATH=$PYTHONPATH":/Users/mark/Code/" 
+	# (if not:)
+	export PYTHONPATH=":/Users/mark/Code/"
 
 3) Make sure you have python3.X environment on your computer somewhere. Currently (2015.01) this should be 3.4. 
 	I recommend you install this (and all your python packages) via anaconda:
@@ -67,21 +72,25 @@ pymongo
 	export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"
 
 4) Set settings in <your_bvp_path>/Settings/Settings.json
-	
+	Copy the file <your_bvp_path>/Settings/Example.json to <your_bvp_path>/Settings/Settings.json
+	Relace the obvious bits of the following lines: 
+	"RenderDir": "/path/to/which/to/render/by/default", 
+    "BlenderCmd": "/path/to/your/blender/installation/executable/file", 
+    "LibDir": "/path/to/your/Library" 
 
-== At this point, BVP will* be functional, but you won't 
+== At this point, BVP should* be functional, but you won't have the ability to access / store things in a database without mongod installed & running ==
 
 5) Install mongodb server. 
 	See http://docs.mongodb.org/manual/installation/
 	Recommended install location is ~/mongodb/
 
-
-) Run mongod server with the command: 
+(Before each use of database)
+6) Run mongod server with the command: 
 	mongod --dbpath <path_to_your_BVPdb> --port 9194
 	The port is just a convention, flout it if you wish. 
 	path_to_your_BVPdb is the path to which you have saved the whole directory of BVP .blend files and database headers. 
 
-) Party. Ready to go.
+7) Party. Ready to go.
 
 Installation - Recommended
 ==========================
@@ -92,6 +101,7 @@ Installation - Recommended
 	alias blender="/Applications/blender.app/Contents/MacOS/blender" # or wherever you installed blender.
 
 ) Use the blender settings provided in 
+** currently BROKEN. Sorry.**
 
 
 

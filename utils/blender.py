@@ -459,6 +459,8 @@ def CommitModifiers(ObList,mTypes=['Mirror','EdgeSplit']):
 	Commits mirror / subsurf / other modifiers to meshes (use before joining meshes)
 	
 	Modifier types to commit are specified in "mTypes"
+
+	NOTE: This is shitty and probably broken. Fix me.
 	'''
 	Flag = {'Verbose':False}
 	print('Committing modifiers...')

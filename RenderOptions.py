@@ -4,8 +4,8 @@ Class to control BVP Render options
 # Imports
 import bvp,os,sys
 import math as bnp
-from bvp.utils.blender import set_layers
-from bvp.utils.basics import fixedKeyDict
+from .utils.blender import set_layers
+from .utils.basics import fixedKeyDict
 if bvp.Is_Blender:
 	import bpy
 	import mathutils as bmu # "B lender M ath U tilities"
@@ -50,15 +50,41 @@ class RenderOptions(object):
 	Class for storing render options for a scene. 
 		
 	'''
-	def __init__(self,rParams={}):
-		'''
-		Usage: RenderOptions(rParams={})
-		Class for storing render options for a scene (or scenes).
-		See code for default rendering options.
-		Update any of these values with rParams dictionary input
+	def __init__(self,blender_params=None,bvp_params=None):
+		'''Initialize rendering options for scenes in BVP framework.
 
-		NOTE: RenderOptions no longer touches a scene's file path; it only provides the base file (parent directory) for all rendering.
-		bvpScene's "apply_opts" function should be the only one to mess with bpy.context.scene.filepath (!!) (2012.03.12)
+		Parameters
+		----------
+		blender_params : dict
+			directly updates any blender scene.render params for the scene
+		bvp_params : dict
+			establishes more complex BVP options (whether to initialize node setup 
+			for different render passes [some work, others don't], base path for 
+			render directory, and which file to use to render BVP scenes).
+			fields : defaults are as follows:
+				### --- Basic file / rendering stuff --- ###
+				Type : 'FirstFrame', # other options :  All,FirstAndLastFrame,'every4th'
+				RenderFile : os.path.join(bvp.__path__[0],'Scripts','BlenderRender.py') # File to call to render scenes
+				BasePath : '/auto/k1/mark/Desktop/BlenderTemp/', # Base render path (TO DO: replace with bvp config settings)
+				
+				### --- Render passes --- ###
+				Image : True # Render RGB(A) images or not (alpha layer or not determined by blender_params	)
+				ObjectMasks : False # Render masks for all BVP objects in scene (working)
+				Zdepth : False # Render Z depth pass 
+				Normals : False, # Not yet implemented
+				
+				### --- Work-in-progress render passes (NOT working as of 2015.05) --- ###
+				Contours : False, #Freestyle, yet to be implemented
+				Motion : False, # Render motion (ground truth optical flow) pass
+				Voxels : False # Create voxelized version of each scene 
+				Axes : False, # based on N.Cornea code, for now 
+				Clay : False, # All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
+
+		Notes
+		-----
+		RenderOptions does not directly modify a scene's file path; it only provides the base file (parent directory) for all rendering.
+		bvpScene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
+
 		'''
 		
 		self.use_freestyle = False # May need some clever if statement here - checking on version of blender
@@ -135,13 +161,15 @@ class RenderOptions(object):
 		# Disallow updates that add fields
 		self.__dict__ = fixedKeyDict(self.__dict__)
 		# Update defaults w/ inputs
-		if 'BVPopts' in rParams.keys():
-			BVPopts = rParams.pop('BVPopts')
-			self.BVPopts.update(BVPopts)
-		if 'DefaultLayerOpts' in rParams.keys():
-			DefaultLayerOpts = rParams.pop('DefaultLayerOpts')
-			self.DefaultLayerOpts.update(DefaultLayerOpts)
-		self.__dict__.update(rParams)
+		if not bvp_params is None:
+			# TO DO: Change this variable name. Big change, tho.
+			self.BVPopts.update(bvp_params)
+		if not blender_params is None:
+			# TO DO: Clean this shit up. Sloppy organization. 
+			if 'DefaultLayerOpts' in blender_params.keys():
+				DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
+				self.DefaultLayerOpts.update(DefaultLayerOpts)
+			self.__dict__.update(blender_params)
 	def __repr__(self):
 		S = 'Class "RenderOptions":\n'+self.__dict__.__repr__()
 		return S
