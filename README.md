@@ -100,20 +100,7 @@ Installation - Recommended
 	Note that path_to_blender should be a path to the actual executable file, INSIDE the blender.app bundle, e.g.:
 	alias blender="/Applications/blender.app/Contents/MacOS/blender" # or wherever you installed blender.
 
-) Use the blender settings provided in 
-** currently BROKEN. Sorry.**
-
-
-
-
-Links: 
-WTF is a .bashrc file?
-WTF is the difference between .bashrc and .bash_profile?
-WTF is a PYTHONPATH?
-Where the hell do I find my system python?
-Why is this all so DAMN COMPLICATED?
-Where can I find some Blender tutorials that are worth a damn? 
-Using anaconda to simplify your python life
+) Use the blender settings provided in bvp/blendfiles/<blah>.blend (This currently DOES NOT WORK SO WELL (OR AT ALL))
 
 
 Contributing models to BVP
@@ -125,3 +112,16 @@ If you have models in non-Blender form (3DS max, Sketchup, .off, whatever), and 
 If you are willing to actually putting them in BVP format, GREAT, we have tools for that. 
 
 
+Adding labels
+=============
+
+) The objects in the database are already labeled with semantic categories from the WordNet hierarchy. To add additional labels through the BVP blender addon GUI, you will need to make sure your system has the WordNet corpus downloaded for nltk (the Natural Language ToolKit for python) ==
+
+Links: 
+WTF is a .bashrc file?
+WTF is the difference between .bashrc and .bash_profile?
+WTF is a PYTHONPATH?
+Where the hell do I find my system python?
+Why is this all so DAMN COMPLICATED?
+Where can I find some Blender tutorials that are worth a damn? 
+Using anaconda to simplify your python life

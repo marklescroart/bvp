@@ -16,28 +16,28 @@ if bvp.Is_Blender:
 	import mathutils as bmu
 
 class bvpCamera(object):
-	'''
-	Usage: bvpCamera(location=[(15,-15,5)],fixPos=[(0,0,1)],frames=[1])
-	
-	Class to handle placement of camera and camera fixation target for a scene. 
+	'''Class to handle placement of camera and camera fixation target for a scene. 
 
-	Inputs:
-		location : a list of (x,y,z) positions for each of n keyframes, 
-			specifying camera location 
-		fixPos   : a list of (x,y,z) positions for each of n keyframes, 
-			specifying fixation target for camera
-		frames   : a list of the keyframes at which to insert camera / 
-			fixation locations. Position is linearly interpolated for all 
-			frames between the keyframes. 
+	Parameters
+	----------
+	location : list of tuples
+		a list of positions for each of n keyframes, each specifying camera 
+		location as an (x,y,z) tuple
+	fix_pos : list of tuples
+		as location, but for the fixation target for the camera
+	frames : list
+		a list of the keyframes at which to insert camera / fixation locations. 
+		Position is linearly interpolated for all frames between the keyframes. 
+	
+	Notes
+	-----
 	If location is specified to be "None", a random location for each keyframe 
 		is drawn according to the defaults in bvpCamConstraint. The same is true
-		for fixPos.
+		for fix_pos.
 	
-	** Tested up to 2 keyframes as of 2012.02.20 -- more may get janky!
-	
-	ML 2012.02.20
+	Tested up to 2 keyframes as of 2012.02.20 -- more may fail
 	'''	
-	def __init__(self,location=((17.5,-17.5,8),),fixPos=((0,0,3.5),),frames=(1,),lens=50.,clip=(.1,500.)): 
+	def __init__(self,location=((17.5,-17.5,8),),fix_pos=((0,0,3.5),),frames=(1,),lens=50.,clip=(.1,500.)): 
 		# Default camera parameters
 		Inpt = locals()
 		for i in Inpt:
@@ -49,70 +49,69 @@ class bvpCamera(object):
 			self.frames = (1,)
 		if not location:
 			self.location = camC.sampleCamPos(self.frames)
-		if not fixPos:
-			self.fixPos = camC.sampleFixPos(self.frames)
+		if not fix_pos:
+			self.fix_pos = camC.sampleFixPos(self.frames)
 	@property
-	def nLoc(self):
+	def n_loc(self):
 		return len(self.location)
 	@property
-	def nFix(self):
-		return len(self.fixPos)
+	def n_fix(self):
+		return len(self.fix_pos)
 	@property
-	def nFrames(self):
+	def n_frames(self):
 		return max(self.frames)-min(self.frames)+1
 	@property
-	def nKeyFrames(self):
+	def n_keyframes(self):
 		return len(self.frames)
 	def __repr__(self):
 		S = '\n~C~ bvpCamera ~C~\n'
-		S += 'Camera lens: %s, clipping: %s, frames: %s\n Cam location key points: %s\n Fix location key points: %s'%(str(self.lens),
-			str(self.clip),str(self.frames),str([["%.2f"%x for x in Pos] for Pos in self.location]),str([["%.2f"%x for x in Pos] for Pos in self.fixPos]))
+		S += 'Camera lens: %s, clipping: %s, frames: %s\n cam location key points: %s\n Fix location key points: %s'%(str(self.lens),
+			str(self.clip),str(self.frames),str([["%.2f"%x for x in Pos] for Pos in self.location]),str([["%.2f"%x for x in Pos] for Pos in self.fix_pos]))
 		return S
 		
-	def Place(self,IDname='000',Scn=None):
-		'''
-		Usage: Place(Scn=None,IDname='000')
+	def place(self,id_name='000',scn=None):
+		'''Places camera into Blender scene (only works within Blender)
 
-		Places camera into Blender scene (only works within Blender)
-
-		ML 2012.01.31
+		Parameters
+		----------
+		id_name : string
+			Name for Blender object. "cam_" is automatically prepended to the name.
+		scn : Blender Scene object
+			Scene to which to add the camera.
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
+		if not scn:
+			scn = bpy.context.scene
 		try:
 			self.clip
 		except:
 			print('setting lens - this is some dumb shit!')
 			self.clip=(.1,500.)
 			self.lens=50.
-		AddCameraWithTarget(Scn,CamName='Cam'+IDname,CamPos=self.location[0],
-									FixName='CamTar'+IDname,FixPos=self.fixPos[0],Clip=self.clip,Lens=self.lens)
+		AddCameraWithTarget(scn,CamName='cam_'+id_name,CamPos=self.location[0],
+									FixName='camtarget_'+id_name,FixPos=self.fix_pos[0],Clip=self.clip,Lens=self.lens)
 		# Set camera motion (multiple camera positions for diff. frames)
-		Cam = bpy.data.objects['Cam'+IDname]
-		Scn.camera = Cam
-		Tar = bpy.data.objects['CamTar'+IDname]
+		cam = bpy.data.objects['cam_'+id_name]
+		scn.camera = cam
+		tar = bpy.data.objects['camtarget_'+id_name]
 		a = CreateAnim_Loc(self.location,self.frames,aName='CamMotion',hType='VECTOR')
-		Cam.animation_data_create()
-		Cam.animation_data.action = a
-		f = CreateAnim_Loc(self.fixPos,self.frames,aName='FixMotion',hType='VECTOR')
-		Tar.animation_data_create()
-		Tar.animation_data.action = f
+		cam.animation_data_create()
+		cam.animation_data.action = a
+		f = CreateAnim_Loc(self.fix_pos,self.frames,aName='FixMotion',hType='VECTOR')
+		tar.animation_data_create()
+		tar.animation_data.action = f
 
-	def PlaceStereoCam(self,Disparity,Scn=None):
-		'''
-		Usage: CamL,CamR = Cam.PlaceStereoCam(Disparity,Scn=None)
-		
-		Add Stereo rendering cameras. Returns two Blender Camera objects, separated
+	def place_stereo(self,Disparity,scn=None):
+		'''Add two cameras for stereo rendering.
+
+		Returns two Blender Camera objects, separated
 		by "Disparity" (in Blender units). That is, left camera is at -Disparity/2, 
 		right camera is at +Disparity/2 from main camera 
 		
-		There must be (one!) main camera in the scene first for this to work!
-
-		ML 2012.02
+		There must be a single main camera in the scene first for this to work!
 		'''
-		if not Scn:
-			Scn = bpy.context.scene
-		CamBase = [o for o in Scn.objects if o.type=='CAMERA']
+		if not scn:
+			scn = bpy.context.scene
+		CamBase = [o for o in scn.objects if o.type=='CAMERA']
 		if not CamBase:
 			raise Exception('No camera in scene!')
 		if len(CamBase)>1:
@@ -120,7 +119,7 @@ class bvpCamera(object):
 		CamBase = CamBase[0]
 		# Parent two new cameras to the extant camera in the scene
 		# Get camera rotation from vector from camera->fixation target (@first frame)
-		camTheta = vec2eulerXYZ(bmu.Vector(self.fixPos[0])-bmu.Vector(self.location[0]))
+		camTheta = vec2eulerXYZ(bmu.Vector(self.fix_pos[0])-bmu.Vector(self.location[0]))
 		camTheta = [bnp.radians(x) for x in camTheta]
 		Lay = tuple([True for x in range(20)]) # all layers
 		
