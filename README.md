@@ -68,7 +68,7 @@ pymongo
 	Once you have a python 3.4 environment somewhere (if you follow the above recommendations,
 	it will be in ) add the following line to your ~/.bashrc or ~/.bash_profile file:
 	export BLENDER_SYSTEM_PYTHON="<my_python3.X_path>"
-	For me, it's: 
+	For me (OSX version 10.10), it's: 
 	export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"
 
 4) Set settings in <your_bvp_path>/Settings/Settings.json
