@@ -45,11 +45,9 @@ pymongo
     ... and all its sub-folders.
     # NOTE: capitalization of words in that path may vary with operating system / Blender version
 
-2.a) * Get Mark to add you as a collaborator on github repo * -*-
-
-2.b) Get BVP from github: git clone https://github.com/marklescroart/bvp <your_bvp_path>
-    # <your_bvp_path> should be something like ~/Code/bvp, or wherever you like keeping code
-    cd <your_bvp_path>
+2. Get BVP from github: `git clone https://github.com/marklescroart/bvp <your_bvp_path>`
+    # `<your_bvp_path>` should be something like `~/Code/bvp`, or wherever you like keeping code
+    cd `<your_bvp_path>`
     #POSSIBLY check out some working branch:
     git fetch origin <branchname>
     git checkout <branchname>
