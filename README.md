@@ -38,37 +38,37 @@ The INTENT with all this is to package all this code / all these dependencies as
 
 1) Download whatever Blender version you want to use. -*-?
 
-    * Standard site for stable versions: http://www.blender.org/
-    * Bleeding edge new stuff available at: http://graphicall.org/
-    * MacOS:
-        - `delete <path_to_blender_app>/blender.app/Contents/Resources/2.72/python` ... and all its sub-folders.
-    * NOTE: capitalization of words in that path may vary with operating system / Blender version
-    * Linux:
-        - 
++ Standard site for stable versions: http://www.blender.org/
++ Bleeding edge new stuff available at: http://graphicall.org/
++ MacOS:
+    * `delete <path_to_blender_app>/blender.app/Contents/Resources/2.72/python` ... and all its sub-folders.
++ NOTE: capitalization of words in that path may vary with operating system / Blender version
++ Linux:
+    * 
 
 2) Get BVP from github: `git clone https://github.com/marklescroart/bvp <your_bvp_path>`
 
-    1. `<your_bvp_path>` should be something like `~/Code/bvp`, or wherever you like keeping code
-        * `cd <your_bvp_path>`
-    2. POSSIBLY check out some working branch:
-        * `git fetch origin <branchname>`
-        * `git checkout <branchname>`
-    3. Make sure the folder above `<your_bvp_path>` is on your `PYTHONPATH` in your .bashrc file, so you can successfully import bvp from a python session
-    4. (the path requirement will go away once bvp is properly packaged...) -*-
-        * For example, include the following line in your .bashrc file:
-        * (if you already have a PYTHONPATH environment variable set:)
-            *`export PYTHONPATH=$PYTHONPATH":/Users/mark/Code/"`
-    5. (if not:)
-        * `export PYTHONPATH=":/Users/mark/Code/"`
+1. `<your_bvp_path>` should be something like `~/Code/bvp`, or wherever you like keeping code
+    + `cd <your_bvp_path>`
+2. POSSIBLY check out some working branch:
+    + `git fetch origin <branchname>`
+    + `git checkout <branchname>`
+3. Make sure the folder above `<your_bvp_path>` is on your `PYTHONPATH` in your .bashrc file, so you can successfully import bvp from a python session
+4. (the path requirement will go away once bvp is properly packaged...) -*-
+    + For example, include the following line in your .bashrc file:
+    + (if you already have a PYTHONPATH environment variable set:)
+        *`export PYTHONPATH=$PYTHONPATH":/Users/mark/Code/"`
+5. (if not:)
+    + `export PYTHONPATH=":/Users/mark/Code/"`
 
 3) Make sure you have python3.X environment on your computer somewhere. Currently (2015.01) this should be 3.4. 
 
-    * I recommend you install this (and all your python packages) via anaconda:
-        - `sudo conda create -n py34 python=3.4 anaconda`  # creates python 3.4 environment with standard anaconda packages (numpy, scipy, matplotlib, more)
-        - `sudo conda install -n py34 pymongo` # install pymongo wrapper for mongodb
-    * Once you have a python 3.4 environment somewhere add the following line to your ~/.bashrc or ~/.bash_profile file:
-        - `export BLENDER_SYSTEM_PYTHON="<my_python3.X_path>"` (
-        - For me (OSX version 10.11), the command is: `export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"`
++ I recommend you install this (and all your python packages) via anaconda:
+    * `sudo conda create -n py34 python=3.4 anaconda`  # creates python 3.4 environment with standard anaconda packages (numpy, scipy, matplotlib, more)
+    * `sudo conda install -n py34 pymongo` # install pymongo wrapper for mongodb
++ Once you have a python 3.4 environment somewhere add the following line to your ~/.bashrc or ~/.bash_profile file:
+    * `export BLENDER_SYSTEM_PYTHON="<my_python3.X_path>"` (
+    * For me (OSX version 10.11), the command is: `export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"`
 
 4) Set settings in `<your_bvp_path>/Settings/Settings.json`
 
@@ -118,9 +118,9 @@ The objects in the database are already labeled with semantic categories from th
 
 Links 
 =====
-What is a [.bashrc file](http://unix.stackexchange.com/questions/129143/what-is-the-purpose-of-bashrc-and-how-does-it-work)?
-What is the [difference between .bashrc and .bash_profile]()?
-What is a [PYTHONPATH](http://stackoverflow.com/questions/19917492/how-to-use-pythonpath)?
-Where do I find my [system python](https://wiki.python.org/moin/BeginnersGuide/Download)?
-Where can I find some [good](http://www.blenderguru.com/) [Blender](http://www.blender.org/support/tutorials/) [tutorials](https://cgcookie.com/learn-blender/)? 
-[Why is this all so DAMN COMPLICATED?](http://giphy.com/gifs/tantrum-sad-baby-13AXYJh2jDt2IE)
+* What is a [.bashrc file](http://unix.stackexchange.com/questions/129143/what-is-the-purpose-of-bashrc-and-how-does-it-work)?
+* What is the [difference between .bashrc and .bash_profile]()?
+* What is a [PYTHONPATH](http://stackoverflow.com/questions/19917492/how-to-use-pythonpath)?
+* Where do I find my [system python](https://wiki.python.org/moin/BeginnersGuide/Download)?
+* Where can I find some [good](http://www.blenderguru.com/) [Blender](http://www.blender.org/support/tutorials/) [tutorials](https://cgcookie.com/learn-blender/)? 
+* Why is this all so [DAMN COMPLICATED?](http://giphy.com/gifs/tantrum-sad-baby-13AXYJh2jDt2IE)
