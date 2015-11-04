@@ -75,7 +75,8 @@ The INTENT with all this is to package all this code / all these dependencies as
         - `"BlenderCmd": "/path/to/your/blender/installation/executable/file"` 
         - `"LibDir": "/path/to/your/Library"` 
 
-== At this point, BVP *should* be functional, but you won't have the ability to access / store things in a database without mongod installed & running ==
+At this point, BVP *should* be functional, but you won't have the ability to access / store things in a database without mongod installed & running
+===
 
 5) Install mongodb server. 
     * See http://docs.mongodb.org/manual/installation/
@@ -110,9 +111,10 @@ If you are willing to actually putting them in BVP format, GREAT, we have tools 
 Adding labels
 =============
 
-The objects in the database are already labeled with semantic categories from the WordNet hierarchy. To add additional labels through the BVP blender addon GUI, you will need to make sure your system has the WordNet corpus downloaded for nltk (the Natural Language ToolKit for python) ==
+The objects in the database are already labeled with semantic categories from the WordNet hierarchy. To add additional labels through the BVP blender addon GUI, you will need to make sure your system has the WordNet corpus downloaded for nltk (the Natural Language ToolKit for python)
 
-Links: 
+Links 
+=====
 What is a [.bashrc file](http://unix.stackexchange.com/questions/129143/what-is-the-purpose-of-bashrc-and-how-does-it-work)?
 What is the [difference between .bashrc and .bash_profile]()?
 What is a [PYTHONPATH](http://stackoverflow.com/questions/19917492/how-to-use-pythonpath)?
