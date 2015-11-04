@@ -23,8 +23,7 @@ archival hdf5 files*.
 
 
 
-Installation
-============
+# Installation
 
 The INTENT with all this is to package all this code / all these dependencies as pip / conda packages. 
 
@@ -38,6 +37,7 @@ The INTENT with all this is to package all this code / all these dependencies as
 * pymongo
 
 1) Download whatever Blender version you want to use. -*-?
+
     * Standard site for stable versions: http://www.blender.org/
     * Bleeding edge new stuff available at: http://graphicall.org/
     * MacOS:
@@ -47,6 +47,7 @@ The INTENT with all this is to package all this code / all these dependencies as
         - 
 
 2) Get BVP from github: `git clone https://github.com/marklescroart/bvp <your_bvp_path>`
+
     1. `<your_bvp_path>` should be something like `~/Code/bvp`, or wherever you like keeping code
         * `cd <your_bvp_path>`
     2. POSSIBLY check out some working branch:
@@ -61,6 +62,7 @@ The INTENT with all this is to package all this code / all these dependencies as
         * `export PYTHONPATH=":/Users/mark/Code/"`
 
 3) Make sure you have python3.X environment on your computer somewhere. Currently (2015.01) this should be 3.4. 
+
     * I recommend you install this (and all your python packages) via anaconda:
         - `sudo conda create -n py34 python=3.4 anaconda`  # creates python 3.4 environment with standard anaconda packages (numpy, scipy, matplotlib, more)
         - `sudo conda install -n py34 pymongo` # install pymongo wrapper for mongodb
@@ -69,28 +71,30 @@ The INTENT with all this is to package all this code / all these dependencies as
         - For me (OSX version 10.11), the command is: `export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"`
 
 4) Set settings in `<your_bvp_path>/Settings/Settings.json`
-    * Copy the file `<your_bvp_path>/Settings/Example.json` to `<your_bvp_path>/Settings/Settings.json`
-    * Relace the obvious bits of the following lines: 
-        - `"RenderDir": "/path/to/which/to/render/by/default"`, 
-        - `"BlenderCmd": "/path/to/your/blender/installation/executable/file"` 
-        - `"LibDir": "/path/to/your/Library"` 
 
-At this point, BVP *should* be functional, but you won't have the ability to access / store things in a database without mongod installed & running
-===
+* Copy the file `<your_bvp_path>/Settings/Example.json` to `<your_bvp_path>/Settings/Settings.json`
+* Replace the obvious bits of the following lines:  
+    * `"RenderDir": "/path/to/which/to/render/by/default"`, 
+    * `"BlenderCmd": "/path/to/your/blender/installation/executable/file"` 
+    * `"LibDir": "/path/to/your/Library"` 
+
+### At this point, BVP *should* be functional, but you won't have the ability to access / store things in a database without mongod installed & running
 
 5) Install mongodb server. 
+
     * See http://docs.mongodb.org/manual/installation/
     * Recommended install location is `~/mongodb/`
 
 6) Before each use of database, run mongod server with the command: 
-    * `mongod --dbpath <path_to_your_BVPdb> --port 9194`
+
+  * `mongod --dbpath <path_to_your_BVPdb> --port 9194`
     * The port is just a convention, flout it if you wish. 
     * path_to_your_BVPdb is the path to which you have saved the whole directory of BVP .blend files and database headers. 
 
 7) Party. Ready to go.
 
-Installation - Recommended
-==========================
+## Installation - Recommended
+
 8) Set a blender alias -*-
     * add the following line to your ~/.bashrc or ~/.bash_profile file:
         - `alias blender="<path_to_blender>"`
@@ -99,8 +103,8 @@ Installation - Recommended
 
 9) Use the blender settings provided in `bvp/blendfiles/<blah>.blend` (This currently DOES NOT WORK SO WELL (OR AT ALL))
 
-Contributing models to BVP
-==========================
+# Contributing models to BVP
+
 First: I love you for even reading this! 
 
 If you have models in non-Blender form (3DS max, Sketchup, .off, whatever), and don't want to be bothered, EMAIL ME and we can talk. I love more models. I always want more models. 
@@ -108,8 +112,7 @@ If you have models in non-Blender form (3DS max, Sketchup, .off, whatever), and 
 If you are willing to actually putting them in BVP format, GREAT, we have tools for that. 
 
 
-Adding labels
-=============
+# Adding labels
 
 The objects in the database are already labeled with semantic categories from the WordNet hierarchy. To add additional labels through the BVP blender addon GUI, you will need to make sure your system has the WordNet corpus downloaded for nltk (the Natural Language ToolKit for python)
 
