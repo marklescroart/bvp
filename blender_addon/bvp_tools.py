@@ -1,9 +1,3 @@
-import bpy
-import bvp
-import os
-from bpy.types import Panel
-import numpy as np
-
 """
 This is the graphical interface add-on to Blender for the B.lender V.ision P.roject (bvp) python module. 
 
@@ -28,6 +22,12 @@ need to compile those into a list of useful Blenderization on a public web page
 
 Shit, there's a selected_objects value in bpy.context - who knew?
 """
+
+import bpy
+import bvp
+import os
+from bpy.types import Panel
+import numpy as np
 
 
 bl_info = {
