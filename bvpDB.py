@@ -124,7 +124,12 @@ class bvpDB(object):
 		# Make bvpDB fields (objects, backgrounds, skies, etc) the actual database collections (?)
 		for sc in ['objects','backgrounds','skies','shadows','actions']: # More? Better not to enumerate? 
 			setattr(self,sc,self.dbi[sc])
-	
+			
+	def put_document(self,doc):
+		if not 'type' in doc:
+			raise Exception("Documents to be saved must have a 'type' field!")
+		doc_class = doc.pop('type')
+		dbi.dbi[doc_class].save(doc)
 	#def __del__(self):
 	#	"""Cleanup method: shut down any locally-running servers"""
 	#	if self.temp_instance:

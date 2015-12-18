@@ -70,6 +70,7 @@ pymongo
 	export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"
 
 4) Set settings in <your_bvp_path>/Settings/Settings.json
+	# THIS SHOULD HAPPEN AUTOMATICALLY ON THE FIRST IMPORT. Possibly with a GUI.
 	Copy the file <your_bvp_path>/Settings/Example.json to <your_bvp_path>/Settings/Settings.json
 	Relace the obvious bits of the following lines: 
 	"RenderDir": "/path/to/which/to/render/by/default", 
