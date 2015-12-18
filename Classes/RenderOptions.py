@@ -6,9 +6,11 @@ import bvp,os,sys
 import math as bnp
 from .utils.blender import set_layers
 from .utils.basics import fixedKeyDict
-if bvp.Is_Blender:
+try:
 	import bpy
 	#import mathutils as bmu # "B lender M ath U tilities"
+except ImportError:
+
 # The "type" input for compositor node creation has been arbitrarily changed 
 # numerous times throughout Blender API development. This is EXTREMELY 
 # IRRITATING. Nonetheless, the format may change again, so I've collected
@@ -287,8 +289,6 @@ class RenderOptions(object):
 		If scenes are created with many objects off-camera, this code will create a mask for EVERY off-scene object. 
 		These masks will not be in the scene, but blender will render an image (an all-black image) for each and 
 		every one of them.
-		
-		ML 2012.01
  		'''
 		if not scn:
 			scn = bpy.context.scene
@@ -394,11 +394,7 @@ class RenderOptions(object):
 			NewIDOut.location = Loc - bvp.bmu.Vector((-150.,100))
 
 	def AddZdepthLayerNodes(self,scn=None,single_output=False):
-		'''Add Z depth node configuration to scene
-
-		Adds compositor nodes to render out Z buffer
-
-		ML 2012.01
+		'''Adds compositor nodes to render out Z buffer
 		'''
 		if not scn:
 			scn = bpy.context.scene
@@ -577,6 +573,7 @@ class RenderOptions(object):
 			# Set base path
 			NorOut.base_path = NorOut.base_path[:endCut]
 		NT.links.new(NorCom.outputs['Image'],NorOut.inputs[0])
+		
 	def AddMotionLayerNodes(self,scn=None,single_output=False):
 		'''Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
 

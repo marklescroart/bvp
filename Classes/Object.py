@@ -5,24 +5,27 @@
 
 # Imports
 import os
-import bvp # This seems like it shouldn't work, but it does... WHY?
 import random
 import warnings
 # Get rid of these - import from local directories
-from bvp.utils.basics import fixedKeyDict 
-from bvp.utils.blender import add_group,add_action,grab_only,set_cursor
-from bvp.utils.bvpMath import PerspectiveProj
+from ..utils.basics import fixedKeyDict 
+from ..utils.blender import add_group,add_action,grab_only,set_cursor
+from ..utils.bvpMath import PerspectiveProj
 # Blender imports # GET RID OF this too! find a better way to set a global variable...
-from . import Verbosity_Level, Is_Blender
+#from . import Verbosity_Level, Is_Blender
 #from . import bvpDB # Why is this causing me problems?
-if Is_Blender:
+try:
 	import bpy
-	from . import bmu
+	import mathutils as bmu
+	is_blender = True
+except ImportError: 
+	is_blender = False
 
 class bvpObject(object):
 	'''Layer of abstraction for objects (imported from other files) in Blender scenes.
 	'''
-	def __init__(self,dbi=None,action=None,pose=None,pos3D=(0.,0.,0.),size3D=3.,rot3D=(0.,0.,0.),**kwargs):
+	def __init__(self, name=None, file_name=None, dbi=None, action=None, pose=None, 
+		pos3D=(0.,0.,0.), size3D=3., rot3D=(0.,0.,0.), **kwargs):
 		"""	Class to store an abstraction of an object in a BVP scene. 
 
 		Stores all necessary information to define an object in a scene: identifying information for
@@ -31,13 +34,15 @@ class bvpObject(object):
 
 		Parameters
 		----------
-		dbi : bvpDB object | None
+		dbi : DB object | None
 			Database interface object for local/network BVP database of objects. If set to None, database is
 			not searched, object is created from 
+		name : string 
+			name of group to which object belongs in .blend file; should be unique...
 		pose : int | None
 			Index for pose in object's pose library (if object has an armature with a pose library)
-		action : bvpAction object | dict (?)
-
+		action : Action object | dict (?)
+			Action to be applied to object's armature
 		pos3D : tuple or bpy.Vector
 			Position [X,Y,Z] in 3D. If the object has an action attached to it, this is the 
 			starting position for the action. 
@@ -124,7 +129,7 @@ class bvpObject(object):
 			S+='%d Verts; %d Faces'%(self.nvertices,self.nFaces)
 		return(S)
 
-	def Place(self,scn=None,proxy=True):
+	def place(self, scn=None, proxy=True):
 		'''Places object into Blender scene, with pose & animation information
 
 		Parameters
@@ -194,11 +199,11 @@ class bvpObject(object):
 
 		# Set pose, action
 		if not self.pose is None:
-			self.ApplyPose(ArmProxy,self.pose)
+			self.apply_pose(ArmProxy,self.pose)
 		if not self.action is None:
-			# Get bvpAction if not already a bvpAction object
+			# Get Action if not already a Action object
 			if isinstance(self.action,dict):
-				self.action = bvp.bvpAction(**self.action)
+				self.action = bvp.Action(**self.action)
 			self.ApplyAction(ArmProxy,self.action)
 		# Deal with particle systems. Use of particle systems in general is not advised, since
 		# they complicate sizing and drastically slow renders.
@@ -216,13 +221,14 @@ class bvpObject(object):
 					# after creation (e.g., hair is commonly styled). Again, avoid if 
 					# possible...
 		scn.update()
-		# Update scene, because some poses / effects don't seem to take effect until the frame changes:
+		# Shift frame and update scene, because some poses / effects don't seem to take 
+		# effect until the frame changes:
 		scn.frame_current+=1
 		scn.update()
 		scn.frame_current-=1
 		scn.update()
 
-	def PlaceFull(self,scn=None,objects=True,materials=True,textures=True):
+	def place_full(self, scn=None, objects=True, materials=True, textures=True):
 		"""Import full copy of object (all meshes, materials, etc)
 
 		PROBABLY BROKEN CURRENTLY (2014.09)
@@ -259,7 +265,7 @@ class bvpObject(object):
 			setattr(G,'rotation_euler',self.rot3D)
 		if self.pose or self.pose==0: # allow for pose index to equal zero, but not None
 			Arm,Pose = self.GetPoses(G)
-			self.ApplyPose(Arm,self.pose)
+			self.apply_pose(Arm,self.pose)
 		# Deal with particle systems:
 		if not self.name is None:
 			for o in G.dupli_group.objects:
@@ -286,13 +292,13 @@ class bvpObject(object):
 		Kept separate from bvpObject __init__ function so to be able to interactively apply actions 
 		in an open Blender session.
 
-		Make this a method of bvpAction instead??
+		Make this a method of Action instead??
 
 		Parameters
 		----------
 		arm : bpy.data.object containing armature
 			Armature object to which the action is applied.
-		action : bvpAction
+		action : Action
 			Action to be applied. Must have file_name and path attributes
 		'''
 		# 
@@ -302,7 +308,7 @@ class bvpObject(object):
 			arm.animation_data_create()
 		arm.animation_data.action = act
 
-	def ApplyPose(self,Arm,PoseIdx):
+	def apply_pose(self,Arm,PoseIdx):
 		'''Apply a pose to an armature.
 
 		Parameters

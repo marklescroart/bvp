@@ -1,50 +1,50 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import bvp
 import math as bnp
-from bvp.bvpCamConstraint import bvpCamConstraint
-from bvp.utils.basics import fixedKeyDict
-from bvp.utils.blender import AddCameraWithTarget,grab_only,CreateAnim_Loc
-from bvp.utils.bvpMath import vec2eulerXYZ
-# This won't work yet! Poop!
-
+from .Constraint import CamConstraint
+from ..utils.basics import fixedKeyDict
+from ..utils.blender import AddCameraWithTarget,grab_only,CreateAnim_Loc
+from ..utils.bvpMath import vec2eulerXYZ
 
 # Blender imports
-if bvp.Is_Blender:
+try:
 	import bpy
 	import mathutils as bmu
+	is_blender = True
+except ImportError:
+	is_blender = False
 
-class bvpCamera(object):
-	'''Class to handle placement of camera and camera fixation target for a scene. 
-
-	Parameters
-	----------
-	location : list of tuples
-		a list of positions for each of n keyframes, each specifying camera 
-		location as an (x,y,z) tuple
-	fix_pos : list of tuples
-		as location, but for the fixation target for the camera
-	frames : list
-		a list of the keyframes at which to insert camera / fixation locations. 
-		Position is linearly interpolated for all frames between the keyframes. 
-	
-	Notes
-	-----
-	If location is specified to be "None", a random location for each keyframe 
-		is drawn according to the defaults in bvpCamConstraint. The same is true
-		for fix_pos.
-	
-	Tested up to 2 keyframes as of 2012.02.20 -- more may fail
-	'''	
+class Camera(object):
+	"""Class to handle placement of camera and camera fixation target for a scene."""
 	def __init__(self,location=((17.5,-17.5,8),),fix_pos=((0,0,3.5),),frames=(1,),lens=50.,clip=(.1,500.)): 
+		"""
+		Parameters
+		----------
+		location : list of tuples
+			a list of positions for each of n keyframes, each specifying camera 
+			location as an (x,y,z) tuple
+		fix_pos : list of tuples
+			as location, but for the fixation target for the camera
+		frames : list
+			a list of the keyframes at which to insert camera / fixation locations. 
+			Position is linearly interpolated for all frames between the keyframes. 
+		
+		Notes
+		-----
+		If location is specified to be "None", a random location for each keyframe 
+			is drawn according to the defaults in CamConstraint. The same is true
+			for fix_pos.
+		
+		Tested up to 2 keyframes as of 2012.02.20 -- more may fail
+		"""
 		# Default camera parameters
 		Inpt = locals()
 		for i in Inpt:
 			if not i=='self':
 				if Inpt[i]:
 					setattr(self,i,Inpt[i])
-		camC = bvpCamConstraint() # Initialize w/ default parameters 
+		camC = CamConstraint() # Initialize w/ default parameters 
 		if all([x==1 for x in self.frames]):
 			self.frames = (1,)
 		if not location:
@@ -64,7 +64,7 @@ class bvpCamera(object):
 	def n_keyframes(self):
 		return len(self.frames)
 	def __repr__(self):
-		S = '\n~C~ bvpCamera ~C~\n'
+		S = '\n~C~ Camera ~C~\n'
 		S += 'Camera lens: %s, clipping: %s, frames: %s\n cam location key points: %s\n Fix location key points: %s'%(str(self.lens),
 			str(self.clip),str(self.frames),str([["%.2f"%x for x in Pos] for Pos in self.location]),str([["%.2f"%x for x in Pos] for Pos in self.fix_pos]))
 		return S

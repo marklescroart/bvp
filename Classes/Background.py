@@ -1,67 +1,73 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports.
-import os,types,bvp
+import os
 import math as bnp
-from bvp.utils.blender import add_group
-from bvp.bvpObConstraint import bvpObConstraint
-from bvp.bvpCamConstraint import bvpCamConstraint
-from bvp.bvpObject import bvpObject as O
-#import logger
+from ..utils.blender import add_group
+from .Constraint import ObConstraint, CamConstraint
+from .Object import Object as O
 
-if bvp.Is_Blender:
+try:
 	import bpy
 	import mathutils as bmu
+	is_blender = True
+except ImportError:
+	is_blender = False
 
-# Class def
-class bvpBG(object):
-	'''
-	Usage: bg = bvpBG(bgID=None,Lib=None) 
-	
-	Class to store (abstraction of) backgrounds (Floor, background objects, Object/Camera constraints, possibly lights)
-	Backgrounds should be stored as scenes in one or more .blend files. File titles should be 
-	"Category_BG_<BGtype>.blend", e.g. "Category_BG_Floor.blend", and all elements of the background (floor, multiple
-	levels of floor, any objects) should be put into the same group (the import command used imports a group). Group 
-	titles should be sensible.
-	
-	Inputs: 
-		bgID: a unique identifier for the BG in question. Either a string 
-			(interpreted to be the name of the BG group) or a lambda function
-			(See bvpLibrary "getSceneComponent" function)
+class Background(object):
+	"""Backgrounds for scenes"""
+	def __init__(self,name=None,dbi=None): # Add BGinfo? (w/ obstacles, camera constraints)
+		"""Class to store (abstraction of) scene backgrounds.
 
-		Lib : is the bvpLibrary from which this BG is being drawn		
+		Backgrounds consist of a floor, background objects, Object/Camera constraints, possibly lights. 
+		Backgrounds should be stored as scenes in one or more .blend files. File titles should be 
+		"Category_BG_<BGtype>.blend", e.g. "Category_BG_Floor.blend", and all elements of the background (floor, multiple
+		levels of floor, any objects) should be put into the same group (the import command used imports a group). Group 
+		titles should be sensible.
+		
+		Parameters
+		----------
+		bgID: string 
+			a unique identifier for the BG in question. Either a string 
+				(interpreted to be the name of the BG group) or a lambda function
+				(See bvpLibrary "getSceneComponent" function)
+		Notes
+		-----
+		name is a group name, not an individual blender object. Necessary; backgrounds are multiple things.
 
-	ML 2012.03
-	'''
-	def __init__(self,bgID=None,Lib=None): # Add BGinfo? (w/ obstacles, camera constraints)
+		"""
 		# Defaults ?? Create Lib from default BG file instead ??
 		self.parentFile=None
-		self.grpName=None
+		self.name=None
 		self.semanticCat=None
+		# Kill? These should be probability distributions over all of WordNet, which will be complex
+		# enough to need their own classes. 
 		self.objectSemanticCat='all'
 		self.skySemanticCat='all'
 		self.realWorldSize=100.0 # size of whole space in meters
 		self.lens=50.
-		self.nVertices=0
-		self.nFaces=0
+		self.n_vertices=0
+		self.n_faces=0
 		# Camera position constraints w/ default values
-		self.camConstraints = bvpCamConstraint()
+		self.camConstraints = CamConstraint()
 		# Object position constraints w/ default values
-		self.obConstraints = bvpObConstraint()
+		self.obConstraints = ObConstraint()
 		# Obstacles (positions to avoid for objects)
 		self.obstacles=None # list of bvpObjects
-		if not bgID is None:
-			if Lib is None:
-				Lib = bvp.bvpLibrary()
-			TmpBG = Lib.getSC(bgID,'backgrounds')
-			if not TmpBG is None:
-				# Replace default values with values from library
-				self.__dict__.update(TmpBG)
+		# if not bgID is None:
+		# 	if Lib is None:
+		# 		Lib = bvp.bvpLibrary()
+		# 	TmpBG = Lib.getSC(bgID,'backgrounds')
+		# 	if not TmpBG is None:
+		# 		# Replace default values with values from library
+		# 		self.__dict__.update(TmpBG)
+
 		# lameness:
-		if isinstance(self.realWorldSize,(list,tuple)):
-			self.realWorldSize = self.realWorldSize[0]
+		# Real world size (??)
+		# if isinstance(self.realWorldSize,(list,tuple)):
+		# 	self.realWorldSize = self.realWorldSize[0]
 	def __repr__(self):
-		S = '\n ~B~ bvpBackground "%s" ~B~\n'%(self.grpName)
+		S = '\n ~B~ Background "%s" ~B~\n'%(self.grpName)
 		if self.parentFile:
 			S+='Parent File: %s\n'%self.parentFile
 		if self.semanticCat:
@@ -78,7 +84,7 @@ class bvpBG(object):
 			S+='%d Verts; %d Faces'%(self.nVertices,self.nFaces)
 		return(S)
 
-	def Place(self,Scn=None):
+	def place(self,Scn=None):
 		'''
 		Adds background to Blender scene
 		'''
@@ -90,7 +96,8 @@ class bvpBG(object):
 			add_group(self.grpName,fNm,fDir)
 		else:
 			print("BG is empty!")
-	def TestBG(self,frames=(1,1),ObL=(),nObj=0,EdgeDist=0.,ObOverlap=.50):
+			
+	def test_background(self,frames=(1,1),ObL=(),nObj=0,EdgeDist=0.,ObOverlap=.50):
 		'''
 		Tests object / camera constraints to see if they are working
 		** And shadows??

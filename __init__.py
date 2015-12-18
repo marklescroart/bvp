@@ -77,6 +77,7 @@ def _getuuid():
 	import uuid # Overkill for unique file name
 	uu = str(uuid.uuid4()).replace('\n','').replace('-','')
 	return uu
+	
 def _cluster(cmd,logfile='SlurmLog_node_%N.out',mem=15500,ncpus=2):
 	"""Run a job on the cluster."""
 	# Command to write to file to execute

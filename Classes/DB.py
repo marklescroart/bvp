@@ -25,8 +25,11 @@ bvpSky
 bvpCamera
 bvpShadow
 
+each class should have: from_docdict(doc), from_blender(blender_object), 
+docdict [property], to_blender [sets blend props?] 
+
 - Actions - 
-bvpAction - must be linked to specific class of armatures (which will be a property of bvpObjects)
+	bvpAction - must be linked to specific class of armatures (which will be a property of bvpObjects)
 	- Armature_class
 	- wordnet_label
 	- semantic_category

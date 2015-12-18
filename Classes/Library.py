@@ -158,6 +158,7 @@ class bvpLibrary(object):
 				print('Warning! No %s match filter function!'%ComponentType)
 
 		return TmpOb
+
 	def getGrpNames(self,filterFn=None,ComponentType='objects'):
 		'''
 		Gets grp Names (unique ids for each object / background / etc). By default, gets ALL names, but can be filtered
@@ -174,6 +175,7 @@ class bvpLibrary(object):
 		Nm = [x['grpName'] for x in L]
 		Nm.sort()
 		return Nm
+		
 	def UpdatePropFiles(self,ClassToUpdate=('object','background','sky','shadow')):
 		'''
 		.blend files -> *Props.txt files
