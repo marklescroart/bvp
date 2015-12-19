@@ -45,9 +45,7 @@ pymongo
 	... and all its sub-folders.
 	# NOTE: capitalization of words in that path may vary with operating system / Blender version
 
-2.a) * Get Mark to add you as a collaborator on github repo * -*-
-
-2.b) Get BVP from github: git clone https://github.com/marklescroart/bvp <your_bvp_path>
+2. Get BVP from github: git clone https://github.com/marklescroart/bvp <your_bvp_path>
 	# <your_bvp_path> should be something like ~/Code/bvp, or wherever you like keeping code
 	cd <your_bvp_path>
 	#POSSIBLY check out some working branch:
@@ -61,17 +59,18 @@ pymongo
 	# (if not:)
 	export PYTHONPATH=":/Users/mark/Code/"
 
-3) Make sure you have python3.X environment on your computer somewhere. Currently (2015.01) this should be 3.4. 
+3) Make sure you have python3.X environment on your computer somewhere. Currently (2015.12) this should be 3.4. 
 	I recommend you install this (and all your python packages) via anaconda:
 	sudo conda create -n py34 python=3.4 anaconda  # creates python 3.4 environment with standard anaconda packages (numpy, scipy, matplotlib, more)
 	sudo conda install -n py34 pymongo # install pymongo wrapper for mongodb
 	Once you have a python 3.4 environment somewhere (if you follow the above recommendations,
 	it will be in ) add the following line to your ~/.bashrc or ~/.bash_profile file:
 	export BLENDER_SYSTEM_PYTHON="<my_python3.X_path>"
-	For me, it's: 
+	For me (OSX version 10.10), it's: 
 	export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"
 
 4) Set settings in <your_bvp_path>/Settings/Settings.json
+	# THIS SHOULD HAPPEN AUTOMATICALLY ON THE FIRST IMPORT. Possibly with a GUI.
 	Copy the file <your_bvp_path>/Settings/Example.json to <your_bvp_path>/Settings/Settings.json
 	Relace the obvious bits of the following lines: 
 	"RenderDir": "/path/to/which/to/render/by/default", 

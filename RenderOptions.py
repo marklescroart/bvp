@@ -334,7 +334,7 @@ class RenderOptions(object):
 		RL = scn.render.layers.keys()
 		if not 'ObjectMasks1' in RL:
 			for iOb in range(PassCt-1):
-				ObLayer =scn.render.layers.add('ObjectMasks%d'%(iOb+1))
+				ObLayer =scn.render.layers.new('ObjectMasks%d'%(iOb+1))
 				#bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
 				#ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
 				#ObLayer = scn.render.layers[ObLayer[0]]

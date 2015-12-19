@@ -1,9 +1,3 @@
-import bpy
-import bvp
-import os
-from bpy.types import Panel
-import numpy as np
-
 """
 This is the graphical interface add-on to Blender for the B.lender V.ision P.roject (bvp) python module. 
 
@@ -28,6 +22,12 @@ need to compile those into a list of useful Blenderization on a public web page
 
 Shit, there's a selected_objects value in bpy.context - who knew?
 """
+
+import bpy
+import bvp
+import os
+from bpy.types import Panel
+import numpy as np
 
 
 bl_info = {
@@ -163,7 +163,7 @@ def enum_dbs(self,context):
 	try:
 		# TO DO: Add ShapeNet / ModelNet to this list?
 		dbi = bvp.bvpDB(port=dbport)
-		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
+		dbnm = [(d,d,'') for d in dbi.dbi.client.database_names() if not d in ['local','admin']]
 	except:
 		dbnm = [('(none)','(none)','')]
 	return dbnm
@@ -277,7 +277,7 @@ class RescaleGroup(bpy.types.Operator):
 	bl_label = "Set up group of objects"
 	bl_options = {'REGISTER','UNDO'}
 	def execute(self,context):
-		scn = bpy.context.scene
+		scn = context.scene
 		ob_list = [o for o in scn.objects if o.select and not o.type in ['CAMERA']]
 		ToSet_Size = 10.0
 		ToSet_Loc = (0.0,0.0,0.0)
@@ -451,7 +451,7 @@ class DBSaveAction(bpy.types.Operator):
 			# Save in database
 			dbi.actions.save(to_save)
 			# Save parent file
-			save_path = os.path.join(dbpath,'Actions',to_save['parent_file'])
+			save_path = os.path.join(dbpath,'Action',to_save['parent_file'])
 			print('saving %s'%save_path)
 			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
@@ -470,66 +470,68 @@ class DBSaveAction(bpy.types.Operator):
 		
 	def invoke(self,context,event):
 		global to_save
-		wm = context.window_manager
-		ob = context.object
-		act = ob.animation_data.action
-		## -- Compute parameters -- ##
-		## Frames
-		nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
-		## WordNet labels
-		wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
-		wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
-		## Bounding box
-		if isinstance(ob.data,bpy.types.Armature):
-			# Get child objects, armatures have no position information
-			ob_list = [ob]+list(ob.children)
-		scn = context.scene
-		mn,mx = [],[]
-		for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
-		    scn.frame_set(fr)
-		    scn.update()
-		    mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
-		    mn.append(mntmp)
-		    mx.append(mxtmp)
-		min_xyz = np.min(np.vstack(mn),axis=0).tolist()
-		max_xyz = np.max(np.vstack(mx),axis=0).tolist()
-		#bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
-		bvp.utils.blender.grab_only(ob)
-		## Parent file
-		#pfile = act.bvpAction.parent_file
-		# The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
-		# of the current file (group/action/whatever) and save them (append them) to another specfied file
-		# in the database. Currently NOT IMPLEMENTED.
-		thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
-		if thisfile=="":
-			# Require saving in db-appropriate location 
-			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
+		bvpAct = bvp.bvpAction.from_blender(context)
+		to_save = bvpAct.docdict
+		# wm = context.window_manager
+		# ob = context.object
+		# act = ob.animation_data.action
+		# ## -- Compute parameters -- ##
+		# ## Frames
+		# nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
+		# ## WordNet labels
+		# wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
+		# wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
+		# ## Bounding box
+		# if isinstance(ob.data,bpy.types.Armature):
+		# 	# Get child objects, armatures have no position information
+		# 	ob_list = [ob]+list(ob.children)
+		# scn = context.scene
+		# mn,mx = [],[]
+		# for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
+		#     scn.frame_set(fr)
+		#     scn.update()
+		#     mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
+		#     mn.append(mntmp)
+		#     mx.append(mxtmp)
+		# min_xyz = np.min(np.vstack(mn),axis=0).tolist()
+		# max_xyz = np.max(np.vstack(mx),axis=0).tolist()
+		# #bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
+		# bvp.utils.blender.grab_only(ob)
+		# ## Parent file
+		# #pfile = act.bvpAction.parent_file
+		# # The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
+		# # of the current file (group/action/whatever) and save them (append them) to another specfied file
+		# # in the database. Currently NOT IMPLEMENTED.
+		# thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
+		# if thisfile=="":
+		# 	# Require saving in db-appropriate location 
+		# 	raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
 
-		# Construct action struct to save
-		to_save = dict(
-			# Edited through UI 
-			act_name=act.name,
-			parent_file=thisfile,
-			wordnet_label=wordnet_labels,
-			wordnet_frames=wordnet_frames,
-			is_cyclic=act.bvpAction.is_cyclic,
-			is_translating=act.bvpAction.is_translating,
-			is_broken=act.bvpAction.is_broken,
-			is_armature=act.bvpAction.is_armature,
-			bg_interaction=act.bvpAction.bg_interaction,
-			obj_interaction=act.bvpAction.obj_interaction,
-			is_interactive=act.bvpAction.is_interactive,
-			is_animal=act.bvpAction.is_animal,
-			# Computed / assumed
-			nframes=nframes,
-			fps=act.bvpAction.fps,
-			min_xyz=min_xyz,
-			max_xyz=max_xyz,
-			)
+		# # Construct action struct to save
+		# to_save = dict(
+		# 	# Edited through UI 
+		# 	act_name=act.name,
+		# 	parent_file=thisfile,
+		# 	wordnet_label=wordnet_labels,
+		# 	wordnet_frames=wordnet_frames,
+		# 	is_cyclic=act.bvpAction.is_cyclic,
+		# 	is_translating=act.bvpAction.is_translating,
+		# 	is_broken=act.bvpAction.is_broken,
+		# 	is_armature=act.bvpAction.is_armature,
+		# 	bg_interaction=act.bvpAction.bg_interaction,
+		# 	obj_interaction=act.bvpAction.obj_interaction,
+		# 	is_interactive=act.bvpAction.is_interactive,
+		# 	is_animal=act.bvpAction.is_animal,
+		# 	# Computed / assumed
+		# 	nframes=nframes,
+		# 	fps=act.bvpAction.fps,
+		# 	min_xyz=min_xyz,
+		# 	max_xyz=max_xyz,
+		# 	)
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
 		# Check for existence of to_save in database
-		chk = dbi.actions.find_one(dict(act_name=to_save['act_name']))
+		chk = dbi.Action.find_one(dict(name=to_save['name']))
 		print("chk is: ")
 		print(chk)
 		if chk is None:

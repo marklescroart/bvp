@@ -8,6 +8,9 @@ def set_scn():
 	'''
 	Quickie camera + lighting for an object
 	'''
-	bvp.bvpCamera().Place()
-	bvp.bvpSky().Place()
-	bvp.RenderOptions().apply_opts()
+	cam = bvp.bvpCamera()
+	sky = bvp.bvpSky()
+	RO = bvp.RenderOptions()
+	scn = bvp.bvpScene(cam=cam,sky=sky)
+	scn.create()
+	scn.apply_opts(render_options=RO)
