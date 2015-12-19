@@ -151,6 +151,8 @@ class bvpDB(object):
 		# Need indices in database (?)
 		if sctype == 'objects':
 			out = [bvp.bvpObject(dbi=None,**params) for params in result]
+		if sctype == 'actions':
+			out = [bvp.bvpAction(dbi=None,**params) for params in result]
 		else:
 			raise NotImplementedError('Scene types besides objects are not ready yet!')
 		return out

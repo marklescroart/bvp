@@ -80,7 +80,7 @@ class bvpAction(object):
 
 	def __repr__(self):
 		"""Display string"""
-		S = '\n ~A~ bvpAction "%s" ~A~\n'%(self.name)
+		S = '\n ~A~ bvpAction "%s" ~A~\n'%(self.act_name)
 		if hasattr(self,'cycle') and self.cycle:
 			S+='Cyclic action '
 		if hasattr(self,'armature') and not self.armature is None:

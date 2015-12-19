@@ -6,8 +6,8 @@ Blender is our storage for all mesh geometry...?
 '''
 import bvp
 import numpy as np
-from scipy import sparse
-import scipy.sparse.linalg as la
+#from scipy import sparse
+#import scipy.sparse.linalg as la
 import functools
 
 if bvp.Is_Blender:

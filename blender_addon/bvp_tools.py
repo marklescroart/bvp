@@ -467,6 +467,7 @@ class DBSaveAction(bpy.types.Operator):
 		#	script.format() # Depends on script
 		#	bvp.blend(script,pfile)
 		return {'FINISHED'}
+		
 	def invoke(self,context,event):
 		global to_save
 		wm = context.window_manager
