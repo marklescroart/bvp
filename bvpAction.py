@@ -121,7 +121,7 @@ class bvpAction(object):
 		else:
 			return os.path.join(self.dbi.dbpath,'Action',self.file_name)
 
-	def get_docdict(self,to_remove=('fpath',)):
+	def get_docdict(self,to_remove=('fpath','dbi')):
 		"""Get docdb (database header) dictionary representation of this object
 
 		Used to insert this object into a docdb database or query a database for 

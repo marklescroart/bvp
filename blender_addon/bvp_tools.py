@@ -449,11 +449,11 @@ class DBSaveAction(bpy.types.Operator):
 		if self.do_save:
 			print('Saving %s in database'%repr(to_save))
 			# Save in database
-			dbi.actions.save(to_save)
+			dbi.dbi.Action.save(to_save)
 			# Save parent file
-			save_path = os.path.join(dbpath,'Action',to_save['parent_file'])
-			print('saving %s'%save_path)
-			bpy.ops.wm.save_as_mainfile(filepath=save_path)
+			save_path = os.path.join(dbpath,'Action',to_save['file_name'])
+			print('NOT saving %s'%save_path)
+			#bpy.ops.wm.save_mainfile(filepath=save_path)
 		else:
 			# NOOOOOO!
 			print("Aborting - nothing saved!")
@@ -471,7 +471,7 @@ class DBSaveAction(bpy.types.Operator):
 		global to_save
 		bvpAct = bvp.bvpAction.from_blender(context)
 		to_save = bvpAct.docdict
-		# wm = context.window_manager
+		wm = context.window_manager
 		# ob = context.object
 		# act = ob.animation_data.action
 		# ## -- Compute parameters -- ##
@@ -530,7 +530,7 @@ class DBSaveAction(bpy.types.Operator):
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
 		# Check for existence of to_save in database
-		chk = dbi.Action.find_one(dict(name=to_save['name']))
+		chk = dbi.dbi.Action.find_one(dict(name=to_save['name']))
 		print("chk is: ")
 		print(chk)
 		if chk is None:
