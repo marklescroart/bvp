@@ -53,6 +53,8 @@ grp_name # Name of group in .blend file. Should be unique. Meh. Maybe not. Has t
 -> DO NOT kill BVP library. Modify it to read from a single JSON file stored at the top level, that has 
 a (static) view of all the elements in all the blend files.
 
+mongod --dbpath /m02/BVPdb/mongodb --port 9194
+
 """
 
 # Imports
@@ -129,7 +131,7 @@ class bvpDB(object):
 		if not 'type' in doc:
 			raise Exception("Documents to be saved must have a 'type' field!")
 		doc_class = doc.pop('type')
-		dbi.dbi[doc_class].save(doc)
+		self.dbi[doc_class].save(doc)
 	#def __del__(self):
 	#	"""Cleanup method: shut down any locally-running servers"""
 	#	if self.temp_instance:
