@@ -253,7 +253,8 @@ class bvpSky(object):
 			Scn = bpy.context.scene
 		fPath,fName = os.path.split(self.parentFile)
 		WorldName = self.grpName
-		bpy.ops.wm.link_append(
+		#bpy.ops.wm.link_append( # API CHANGE!
+		bpy.ops.wm.link(
 			directory=os.path.join(fPath,fName)+"\\World\\", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
 			filepath="//"+fName+"\\World\\"+WorldName, # local filepath within .blend file to the world to be imported
 			filename=WorldName, # "filename" being the name of the data block, i.e. the name of the world.

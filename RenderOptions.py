@@ -14,25 +14,25 @@ if bvp.Is_Blender:
 # all the node type IDs here and use the variables below
 
 #['R_LAYERS', 'COMPOSITE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE']
-if sys.platform == 'darwin':
-	print('Mac computer node names!')
-	RLayerNodeX = 'R_LAYERS' 
-	CompositorNodeX = 'COMPOSITE'
-	OutputFileNodeX = 'OUTPUT_FILE'
-	ViewerNodeX = 'VIEWER'
-	SepRGBANodeX = 'CompositorNodeSepRGBA'
-	CombRGBANodeX = 'CompositorNodeCombRGBA'
-	IDmaskNodeX = 'ID_MASK'
-	MathNodeX = 'CompositorNodeMath'
-else:
-	RLayerNodeX = 'CompositorNodeRLayers' 
-	CompositorNodeX = 'CompositorNodeComposite'
-	OutputFileNodeX = 'CompositorNodeOutputFile'
-	ViewerNodeX = 'CompositorNodeViewer'
-	SepRGBANodeX = 'CompositorNodeSepRGBA'
-	CombRGBANodeX = 'CompositorNodeCombRGBA'
-	IDmaskNodeX = 'CompositorNodeIDMask'
-	MathNodeX = 'CompositorNodeMath'
+#if sys.platform == 'darwin':
+#	print('Mac computer node names!')
+RLayerNodeX = 'R_LAYERS' 
+CompositorNodeX = 'COMPOSITE'
+OutputFileNodeX = 'OUTPUT_FILE'
+ViewerNodeX = 'VIEWER'
+SepRGBANodeX = 'SEPRGBA'
+CombRGBANodeX = 'COMBRGBA'
+IDmaskNodeX = 'ID_MASK'
+MathNodeX = 'MATH'
+#else:
+	# RLayerNodeX = 'CompositorNodeRLayers' 
+	# CompositorNodeX = 'CompositorNodeComposite'
+	# OutputFileNodeX = 'CompositorNodeOutputFile'
+	# ViewerNodeX = 'CompositorNodeViewer'
+	# SepRGBANodeX = 'CompositorNodeSepRGBA'
+	# CombRGBANodeX = 'CompositorNodeCombRGBA'
+	# IDmaskNodeX = 'CompositorNodeIDMask'
+	# MathNodeX = 'CompositorNodeMath'
 
 # else:
 RLayerNode = 'CompositorNodeRLayers' 
@@ -669,7 +669,8 @@ class RenderOptions(object):
 		fPath = os.path.join(fPath,'BlendFiles')
 		fName = 'Cycles_Render.blend'
 		MatNm = 'CycWhite'
-		bpy.ops.wm.link_append(
+		# bpy.ops.wm.link_append( # API change!
+		bpy.ops.wm.link(
 			directory=os.path.join(fPath,fName)+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Materials)
 			filepath="//"+fName+"\\Material\\"+'CycWhite', # local filepath within .blend file to the material to be imported
 			filename='CycWhite', # "filename" being the name of the data block, i.e. the name of the material.

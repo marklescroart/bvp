@@ -846,7 +846,8 @@ def AddLamp(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Scenes/'):
 	ScnNum = len(bpy.data.scenes)
 	ScnListOld = [s.name for s in bpy.data.scenes]
 	# APPEND SCENE CONTAINING LAMPS TO BE ADDED
-	bpy.ops.wm.link_append(
+	#bpy.ops.wm.link_append( # API change...
+	bpy.ops.wm.link(
 		directory=fPath+fName+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
 		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
 		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
@@ -937,7 +938,8 @@ def AddObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
 	ScnListOld = [s.name for s in bpy.data.scenes]
 	# APPEND SCENE CONTAINING "OBJECT" TO BE ADDED
 	# Note that "OBJECT" is in quotes because it may be a composite object, composed of several different Blender objects (i.e., parts of the object may be modeled separately). All objects should have a single parent, though.
-	bpy.ops.wm.link_append(
+	#bpy.ops.wm.link_append( #API change
+	bpy.ops.wm.link(
 		directory=os.path.join(fPath,fName)+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
 		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
 		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
@@ -1025,7 +1027,8 @@ def AddGroup(fName, GrpName, fPath=bvp.Settings['Paths']['LibDir']+'/Objects/'):
 		G.name = GrpName
 	else:
 		print('Did not find group! adding...')
-		bpy.ops.wm.link_append(
+		#bpy.ops.wm.link_append( #API change
+		bpy.ops.wm.link(
 			directory=os.path.join(fPath,fName)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
 			filepath="//"+fName+"\\Group\\"+GrpName, # local filepath within .blend file to the scene to be imported
 			filename=GrpName, # "filename" being the name of the data block, i.e. the name of the group
@@ -1065,7 +1068,8 @@ def AddJoinedObject(fName, ScName, fPath=bvp.Settings['Paths']['LibDir']+'/Objec
 	ScnListOld = [s.name for s in bpy.data.scenes]
 	# APPEND SCENE CONTAINING "OBJECT" TO BE ADDED
 	# Note that "OBJECT" is in quotes because it may be a composite object, composed of several different Blender objects (i.e., parts of the object may be modeled separately). All objects should have a single parent, though.
-	bpy.ops.wm.link_append(
+	#bpy.ops.wm.link( #API change
+	bpy.ops.wm.link(
 		directory=fPath+fName+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
 		filepath="//"+fName+"\\Scene\\"+ScName, # local filepath within .blend file to the scene to be imported
 		filename=ScName, # "filename" being the name of the data block, i.e. the name of the scene.
