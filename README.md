@@ -7,20 +7,14 @@ bvp consists of a library of python classes and functions, as well as a library 
 elements" (objects, backgrounds, skies/lighting setups, shadows, and cameras) stored in 
 .blend files and accessible through a database.
 
-Scene elements are all managed by classes that wrap functionality of native Blender 
-objects and store meta-data about each element (for example, the semantic category or
-size of an object). Each individual scene element is stored in a archival .blend files, 
-and managed by a database system based on mongodb (http://www.mongodb.com/).
+Scene elements are all managed by classes that wrap functionality of native Blender objects and store meta-data about each element (for example, the semantic category or size of an object). Each individual scene element is stored in a archival .blend files, and managed by a database system based on mongodb (http://www.mongodb.com/).
 
-Scene elements can be combined using a bvpScene class, which has methods to populate a 
-given scene with objects in random locations, render the scene, and more.
+Scene elements can be combined using a bvpScene class, which has methods to populate a given scene with objects in random locations, render the scene, and more.
 
 All relevant information for a set of scenes is stored in the bvpSceneList 
-class, which has* methods for permanent storage* / write-out of stimulus lists to 
-archival hdf5 files*. 
+class, which has* methods for permanent storage* / write-out of stimulus lists to archival hdf5 files*. 
 
 *Still to come 2014.10.23
-
 
 
 Installation
@@ -70,7 +64,7 @@ pymongo
 	export BLENDER_SYSTEM_PYTHON="/Users/mark/anaconda/envs/py34/"
 
 4) Set settings in <your_bvp_path>/Settings/Settings.json
-	# THIS SHOULD HAPPEN AUTOMATICALLY ON THE FIRST IMPORT. Possibly with a GUI.
+	# THIS SHOULD HAPPEN AUTOMATICALLY ON THE FIRST IMPORT. Possibly with a GUI to help fill in defaults. 
 	Copy the file <your_bvp_path>/Settings/Example.json to <your_bvp_path>/Settings/Settings.json
 	Relace the obvious bits of the following lines: 
 	"RenderDir": "/path/to/which/to/render/by/default", 
