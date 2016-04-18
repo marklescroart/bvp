@@ -175,8 +175,6 @@ class bvpScene(object):
 	def apply_opts(self,scn=None,render_options=None):
 		'''Apply general options to scene (environment lighting, world, start/end frames, etc), 
 		including (optionally) render options (of class 'RenderOptions'))
-		
-		ML 2011
 		'''
 		scn = bvp.utils.blender.set_scene(scn) 
 		# Set frames (and other scene props?)
@@ -231,6 +229,7 @@ class bvpScene(object):
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
 		scn.layers = [True]*20
+	
 	def create_working(self,render_options=None,scn=None):
 		'''Creates the stored scene, but allows for objects without set positions.
 
@@ -256,6 +255,7 @@ class bvpScene(object):
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
 		scn.layers = [True]*20	
+	
 	def render(self,render_options,scn=None):
 		'''Renders the scene (immediately, in open instance of Blender)
 		
@@ -274,6 +274,7 @@ class bvpScene(object):
 		render_options.apply_opts()
 		# Render all layers!
 		scn.layers = [True]*20
+		# Set frame step
 		if render_options.BVPopts['Type'].lower()=='firstframe':
 			scn.frame_step = scn.frame_end+1 # so only one frame will render
 		elif render_options.BVPopts['Type'].lower()=='firstandlastframe':

@@ -121,7 +121,7 @@ class bvpAction(object):
 		else:
 			return os.path.join(self.dbi.dbpath,'Action',self.file_name)
 
-	def get_docdict(self,to_remove=('fpath',)):
+	def get_docdict(self,to_remove=('fpath','dbi')):
 		"""Get docdb (database header) dictionary representation of this object
 
 		Used to insert this object into a docdb database or query a database for 
@@ -174,7 +174,8 @@ class bvpAction(object):
 		scn = context.scene
 		act = ob.animation_data.action
 		# Create database instance
-		dbi = bvpDB(port=Settings['db']['port'], dbname=wm.active_db)
+		#dbi = bvpDB(port=Settings['db']['port'], dbname=wm.active_db) # Don't know why this is breaking...
+		dbi = None
 		#else:
 		#	act = context
 		#	scn = None

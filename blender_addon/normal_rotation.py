@@ -1,3 +1,9 @@
+import bpy
+import bvp
+import os
+from bpy.types import Panel
+import numpy as np
+
 """
 This is the graphical interface add-on to Blender for the B.lender V.ision P.roject (bvp) python module. 
 
@@ -22,12 +28,6 @@ need to compile those into a list of useful Blenderization on a public web page
 
 Shit, there's a selected_objects value in bpy.context - who knew?
 """
-
-import bpy
-import bvp
-import os
-from bpy.types import Panel
-import numpy as np
 
 
 bl_info = {
@@ -163,10 +163,17 @@ def enum_dbs(self,context):
 	try:
 		# TO DO: Add ShapeNet / ModelNet to this list?
 		dbi = bvp.bvpDB(port=dbport)
-		dbnm = [(d,d,'') for d in dbi.dbi.client.database_names() if not d in ['local','admin']]
+		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
 	except:
 		dbnm = [('(none)','(none)','')]
 	return dbnm
+
+def enum_scene_objects(self,context):
+	scn = context.scene
+	if len(scn.objects)==0:
+		return [("","No objects",""),]
+	else:
+		return [(o.name,o.name,"") for o in scn.objects]
 
 ## -- General property declarations -- ##
 def declare_properties():
@@ -227,6 +234,7 @@ def declare_properties():
 	bpy.types.WindowManager.active_group = bpy.props.StringProperty(name='active_group',default="") 
 	#bpy.types.WindowManager.active_action = bpy.props.StringProperty(name='active_action',default="") 
 	bpy.types.WindowManager.query_results = bpy.props.EnumProperty(items=enum_db_results,name='Search results')
+	bpy.types.WindowManager.scene_objects = bpy.props.EnumProperty(items=enum_scene_objects,name='Scene objects')
 	bpy.types.WindowManager.wn_results = bpy.props.EnumProperty(items=enum_wn_results,name='WordNet search results')
 	bpy.types.WindowManager.wn_label_index = bpy.props.IntProperty(default=0)
 	# Add .WindowManager.bvp.active_xxx?
@@ -277,7 +285,7 @@ class RescaleGroup(bpy.types.Operator):
 	bl_label = "Set up group of objects"
 	bl_options = {'REGISTER','UNDO'}
 	def execute(self,context):
-		scn = context.scene
+		scn = bpy.context.scene
 		ob_list = [o for o in scn.objects if o.select and not o.type in ['CAMERA']]
 		ToSet_Size = 10.0
 		ToSet_Loc = (0.0,0.0,0.0)
@@ -449,11 +457,11 @@ class DBSaveAction(bpy.types.Operator):
 		if self.do_save:
 			print('Saving %s in database'%repr(to_save))
 			# Save in database
-			dbi.dbi.Action.save(to_save)
+			dbi.actions.save(to_save)
 			# Save parent file
-			save_path = os.path.join(dbpath,'Action',to_save['file_name'])
-			print('NOT saving %s'%save_path)
-			#bpy.ops.wm.save_mainfile(filepath=save_path)
+			save_path = os.path.join(dbpath,'Actions',to_save['parent_file'])
+			print('saving %s'%save_path)
+			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
 			# NOOOOOO!
 			print("Aborting - nothing saved!")
@@ -467,71 +475,68 @@ class DBSaveAction(bpy.types.Operator):
 		#	script.format() # Depends on script
 		#	bvp.blend(script,pfile)
 		return {'FINISHED'}
-		
 	def invoke(self,context,event):
 		global to_save
-		bvpAct = bvp.bvpAction.from_blender(context)
-		to_save = bvpAct.docdict
 		wm = context.window_manager
-		# ob = context.object
-		# act = ob.animation_data.action
-		# ## -- Compute parameters -- ##
-		# ## Frames
-		# nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
-		# ## WordNet labels
-		# wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
-		# wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
-		# ## Bounding box
-		# if isinstance(ob.data,bpy.types.Armature):
-		# 	# Get child objects, armatures have no position information
-		# 	ob_list = [ob]+list(ob.children)
-		# scn = context.scene
-		# mn,mx = [],[]
-		# for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
-		#     scn.frame_set(fr)
-		#     scn.update()
-		#     mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
-		#     mn.append(mntmp)
-		#     mx.append(mxtmp)
-		# min_xyz = np.min(np.vstack(mn),axis=0).tolist()
-		# max_xyz = np.max(np.vstack(mx),axis=0).tolist()
-		# #bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
-		# bvp.utils.blender.grab_only(ob)
-		# ## Parent file
-		# #pfile = act.bvpAction.parent_file
-		# # The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
-		# # of the current file (group/action/whatever) and save them (append them) to another specfied file
-		# # in the database. Currently NOT IMPLEMENTED.
-		# thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
-		# if thisfile=="":
-		# 	# Require saving in db-appropriate location 
-		# 	raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
+		ob = context.object
+		act = ob.animation_data.action
+		## -- Compute parameters -- ##
+		## Frames
+		nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
+		## WordNet labels
+		wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
+		wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
+		## Bounding box
+		if isinstance(ob.data,bpy.types.Armature):
+			# Get child objects, armatures have no position information
+			ob_list = [ob]+list(ob.children)
+		scn = context.scene
+		mn,mx = [],[]
+		for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
+		    scn.frame_set(fr)
+		    scn.update()
+		    mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
+		    mn.append(mntmp)
+		    mx.append(mxtmp)
+		min_xyz = np.min(np.vstack(mn),axis=0).tolist()
+		max_xyz = np.max(np.vstack(mx),axis=0).tolist()
+		#bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
+		bvp.utils.blender.grab_only(ob)
+		## Parent file
+		#pfile = act.bvpAction.parent_file
+		# The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
+		# of the current file (group/action/whatever) and save them (append them) to another specfied file
+		# in the database. Currently NOT IMPLEMENTED.
+		thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
+		if thisfile=="":
+			# Require saving in db-appropriate location 
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
 
-		# # Construct action struct to save
-		# to_save = dict(
-		# 	# Edited through UI 
-		# 	act_name=act.name,
-		# 	parent_file=thisfile,
-		# 	wordnet_label=wordnet_labels,
-		# 	wordnet_frames=wordnet_frames,
-		# 	is_cyclic=act.bvpAction.is_cyclic,
-		# 	is_translating=act.bvpAction.is_translating,
-		# 	is_broken=act.bvpAction.is_broken,
-		# 	is_armature=act.bvpAction.is_armature,
-		# 	bg_interaction=act.bvpAction.bg_interaction,
-		# 	obj_interaction=act.bvpAction.obj_interaction,
-		# 	is_interactive=act.bvpAction.is_interactive,
-		# 	is_animal=act.bvpAction.is_animal,
-		# 	# Computed / assumed
-		# 	nframes=nframes,
-		# 	fps=act.bvpAction.fps,
-		# 	min_xyz=min_xyz,
-		# 	max_xyz=max_xyz,
-		# 	)
+		# Construct action struct to save
+		to_save = dict(
+			# Edited through UI 
+			act_name=act.name,
+			parent_file=thisfile,
+			wordnet_label=wordnet_labels,
+			wordnet_frames=wordnet_frames,
+			is_cyclic=act.bvpAction.is_cyclic,
+			is_translating=act.bvpAction.is_translating,
+			is_broken=act.bvpAction.is_broken,
+			is_armature=act.bvpAction.is_armature,
+			bg_interaction=act.bvpAction.bg_interaction,
+			obj_interaction=act.bvpAction.obj_interaction,
+			is_interactive=act.bvpAction.is_interactive,
+			is_animal=act.bvpAction.is_animal,
+			# Computed / assumed
+			nframes=nframes,
+			fps=act.bvpAction.fps,
+			min_xyz=min_xyz,
+			max_xyz=max_xyz,
+			)
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
 		# Check for existence of to_save in database
-		chk = dbi.dbi.Action.find_one(dict(name=to_save['name']))
+		chk = dbi.actions.find_one(dict(act_name=to_save['act_name']))
 		print("chk is: ")
 		print(chk)
 		if chk is None:
@@ -551,6 +556,32 @@ class DBSaveAction(bpy.types.Operator):
 # 	except pymongo.errors.ConnectionError:
 # 		import warnings
 # 		warnings.warn('Unable to initialize pymongo server! You''re probably borked!')
+
+class AlignToNormal(bpy.types.Operator):
+	bl_idname = 'bvp.align_to_normal'
+	bl_label = 'Align object to nearest normal'
+	bl_options = {'REGISTER','UNDO'}
+
+	def execute(self,context): 
+		wm = context.window_manager
+		base = context.scene.objects[wm.scene_objects]
+		to_rot = context.object
+		# Get mesh for base object
+		me = base.data
+		# Get absolute locations (use matrix_world) for each vertex
+		verts = np.array([v.co*base.matrix_world for v in me.vertices])
+		obloc = np.array(to_rot.location)
+		dst = np.linalg.norm(verts-obloc[None,:],axis=1)
+		# Select nearest vertex
+		vi = np.argmin(dst)
+		print('Nearest vertex is vertex %d\n\tat %s'%(vi,repr(me.vertices[vi].co*base.matrix_world)))
+		print('\tdistance is %0.3f'%np.min(dst))
+		print('\t%d vertices'%len(dst))
+		xyzr = bvp.utils.bvpMath.vec2eulerXYZ(me.vertices[vi].normal)
+		rr = [x/180.*np.pi for x in xyzr]
+		print('rotating %s'%repr(xyzr))
+		to_rot.rotation_euler = rr
+		return {'FINISHED'}
 
 class DBSearchDialog(bpy.types.Operator):
 	bl_idname = "bvp.db_search"
@@ -744,6 +775,40 @@ class BVP_PANEL_db_tools(View3DPanel,Panel):
 			col = spl.column()
 			col.operator('bvp.db_import_proxy',text='Place Proxy')
 			#col.label('Import Full')
+
+class BVP_PANEL_temp(View3DPanel,Panel):
+	"""Creates a BVP panel in the Tools window"""
+	bl_label = "Temp extra object tools"
+	bl_idname = "BVP_object_extras"
+
+	# NOTE: I don't want to use poll, because I want to still display this window 
+	# if there isn't an active object (for Create group / rescale button)
+	def draw(self, context):
+		layout = self.layout
+		# Get currently-selected object
+		ob = context.object
+		scene = context.scene	
+		wm = context.window_manager
+		# Object or no
+		if ob is None: # better to use poll?
+			row = layout.row()
+			row.label('(No object selected)')
+		else:
+			row = layout.row()
+			spl = layout.split()
+			
+			## -- 1st column -- ##
+			col = spl.column()
+			col.label("Current object:")
+			
+			## -- 2nd column -- ##
+			col = spl.column()
+			col.prop(ob,'name',text="")
+			col.prop(wm,'scene_objects',text="")
+			# Button for re-scaling object groups 
+			row = layout.row()
+			row.operator('bvp.align_to_normal',text='align to normal')
+			#XXXq#
 
 class BVP_PANEL_object_tools(View3DPanel,Panel):
 	"""Creates a BVP panel in the Tools window"""
