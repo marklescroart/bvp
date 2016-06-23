@@ -210,7 +210,7 @@ class bvpScene(object):
 		'''
 		scn = bvp.utils.blender.set_scene(scn)
 		# set layers to correct setting
-		scn.layers = [True]+[False]*19
+		#scn.layers = [True]+[False]*19 NOT NECESSARY, over-written below
 		# set cursort to center
 		set_cursor((0,0,0))
 		# place bg
@@ -228,7 +228,7 @@ class bvpScene(object):
 			o.Place()
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
-		scn.layers = [True]*20
+		scn.layers = [True]*20 # SHOULD BE HANDLED IN RENDER OPTIONS
 	
 	def create_working(self,render_options=None,scn=None):
 		'''Creates the stored scene, but allows for objects without set positions.
@@ -238,7 +238,7 @@ class bvpScene(object):
 		if not scn:
 			scn = bpy.context.scene
 		# set layers to correct setting
-		scn.layers = [True]+[False]*19
+		#scn.layers = [True]+[False]*19
 		# set cursort to center
 		set_cursor((0,0,0))
 		# place bg
@@ -273,7 +273,7 @@ class bvpScene(object):
 		scn.render.filepath = render_options.BVPopts['BasePath']%self.fpath
 		render_options.apply_opts()
 		# Render all layers!
-		scn.layers = [True]*20
+		#scn.layers = [True]*20 # RenderOptions should handle layers to be rendered
 		# Set frame step
 		if render_options.BVPopts['Type'].lower()=='firstframe':
 			scn.frame_step = scn.frame_end+1 # so only one frame will render

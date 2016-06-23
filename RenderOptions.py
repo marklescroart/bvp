@@ -235,7 +235,9 @@ class RenderOptions(object):
             self.BVPopts['Motion'] = False
         scn.use_nodes = True
         # Set only first layer to be active # WHY? This seems outdated.
-        scn.layers = [True]+[False]*19
+        print('RenderOptions set layers to:')
+        print(self.default_layer_opts['layers'])
+        scn.layers = self.default_layer_opts['layers'] #[True]+[False]*19
         # Get all non-function attributes
         ToSet = [x for x in self.__dict__.keys() if not hasattr(self.__dict__[x],'__call__') and not x in ['BVPopts','default_layer_opts','image_settings', 'freestyle_settings']]
         for s in ToSet:
