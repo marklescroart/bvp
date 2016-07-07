@@ -37,7 +37,7 @@ class bvpShape(object):
 
     Implements some useful functions for dealing with functions across meshes.
     """
-    def __init__(self, pts, polys,edges=None,make_object=None):
+    def __init__(self, pts, polys, edges=None, make_object=None):
         """Initialize Shape.
 
         Parameters
@@ -59,8 +59,8 @@ class bvpShape(object):
                 #raise Exception("Must supply edges to make new shape!")
                 edges = []
             me = bpy.data.meshes.new(make_object+'_mesh')
-            me.from_pydata(pts,edges,polys)
-            self.ob = bpy.data.objects.new(make_object,me)
+            me.from_pydata(pts, edges, polys)
+            self.ob = bpy.data.objects.new(make_object, me)
         else: 
             self.ob = None
         self._cache = dict()
@@ -68,7 +68,7 @@ class bvpShape(object):
         self._nLC_solvers = dict()
 
     @classmethod
-    def from_object(cls,obgrp,name=None,replace=True):
+    def from_object(cls, obgrp, name=None, replace=True):
         """Get pts,polys from blender object (i.e., a group of potentially many Blender objects)
 
         Eventually:
@@ -90,62 +90,104 @@ class bvpShape(object):
             Having defined `pts` & `polys`
 
         """
+        scn = bpy.context.scene
         # Test for single (manifold?) mesh:
         if isinstance(obgrp,bpy.types.Object):
             obgrp = [obgrp]
         elif isinstance(obgrp,bpy.types.Group):
             obgrp = list(obgrp.objects)
-        if len(obgrp)>1:
-            # Ruh roh... (TEMP ERRROR for multiple objects) 
-            raise NotImplementedError("Can't handle multi-object groups yet!")
+        # if len(obgrp)>1:
+        #     # Ruh roh... (TEMP ERRROR for multiple objects) 
+        #     raise NotImplementedError("Can't handle multi-object groups yet!")
+        excluded = [o for o in obgrp if isinstance(o.data, bpy.types.Armature) or not o.is_visible(scn)]
+        if len(excluded) > 1:
+            print("Excluded: %s"%repr(excluded))
+        obgrp = [o for o in obgrp if not isinstance(o.data, bpy.types.Armature) and o.is_visible(scn)]
+        pt_list = []
+        poly_list = []
+        edge_list = []
         for ob in obgrp:
             # Check for multiple meshes within group
             grab_only(ob)
             bpy.ops.mesh.separate(type='LOOSE')
             nobjects = len(bpy.context.selected_objects)
-            if nobjects>1:
-                # Ruh roh... (TEMP ERROR for multiple meshes)
-                raise NotImplementedError("Can't handle multi-mesh objects yet!")
             for oo in bpy.context.selected_objects:
-                print("Getting pts, polys, edges...")
+                if oo.data is None or (not oo.is_visible(scn)):
+                    continue
+                print("Getting pts, polys, edges for %s..."%oo.name)
+                apply_modifiers = True
+                try:
+                    obmesh = ob.to_mesh(scn, apply_modifiers, 'RENDER')
+                except RuntimeError:
+                    print('No geometry for object %s!'%oo.name)
+                    continue
                 #Get pts, polys
-                # Was np.array... (may need arrays for math in steps to be added)
-                pts = [v.co for v in oo.data.vertices]
-                polys = [p.vertices for p in oo.data.polygons]
-                edges = [e.vertices for e in oo.data.edges]
+                pts = [ob.matrix_world * v.co for v in obmesh.vertices]
+                polys = [p.vertices for p in obmesh.polygons]
+                edges = [e.vertices for e in obmesh.edges]
+                print('%d vertices'%len(pts))
+                # Put into temporary shape object to triangulate (not optimal...)
+                Stmp = cls.__new__(cls)
+                if replace:
+                    Stmp.__init__(pts, polys, edges=edges, make_object=None)
+                    Stmp.ob = ob
+                else:
+                    Stmp.__init__(pts, polys, edges=edges, make_object=name)
+                # Triangulate mesh (if necessary)
+                polytest = np.array([len(p.vertices) for p in Stmp.ob.data.polygons])
+                if len(polytest) == 0:
+                    print('SKIPPING!')
+                    continue
+                #print("Shape is:")
+                #print(np.ndim(polytest))
+                #print(polytest.shape)
+                #print('...')
+                if np.max(polytest)>3:
+                    print('Performing triangulation...')
+                    Stmp.triangulate()
+                # Re-compute pts, polys
+                Stmp.pts = np.array([v.co for v in Stmp.ob.data.vertices])
+                Stmp.polys = np.array([p.vertices for p in Stmp.ob.data.polygons])
+                Stmp.edges = np.array([p.vertices for p in Stmp.ob.data.edges])
+
+                # Concatenate all meshes in group
+                pt_list.append(Stmp.pts)
+                poly_list.append(Stmp.polys)
+                edge_list.append(Stmp.edges)
 
             # EVENTUALLY, concatenate pts,polys,edges somehow...
             # Power crust?
             # Spherize?
-
-        # Make new object w/ concatenated pts, polys, edges
-        S = cls.__new__(cls)
-        if replace:
-            S.__init__(pts,polys,edges=edges,make_object=name)
+        if (nobjects==1 and len(excluded)==0) and (len(obgrp)==1):
+            # THis might break hard. Currently dont' care (2016.07.06)
+            # Make new object w/ concatenated pts, polys, edges
+            S = Stmp
+            # (optionally) replace current object(s)
+            if replace:
+                for ob in obgrp:
+                    bpy.context.scene.objects.unlink(ob)
+                bpy.context.scene.objects.link(S.ob)
+            
+            # Output
+            grab_only(S.ob)
+            return S
         else:
-            if len(obgrp)>1:
-                raise NotImplementedError("Don't know what to do with multi-object groups!")
-            S.__init__(pts,polys,edges=edges,make_object=None)
-            S.ob = obgrp[0]
-        # Triangulate mesh (if necessary)
-        polytest = np.array([len(p.vertices) for p in S.ob.data.polygons])
-        if np.max(polytest)>3:
-            S.triangulate()
-        
-        # Re-compute pts, polys
-        S.pts = np.array([v.co for v in S.ob.data.vertices])
-        S.polys = np.array([p.vertices for p in S.ob.data.polygons])
-        S.edges = np.array([p.vertices for p in S.ob.data.edges])
-        
-        # (optionally) replace current object(s)
-        if replace:
-            for ob in obgrp:
-                bpy.context.scene.objects.unlink(ob)
-            bpy.context.scene.objects.link(S.ob)
-        
-        # Output
-        grab_only(S.ob)
-        return S
+            pts = np.vstack(pt_list)
+            n_meshes = len(pt_list)
+            # print([x.shape for x in poly_list])
+            to_add = [x.shape[0] for x in pt_list]
+            to_add = np.cumsum([0] + to_add[:-1])
+            # # Should be cumsum
+            # for poly, n in zip(poly_list, to_add):
+            #     print('n:')
+            #     print(n)
+            #     print("Poly max:")
+            #     print(np.max(poly))
+            #     print("Poly max + n")
+            #     print(np.max(poly+n))
+            polys = np.vstack([poly + n for poly, n in zip(poly_list, to_add)])
+            edges = np.vstack([edge + n for edge, n in zip(edge_list, to_add)])
+            return pts, polys, edges # pt_list, poly_list #, edge_list
         
     @property
     @_memo
@@ -759,8 +801,10 @@ class bvpShape(object):
         This is a BLENDER OPERATOR.
         """
         # Set mode to object mode?
+        # CHECK ON WHETHER OB FIELD EXISTS. ALWAYS SHOULD EXIST (?)
         # Object must be in the current scene to apply modifiers.
-        bpy.context.scene.objects.link(self.ob)
+        if not self.ob.name in bpy.context.scene.objects:
+            bpy.context.scene.objects.link(self.ob)
         grab_only(self.ob)
         bpy.context.scene.update() # unnecessary?
         # Create & apply modifier
