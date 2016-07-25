@@ -109,85 +109,86 @@ class bvpShape(object):
         for ob in obgrp:
             # Check for multiple meshes within group
             grab_only(ob)
-            bpy.ops.mesh.separate(type='LOOSE')
+            # Necessary?
+            # bpy.ops.mesh.separate(type='LOOSE')
             nobjects = len(bpy.context.selected_objects)
-            for oo in bpy.context.selected_objects:
-                if oo.data is None or (not oo.is_visible(scn)):
-                    continue
-                print("Getting pts, polys, edges for %s..."%oo.name)
-                apply_modifiers = True
-                try:
-                    obmesh = ob.to_mesh(scn, apply_modifiers, 'RENDER')
-                except RuntimeError:
-                    print('No geometry for object %s!'%oo.name)
-                    continue
-                #Get pts, polys
-                pts = [ob.matrix_world * v.co for v in obmesh.vertices]
-                polys = [p.vertices for p in obmesh.polygons]
-                edges = [e.vertices for e in obmesh.edges]
-                print('%d vertices'%len(pts))
-                # Put into temporary shape object to triangulate (not optimal...)
-                Stmp = cls.__new__(cls)
-                if replace:
-                    Stmp.__init__(pts, polys, edges=edges, make_object=None)
-                    Stmp.ob = ob
-                else:
-                    Stmp.__init__(pts, polys, edges=edges, make_object=name)
-                # Triangulate mesh (if necessary)
-                polytest = np.array([len(p.vertices) for p in Stmp.ob.data.polygons])
-                if len(polytest) == 0:
-                    print('SKIPPING!')
-                    continue
-                #print("Shape is:")
-                #print(np.ndim(polytest))
-                #print(polytest.shape)
-                #print('...')
-                if np.max(polytest)>3:
-                    print('Performing triangulation...')
-                    Stmp.triangulate()
-                # Re-compute pts, polys
-                Stmp.pts = np.array([v.co for v in Stmp.ob.data.vertices])
-                Stmp.polys = np.array([p.vertices for p in Stmp.ob.data.polygons])
-                Stmp.edges = np.array([p.vertices for p in Stmp.ob.data.edges])
+            # for oo in bpy.context.selected_objects:
+            if ob.data is None or (not ob.is_visible(scn)):
+                continue
+            print("Getting pts, polys, edges for %s..."%ob.name)
+            apply_modifiers = True
+            try:
+                obmesh = ob.to_mesh(scn, apply_modifiers, 'RENDER')
+            except RuntimeError:
+                print('No geometry for object %s!'%ob.name)
+                continue
+            #Get pts, polys
+            pts = [ob.matrix_world * v.co for v in obmesh.vertices]
+            polys = [p.vertices for p in obmesh.polygons]
+            edges = [e.vertices for e in obmesh.edges]
+            print('%d vertices'%len(pts))
+            # Put into temporary shape object to triangulate (not optimal...)
+            Stmp = cls.__new__(cls)
+            if replace:
+                Stmp.__init__(pts, polys, edges=edges, make_object=None)
+                Stmp.ob = ob
+            else:
+                Stmp.__init__(pts, polys, edges=edges, make_object=name)
+            # Triangulate mesh (if necessary)
+            polytest = np.array([len(p.vertices) for p in Stmp.ob.data.polygons])
+            if len(polytest) == 0:
+                print('SKIPPING!')
+                continue
+            #print("Shape is:")
+            #print(np.ndim(polytest))
+            #print(polytest.shape)
+            #print('...')
+            if np.max(polytest)>3:
+                print('Performing triangulation...')
+                Stmp.triangulate()
+            # Re-compute pts, polys
+            Stmp.pts = np.array([v.co for v in Stmp.ob.data.vertices])
+            Stmp.polys = np.array([p.vertices for p in Stmp.ob.data.polygons])
+            Stmp.edges = np.array([p.vertices for p in Stmp.ob.data.edges])
 
-                # Concatenate all meshes in group
-                pt_list.append(Stmp.pts)
-                poly_list.append(Stmp.polys)
-                edge_list.append(Stmp.edges)
+            # Concatenate all meshes in group
+            pt_list.append(Stmp.pts)
+            poly_list.append(Stmp.polys)
+            edge_list.append(Stmp.edges)
 
             # EVENTUALLY, concatenate pts,polys,edges somehow...
             # Power crust?
             # Spherize?
-        if (nobjects==1 and len(excluded)==0) and (len(obgrp)==1):
-            # THis might break hard. Currently dont' care (2016.07.06)
-            # Make new object w/ concatenated pts, polys, edges
-            S = Stmp
-            # (optionally) replace current object(s)
-            if replace:
-                for ob in obgrp:
-                    bpy.context.scene.objects.unlink(ob)
-                bpy.context.scene.objects.link(S.ob)
+        # if (nobjects==1 and len(excluded)==0) and (len(obgrp)==1):
+        #     # THis might break hard. Currently dont' care (2016.07.06)
+        #     # Make new object w/ concatenated pts, polys, edges
+        #     S = Stmp
+        #     # (optionally) replace current object(s)
+        #     if replace:
+        #         for ob in obgrp:
+        #             bpy.context.scene.objects.unlink(ob)
+        #         bpy.context.scene.objects.link(S.ob)
             
-            # Output
-            grab_only(S.ob)
-            return S
-        else:
-            pts = np.vstack(pt_list)
-            n_meshes = len(pt_list)
-            # print([x.shape for x in poly_list])
-            to_add = [x.shape[0] for x in pt_list]
-            to_add = np.cumsum([0] + to_add[:-1])
-            # # Should be cumsum
-            # for poly, n in zip(poly_list, to_add):
-            #     print('n:')
-            #     print(n)
-            #     print("Poly max:")
-            #     print(np.max(poly))
-            #     print("Poly max + n")
-            #     print(np.max(poly+n))
-            polys = np.vstack([poly + n for poly, n in zip(poly_list, to_add)])
-            edges = np.vstack([edge + n for edge, n in zip(edge_list, to_add)])
-            return pts, polys, edges # pt_list, poly_list #, edge_list
+        #     # Output
+        #     grab_only(S.ob)
+        #     return S
+        # else:
+        pts = np.vstack(pt_list)
+        n_meshes = len(pt_list)
+        # print([x.shape for x in poly_list])
+        to_add = [x.shape[0] for x in pt_list]
+        to_add = np.cumsum([0] + to_add[:-1])
+        # # Should be cumsum
+        # for poly, n in zip(poly_list, to_add):
+        #     print('n:')
+        #     print(n)
+        #     print("Poly max:")
+        #     print(np.max(poly))
+        #     print("Poly max + n")
+        #     print(np.max(poly+n))
+        polys = np.vstack([poly + n for poly, n in zip(poly_list, to_add)])
+        edges = np.vstack([edge + n for edge, n in zip(edge_list, to_add)])
+        return pts, polys, edges # pt_list, poly_list #, edge_list
         
     @property
     @_memo

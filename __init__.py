@@ -77,13 +77,14 @@ def _getuuid():
 	import uuid # Overkill for unique file name
 	uu = str(uuid.uuid4()).replace('\n','').replace('-','')
 	return uu
+	
 def _cluster(cmd,logfile='SlurmLog_node_%N.out',mem=15500,ncpus=2):
 	"""Run a job on the cluster."""
 	# Command to write to file to execute
 	cmd = ' '.join(cmd)
 	cmd = '#!/bin/sh\n#SBATCH\n'+cmd
 	# Command to 
-	slurm_cmd = ['sbatch','-c',str(ncpus),'-p','all','--mem',str(mem),'-o',logfile]
+	slurm_cmd = ['sbatch','-c',str(ncpus),'-p','regular','--mem',str(mem),'-o',logfile]
 	clust = subprocess.Popen(slurm_cmd,
 		stdin=subprocess.PIPE,
 		stdout=subprocess.PIPE,
