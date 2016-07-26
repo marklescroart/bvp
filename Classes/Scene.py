@@ -3,7 +3,7 @@
 # Imports
 import bvp
 import copy
-from bvp.utils.basics import fixedKeyDict,gridPos,linspace # non-numpy-dependent version of linspace
+from bvp.utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent version of linspace
 from bvp.utils.blender import set_cursor
 from bvp.utils.bvpMath import ImPosCount
 if bvp.Is_Blender:
@@ -35,12 +35,12 @@ class bvpScene(object):
 		Camera for the scene. Defaults to slight up-right camera with no camera motion.
 	frame_range : 2-tuple
 		Frame span to render of this scene. NOTE that this is 1-based (the first frame of a scene is 1, 
-		not zero). Defaults to (1,1)
+		not zero). Defaults to (1, 1)
 
 	Other Parameters
 	----------------
 	frame_rate : scalar
-		Frame rate of movies to render. Technically this doesn't do much, since most renders are per-frame,
+		Frame rate of movies to render. Technically this doesn't do much, since most renders are per-frame, 
 		and you specify a final frame rate for a movie when you concatenate the images together, either with
 		Blender, ffmpeg, or whatever your preferred video encoder is. Defaults to 15 (set in bvp.settings)
 	
@@ -49,15 +49,15 @@ class bvpScene(object):
 	Objects can be placed in a scene without their positions / scales specified. You can then use the 
 	bvpScene.populate_scene() method to set positions for the objects, given the background constraints.
 	'''
-	#def __init__(self,scnParams={}):
-	def __init__(self,num=0,objects=None,bg=None,sky=None,shadow=None,cam=None,frame_range=(1,1),fpath=None,frame_rate=bvp.Settings['RenderDefaults']['FrameRate']): 
+	#def __init__(self, scnParams={}):
+	def __init__(self, num=0, objects=None, bg=None, sky=None, shadow=None, cam=None, frame_range=(1, 1), fpath=None, frame_rate=bvp.Settings['RenderDefaults']['FrameRate']): 
 		'''Class to store scene information in Blender.
 		'''		
 		# Add all inputs as class properties (Shady?)
 		Input = locals()
 		for i in Input:
 			if not i in ['self']:
-				setattr(self,i,Input[i])
+				setattr(self, i, Input[i])
 		
 		if self.objects is None:
 			# Make "objects" field into a list
@@ -83,13 +83,13 @@ class bvpScene(object):
 	@property
 	def ScnParams(self):
 		d = fixedKeyDict({
-			'frame_start':self.frame_range[0],
+			'frame_start':self.frame_range[0], 
 			'frame_end':self.frame_range[1] # Default is 3 seconds
 			# MORE??
 			})
 		return d
 	def __repr__(self):
-		S = 'Class "bvpScene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num,(self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate),self.frame_range[0],self.frame_range[1])
+		S = 'Class "bvpScene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
 		S+='BACKGROUND%s\n\n'%self.bg
 		S+='SKY%s\n\n'%self.sky
 		S+='SHADOW%s\n\n'%self.shadow
@@ -99,8 +99,8 @@ class bvpScene(object):
 			S+='%s\n'%o
 		return S
 	
-	def populate_scene(self,ObList,ResetCam=True,ImPosCt=None,EdgeDist=0.,ObOverlap=.50,MinSz2D=0,RaiseError=False,nIter=50):
-		'''Choose positions for all objects in "ObList" input within the scene,
+	def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=.50, MinSz2D=0, RaiseError=False, nIter=50):
+		'''Choose positions for all objects in "ObList" input within the scene, 
 		according to constraints provided by scene background.
 		
 		ImPosCt tracks the number of times that each image location (bin) 
@@ -111,7 +111,7 @@ class bvpScene(object):
 		'''
 		from random import shuffle
 		if not ImPosCt:
-			ImPosCt = ImPosCount(0,0,ImSz=1.,nBins=5,e=1)
+			ImPosCt = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
 		Attempt = 1
 		Done = False
 		while Attempt<=nIter and not Done:
@@ -120,10 +120,10 @@ class bvpScene(object):
 			if bvp.Verbosity_Level > 3:
 				print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
 			if ResetCam:
-				# Start w/ random cam,fixation position
+				# Start w/ random cam, fixation position
 				cPos = self.bg.camConstraints.sampleCamPos(self.frame_range)
 				fPos = self.bg.camConstraints.sampleFixPos(self.frame_range)
-				self.cam = bvp.bvpCamera(location=cPos,fixPos=fPos,frames=self.frame_range,lens=self.bg.lens)
+				self.cam = bvp.bvpCamera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.bg.lens)
 			# Multiple object constraints for moving objects
 			OC = []
 			for o in ObList:
@@ -153,7 +153,7 @@ class bvpScene(object):
 					NewOb.rot3D = oc.sampleRot(self.cam)
 				if not o.pos3D:
 					# Sample position last (depends on cam position, It may end up depending on pose, rotation, (or action??)
-					NewOb.pos3D,NewOb.pos2D = oc.sampleXY(NewOb.size3D,self.cam,Obst=Obst,EdgeDist=EdgeDist,ObOverlap=ObOverlap,RaiseError=False,ImPosCt=ImPosCt,MinSz2D=MinSz2D)
+					NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb.size3D, self.cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
 					if NewOb.pos3D is None:
 						Fail=True
 						break
@@ -164,15 +164,15 @@ class bvpScene(object):
 				Attempt+=1
 		# Check for failure
 		if Attempt>nIter and RaiseError:
-			raise Exception('MaxAttemptReached','Unable to populate scene %s after %d attempts!'%(self.bg.grpName,nIter))
+			raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.bg.grpName, nIter))
 		elif Attempt>nIter and not RaiseError:
 			print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
 		self.objects = ObToAdd
 		# Make sure last fixation hasn't "wandered" away from objects: 
-		fPosFin = self.bg.camConstraints.sampleFixPos((1,),obj=ObToAdd)
-		self.cam.fixPos = self.cam.fixPos[:-1]+[fPosFin[0],]
+		fPosFin = self.bg.camConstraints.sampleFixPos((1, ), obj=ObToAdd)
+		self.cam.fixPos = self.cam.fixPos[:-1]+[fPosFin[0], ]
 
-	def apply_opts(self,scn=None,render_options=None):
+	def apply_opts(self, scn=None, render_options=None):
 		'''Apply general options to scene (environment lighting, world, start/end frames, etc), 
 		including (optionally) render options (of class 'RenderOptions'))
 		
@@ -181,7 +181,7 @@ class bvpScene(object):
 		scn = bvp.utils.blender.set_scene(scn) 
 		# Set frames (and other scene props?)
 		for s in self.ScnParams.keys():
-			setattr(scn,s,self.ScnParams[s])
+			setattr(scn, s, self.ScnParams[s])
 		if render_options:
 			# Set filepath
 			if render_options.BVPopts['BasePath'][-2:]!='%s':
@@ -198,7 +198,7 @@ class bvpScene(object):
 		pass
 
 
-	def create(self,render_options=None,scn=None):
+	def create(self, render_options=None, scn=None):
 		'''Creates the stored scene (imports bg, sky, lights, objects, shadows) in Blender
 
 		Optionally, applies rendering options 
@@ -214,7 +214,7 @@ class bvpScene(object):
 		# set layers to correct setting
 		scn.layers = [True]+[False]*19
 		# set cursort to center
-		set_cursor((0,0,0))
+		set_cursor((0, 0, 0))
 		# place bg
 		self.bg.Place()
 		if self.bg.realWorldSize<50. and 'indoor' in self.bg.semanticCat:
@@ -222,7 +222,7 @@ class bvpScene(object):
 			Scale = self.bg.realWorldSize*1.5
 		else:
 			Scale = self.bg.realWorldSize
-		self.sky.Place(num=self.num,Scale=Scale)
+		self.sky.Place(num=self.num, Scale=Scale)
 		self.cam.Place(IDname='cam%03d'%self.num)
 		if self.shadow:
 			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
@@ -231,7 +231,7 @@ class bvpScene(object):
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
 		scn.layers = [True]*20
-	def create_working(self,render_options=None,scn=None):
+	def create_working(self, render_options=None, scn=None):
 		'''Creates the stored scene, but allows for objects without set positions.
 
 		See bvpScene.create() help.
@@ -241,10 +241,10 @@ class bvpScene(object):
 		# set layers to correct setting
 		scn.layers = [True]+[False]*19
 		# set cursort to center
-		set_cursor((0,0,0))
+		set_cursor((0, 0, 0))
 		# place bg
 		self.bg.Place()
-		self.sky.Place(num=self.num,Scale=self.bg.realWorldSize)
+		self.sky.Place(num=self.num, Scale=self.bg.realWorldSize)
 		self.cam.Place(IDname='cam%03d'%self.num)
 		if self.shadow:
 			self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
@@ -256,7 +256,7 @@ class bvpScene(object):
 		scn.name = self.fpath
 		self.apply_opts(render_options=render_options)
 		scn.layers = [True]*20	
-	def render(self,render_options,scn=None):
+	def render(self, render_options, scn=None):
 		'''Renders the scene (immediately, in open instance of Blender)
 		
 		Parameters
@@ -286,11 +286,11 @@ class bvpScene(object):
 				scn.frame_start += 1
 			scn.frame_step = 4
 		else:
-			raise Exception("Invalid render type specified!\n   Please use 'FirstFrame','FirstAndLastFrame', or 'All'")
+			raise Exception("Invalid render type specified!\n   Please use 'FirstFrame', 'FirstAndLastFrame', or 'All'")
 		# Render animation
-		bpy.ops.render.render(animation=True,scene=scn.name)
+		bpy.ops.render.render(animation=True, scene=scn.name)
 
-	def clear(self,scn=None):
+	def clear(self, scn=None):
 		'''Resets scene to empty, ready for next.
 
 		Removes all objects, lights, background; resets world settings; clears all nodes; 
@@ -342,7 +342,7 @@ class bvpScene(object):
 		# Re-set (delete) all render layers
 		RL = bpy.context.scene.render.layers.keys()
 		bpy.ops.scene.render_layer_add()
-		for ii,n in enumerate(RL):
+		for ii, n in enumerate(RL):
 			bpy.context.scene.render.layers.active_index=0
 			bpy.ops.scene.render_layer_remove()
 		# Rename newly-added layer (with default properties) to default name:

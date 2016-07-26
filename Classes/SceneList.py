@@ -14,8 +14,8 @@ There is an annoying tradeoff between which parameters can be specified a priori
 '''
 
 # Imports
-import subprocess,bvp,math,os,pickle,copy,time,re
-from bvp.utils.basics import GetHostName,MakeBlenderSafe,loadPik,savePik,fixedKeyDict
+import subprocess, bvp, math, os, pickle, copy, time, re
+from bvp.utils.basics import GetHostName, MakeBlenderSafe, loadPik, savePik, fixedKeyDict
 # For convenience
 if bvp.Is_Numpy:
 	np = bvp.np
@@ -28,7 +28,7 @@ class bvpSceneList(object):
 	'''
 	List of scenes. Potentially, a stimulus set for an experiment,  a few scenes for a demo, etc.
 	'''
-	def __init__(self,ScnList=None,ScnConstr=None,FrameRate=15.,RenderOptions=None,Name='SceneList'):
+	def __init__(self, ScnList=None, ScnConstr=None, FrameRate=15., RenderOptions=None, Name='SceneList'):
 		'''
 		Usage: ScnList = bvpSceneList(ScnListParams)
 		
@@ -56,9 +56,9 @@ class bvpSceneList(object):
 		# Other??		
 	def __repr__(self):
 		S = '<Class BVP scene list: > \n' # Add name??
-		S += '%s:\n%d scenes, %d min, %.2f s \n'%(self.Name,self.nScenes,self.MinSec[0],self.MinSec[1])
+		S += '%s:\n%d scenes, %d min, %.2f s \n'%(self.Name, self.nScenes, self.MinSec[0], self.MinSec[1])
 		return S
-	def __add__(self,ScnOrList):
+	def __add__(self, ScnOrList):
 		'''
 		Addition method for lists. Adds on new scenes (either a bvpSceneList or a single bvpScene).
 		Name and render options of the FIRST argument are kept 
@@ -69,7 +69,7 @@ class bvpSceneList(object):
 		elif type(ScnOrList) is bvp.bvpSceneList:
 			self.ScnList+=ScnOrList.ScnList
 			return self
-	def __getitem__(self,idx):
+	def __getitem__(self, idx):
 		return self.ScnList[idx]
 	@property
 	def nScenes(self):
@@ -82,7 +82,7 @@ class bvpSceneList(object):
 		return self.Seconds/60.
 	@property
 	def MinSec(self):
-		return divmod(self.Seconds,60)
+		return divmod(self.Seconds, 60)
 	@property
 	def sPerScene(self):
 		return [s/self.FrameRate for s in self.nFramesPerScene]
@@ -95,7 +95,7 @@ class bvpSceneList(object):
 	@property
 	def IncompleteScenes(self):
 		try:
-			Inc = [iS for iS,s in enumerate(self.ScnList) if not s.Obj[0].pos3D]
+			Inc = [iS for iS, s in enumerate(self.ScnList) if not s.Obj[0].pos3D]
 		except IndexError:
 			print('your scene list is wonky... no objects!')
 			Inc = []
@@ -105,21 +105,21 @@ class bvpSceneList(object):
 			print('All scenes are complete!')
 			return None
 	
-	def getFiles(self,Type=('Scenes',)):
+	def getFiles(self, Type=('Scenes', )):
 		"""
 		Get full file names to be rendered by current state of scene list.
 
 		Inputs:
 			Type : tuple of image types (also folder names). All possibilities:
-					('Scenes','Masks','Normals','Zdepth') # more?
-					if only one Type is specified, a list is returned; otherwise,
+					('Scenes', 'Masks', 'Normals', 'Zdepth') # more?
+					if only one Type is specified, a list is returned; otherwise, 
 					a dictionary is returned, with each type as a key 
 		"""
 		# Inputs
-		if not type(Type) in (list,tuple):
-			Type = (Type,)
+		if not type(Type) in (list, tuple):
+			Type = (Type, )
 		# Preallocate
-		files = {} #dict(zip(Type,[[]]*len(Type)))
+		files = {} #dict(zip(Type, [[]]*len(Type)))
 		path = self.RenderOptions.BVPopts['BasePath']
 		fType = self.RenderOptions.image_settings['file_format'].lower()
 		for t in Type:
@@ -128,32 +128,32 @@ class bvpSceneList(object):
 			# Fill in "#" in path with 0001 (etc)
 			fp = copy.copy(s.fPath)
 			n = sum([f=="#" for f in fp])
-			fp = fp.replace("#",'')+'%'+'0%dd.'%n+fType 
-			ff = [path%fp%fr for fr in range(int(s.FrameRange[0]),int(s.FrameRange[-1]+1))]
+			fp = fp.replace("#", '')+'%'+'0%dd.'%n+fType 
+			ff = [path%fp%fr for fr in range(int(s.FrameRange[0]), int(s.FrameRange[-1]+1))]
 			for t in Type:
 				if t=='Scenes':
 					fq = copy.copy(ff)
 				elif t=='Masks':
-					fq = [f.replace('.'+fType,'_m%02d.%s'%(m+1,fType)) for f in ff for m in range(s.nObjects)]
+					fq = [f.replace('.'+fType, '_m%02d.%s'%(m+1, fType)) for f in ff for m in range(s.nObjects)]
 				elif t=='Normals':
-					fq = [f.replace('.png','_nor.exr') for f in ff]
+					fq = [f.replace('.png', '_nor.exr') for f in ff]
 				elif t=='Zdepth':
-					fq = [f.replace('.png','_z.exr') for f in ff]
+					fq = [f.replace('.png', '_z.exr') for f in ff]
 				else:
 					raise Exception('Render type "%s" not supported yet!'%t)
-				files[t] += [f.replace('Scenes',t) for f in fq]
+				files[t] += [f.replace('Scenes', t) for f in fq]
 		if len(Type)==1:
 			files = files[t]
 		return files
 
-	def Save(self,fName=None):
+	def Save(self, fName=None):
 		"""
 		Save scenelist to fName (pickle file, usu. "SceneList.pik") 
-		Defaults to <SceneList>.RenderOptions.BVPopts['BasePath'].replace('Scenes/%s','SceneList.pik')
+		Defaults to <SceneList>.RenderOptions.BVPopts['BasePath'].replace('Scenes/%s', 'SceneList.pik')
 		"""
 		if not fName:
-			fName = self.RenderOptions.BVPopts['BasePath'].replace('Scenes/%s','SceneList.pik')
-		savePik(self,fName)
+			fName = self.RenderOptions.BVPopts['BasePath'].replace('Scenes/%s', 'SceneList.pik')
+		savePik(self, fName)
 	def getCamVector(self):
 		"""
 		Return a list of 3-tuples of Camera -> Fixation vectors
@@ -161,11 +161,11 @@ class bvpSceneList(object):
 		CamVec = []
 		for S in self.ScnList:
 			for fr in Cam.frames():
-				cVec = [c-f for c,f in zip(Cam.fixation,Cam.location)]
+				cVec = [c-f for c, f in zip(Cam.fixation, Cam.location)]
 				
 			CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
 
-	def getSemanticCatMatrix(self,CatType='8',Leaves=None):
+	def getSemanticCatMatrix(self, CatType='8', Leaves=None):
 		'''
 		Return a matrix of categories
 		CatType can be "8" or "BasicLevel" as of 2012.08.24
@@ -175,7 +175,7 @@ class bvpSceneList(object):
 			for S in self.ScnList:
 				for O in S.Obj:
 					C.append(O.semanticCat[0].lower())
-			Cats,nExemplars = bvp.utils.basics.unique(C)
+			Cats, nExemplars = bvp.utils.basics.unique(C)
 			CatMat = []
 			for S in self.ScnList:
 				ScCat = [False]*len(Cats)
@@ -185,7 +185,7 @@ class bvpSceneList(object):
 		elif CatType=='BasicLevel':
 			# Should be done on LIBRARY basic level cats to assure no difference btw. scene lists
 			Lib = bvp.bvpLibrary() # modify??
-			Cat,nOcc = bvp.utils.basics.unique([o['basicCat'].lower() for o in Lib.objects if o['basicCat']])
+			Cat, nOcc = bvp.utils.basics.unique([o['basicCat'].lower() for o in Lib.objects if o['basicCat']])
 			Cat.sort()
 			CatMat = []
 			for S in self.ScnList:
@@ -200,15 +200,15 @@ class bvpSceneList(object):
 			for o in Lib.objects: 
 				if o:
 					oCat+=[oo.lower() for oo in o['semanticCat']]
-			Cat,nOcc = bvp.utils.basics.unique(oCat)
+			Cat, nOcc = bvp.utils.basics.unique(oCat)
 			# Hacky: Add special cats. For all dictionary entries, the key (string) will 
 			# be added to the (front of the) semantic category list for an object if that
 			# list contains any of the strings in the list (dictionary values)
-			Cat+=['animate','inanimate']
-			CatAdd = dict(animate=['animal','human','plant'], # inanimate = !animate
-							inanimate=['building','artsm','artlg','geometrical','vehicle'],
-							animal=['human'],
-							artlg=['vehicle','building','geometrical'],
+			Cat+=['animate', 'inanimate']
+			CatAdd = dict(animate=['animal', 'human', 'plant'], # inanimate = !animate
+							inanimate=['building', 'artsm', 'artlg', 'geometrical', 'vehicle'], 
+							animal=['human'], 
+							artlg=['vehicle', 'building', 'geometrical'], 
 							)
 			CatMat = []
 			for S in self.ScnList:
@@ -218,7 +218,7 @@ class bvpSceneList(object):
 						for sc in O.semanticCat:
 							ScCat[Cat.index(sc.lower())] = True
 							# Additional categories: 
-							for k,v in CatAdd.items():
+							for k, v in CatAdd.items():
 								if sc in v:
 									ScCat[Cat.index(k.lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
@@ -229,22 +229,22 @@ class bvpSceneList(object):
 			if Leaves is None:
 				# Note: first match will abort search for matches.
 				Leaves = ['human', # humans
-						'fish','creeper','bird','land mammal','reptile','animal', # animals
-						'bush','tree','food','plant',# plants
+						'fish', 'creeper', 'bird', 'land mammal', 'reptile', 'animal', # animals
+						'bush', 'tree', 'food', 'plant', # plants
 						'building', # buildings
 						'geometrical', # nonsense
-						'tool','weapon','artsm',# artsm
-						'aircraft','auto','boat','vehicle', # vehicle
-						'furniture','outdoor','artlg' # artlg
+						'tool', 'weapon', 'artsm', # artsm
+						'aircraft', 'auto', 'boat', 'vehicle', # vehicle
+						'furniture', 'outdoor', 'artlg' # artlg
 						]
 			# Hacky: Add special cats. For all dictionary entries, the key (string) will 
 			# be added to the (front of the) semantic category list for an object if that
 			# list contains any of the strings in the list (dictionary values)
-			Cat = Leaves+['animate','inanimate']
-			CatAdd = dict(animate=['animal','human','plant'], # inanimate = !animate
-							inanimate=['building','artsm','artlg','geometrical','vehicle'],
-							animal=['human'],
-							artlg=['vehicle','building','geometrical'],
+			Cat = Leaves+['animate', 'inanimate']
+			CatAdd = dict(animate=['animal', 'human', 'plant'], # inanimate = !animate
+							inanimate=['building', 'artsm', 'artlg', 'geometrical', 'vehicle'], 
+							animal=['human'], 
+							artlg=['vehicle', 'building', 'geometrical'], 
 							)
 			CatMat = []
 			for S in self.ScnList:
@@ -256,14 +256,14 @@ class bvpSceneList(object):
 							if sc in Cat:
 								ScCat[Cat.index(sc.lower())] = True
 							# Additional categories: 
-							for k,v in CatAdd.items():
+							for k, v in CatAdd.items():
 								if sc in v:
 									ScCat[Cat.index(k.lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
 		elif CatType=='Backgrounds':
 			# BG categories
 			if Leaves is None:
-				Leaves = ['indoor','outdoor','open','closed','partlyopen','buildings','hills','flat','room','hall']
+				Leaves = ['indoor', 'outdoor', 'open', 'closed', 'partlyopen', 'buildings', 'hills', 'flat', 'room', 'hall']
 			Cat = Leaves
 			CatMat = []
 			for S in self.ScnList:
@@ -276,7 +276,7 @@ class bvpSceneList(object):
 		elif CatType=='Skies':
 			# BG categories
 			if Leaves is None:
-				Leaves = ['day','night','sunset','partly cloudy','sunny','stars','colors']
+				Leaves = ['day', 'night', 'sunset', 'partly cloudy', 'sunny', 'stars', 'colors']
 			Cat = Leaves
 			CatMat = []
 			for S in self.ScnList:
@@ -287,13 +287,13 @@ class bvpSceneList(object):
 							ScCat[Cat.index(sc.lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
 		elif CatType=='HierarchicalObjBGSky':
-			CMo,Co = self.getSemanticCatMatrix('HighLevel')
-			CMb,Cb = self.getSemanticCatMatrix('Backgrounds')
-			CMs,Cs = self.getSemanticCatMatrix('Skies')
-			CatMat = [a+b+c for a,b,c in zip(CMo,CMb,CMs)]
+			CMo, Co = self.getSemanticCatMatrix('HighLevel')
+			CMb, Cb = self.getSemanticCatMatrix('Backgrounds')
+			CMs, Cs = self.getSemanticCatMatrix('Skies')
+			CatMat = [a+b+c for a, b, c in zip(CMo, CMb, CMs)]
 			Cat = Co+Cb+Cs
-		return CatMat,Cat
-	def Update(self,RaiseError=False):
+		return CatMat, Cat
+	def Update(self, RaiseError=False):
 		'''Bring bvpSceneList up-to-date with library / code changes.
 
 		Assure that all objects / backgrounds are up-to-date with library files (semantic cats, real world size, etc.)
@@ -312,37 +312,37 @@ class bvpSceneList(object):
 		'''
 		Lib = bvp.bvpLibrary()
 		Fail=False
-		for iS,S in enumerate(self.ScnList):
+		for iS, S in enumerate(self.ScnList):
 			# Objects
-			for iO,O in enumerate(S.Obj):
+			for iO, O in enumerate(S.Obj):
 				try:
-					N = bvp.bvpObject(O.grpName,Lib)
+					N = bvp.bvpObject(O.grpName, Lib)
 					self.ScnList[iS].Obj[iO].semanticCat = N.semanticCat
 					self.ScnList[iS].Obj[iO].realWorldSize = N.realWorldSize
 				except:
 					Fail=True
-					print('Update failed because grpName has been changed for scene %d object %s!\nNeeds to be manually updated!'%(iS,O.grpName))
+					print('Update failed because grpName has been changed for scene %d object %s!\nNeeds to be manually updated!'%(iS, O.grpName))
 			# Background
 			try:
-				N = bvp.bvpBG(S.BG.grpName,Lib)
+				N = bvp.bvpBG(S.BG.grpName, Lib)
 				self.ScnList[iS].BG.semanticCat = N.semanticCat
 				self.ScnList[iS].BG.realWorldSize = N.realWorldSize
 			except:
 				Fail=True
-				print('Update failed because grpName has been changed for scene %d background %s! Needs to be manually updated!'%(iS,S.BG.grpName))
+				print('Update failed because grpName has been changed for scene %d background %s! Needs to be manually updated!'%(iS, S.BG.grpName))
 			# Skies
 			try:
-				N = bvp.bvpSky(S.Sky.grpName,Lib)
+				N = bvp.bvpSky(S.Sky.grpName, Lib)
 				self.ScnList[iS].Sky.semanticCat = N.semanticCat
 				self.ScnList[iS].Sky.realWorldSize = N.realWorldSize
 			except:
 				if S.Sky.grpName is not None:
 					Fail=True
-					print('Update failed because grpName has been changed for scene %d sky %s! Needs to be manually updated!'%(iS,S.Sky.grpName))
+					print('Update failed because grpName has been changed for scene %d sky %s! Needs to be manually updated!'%(iS, S.Sky.grpName))
 		# Update render options
-		if hasattr(self.RenderOptions,'file_format'):
+		if hasattr(self.RenderOptions, 'file_format'):
 			# Assume both need changing:
-			self.RenderOptions.image_settings = {'file_format':self.RenderOptions.file_format,'color_mode':self.RenderOptions.color_mode}
+			self.RenderOptions.image_settings = {'file_format':self.RenderOptions.file_format, 'color_mode':self.RenderOptions.color_mode}
 			# Get rid of old ones
 			self.RenderOptions.__delattr__('file_format')
 			self.RenderOptions.__delattr__('color_mode')
@@ -350,20 +350,20 @@ class bvpSceneList(object):
 		if Fail and RaiseError:
 			raise Exception('One or more objects need manual updating!')
 
-	def PlotImagePos(self,ScnIdx=None):
+	def PlotImagePos(self, ScnIdx=None):
 		'''Plots image positions of objects in all scenes
 		'''
 		if not ScnIdx:
 			ScnIdx = range(self.nScenes)
-		for Ct,Scn in enumerate(self.ScnList):
+		for Ct, Scn in enumerate(self.ScnList):
 			if Ct in ScnIdx:
 				for O in Scn.Obj:
-					plt.plot(O.pos2D[0],O.pos2D[1],'k.',alpha=.5)
+					plt.plot(O.pos2D[0], O.pos2D[1], 'k.', alpha=.5)
 		# Assumes image size!
-		plt.xlim((0,1))
-		plt.ylim((1,0))
+		plt.xlim((0, 1))
+		plt.ylim((1, 0))
 		plt.show()
-	# def Render(self,RenderType=('Image',),RenderGroupSize=1,Is_Overwrite=False,memory=7700,nCPUs='2'):
+	# def Render(self, RenderType=('Image', ), RenderGroupSize=1, Is_Overwrite=False, memory=7700, nCPUs='2'):
 	# 	'''
 	# 	Renders locally, calling this machine. Blender is closed and re-opened after RenderGroupSize scenes.
 	# 	This is an easy way to prevent Blender from 
@@ -379,15 +379,15 @@ class bvpSceneList(object):
 	# 	'''
 	# 	### --- General set-up: --- ###
 	# 	B1lender = bvp.Settings['Paths']['BlenderCmd']
-	# 	BlendFile = os.path.join(bvp.__path__[0],'BlendFiles','Blank.blend')
-	# 	if isinstance(nCPUs,int):
+	# 	BlendFile = os.path.join(bvp.__path__[0], 'BlendFiles', 'Blank.blend')
+	# 	if isinstance(nCPUs, int):
 	# 		nCPUs = str(nCPUs) 
 	# 	# This string should be used to specify (masks, zdepth, contours, etc) 
 	# 	if 'LogFileAdd' in self.RenderOptions.BVPopts:
 	# 		LogAdd = self.RenderOptions.BVPopts['LogFileAdd']
 	# 	else:
 	# 		LogAdd = '' #self.RenderOptions.BVPopts['LogFileAdd']		
-	# 	for x in ['Image','Clay','ObjectMasks','Zdepth','Contours','Normals']:
+	# 	for x in ['Image', 'Clay', 'ObjectMasks', 'Zdepth', 'Contours', 'Normals']:
 	# 		self.RenderOptions.BVPopts[x] = x in RenderType
 	# 		if x in RenderType:
 	# 			LogAdd += '_'+x
@@ -395,12 +395,12 @@ class bvpSceneList(object):
 	# 		if len(RenderType)>2 and not "Image" in RenderType:
 	# 			raise Exception("I'm still too stupid to handle test renders of depth, normals, etc")
 	# 		elif len(RenderType)==1 and not "Image" in RenderType:
-	# 			RenderType = ("Test","Image")
+	# 			RenderType = ("Test", "Image")
 	# 		# Keep original values to re-set later:
 	# 		resPctOrig  = copy.copy(self.RenderOptions.resolution_percentage)
 	# 		# Set render options for test render
 	# 		self.RenderOptions.resolution_percentage = 50 
-	# 		self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes','Test')
+	# 		self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes', 'Test')
 	# 		self.RenderOptions.BVPopts['Type'] = 'FirstAndLastFrame' #'FirstFrame'
 
 	# 	# Creation of temporary files
@@ -410,46 +410,46 @@ class bvpSceneList(object):
 	# 		os.mkdir(BaseDir)
 	# 	# -> (write slurm output here too???)
 	# 	# -> Make specific date??? No - there should only be one for each stim set, right...?
-	# 	if not os.path.exists(os.path.join(BaseDir,'Log')):
-	# 		os.mkdir(os.path.join(BaseDir,'Log'))
+	# 	if not os.path.exists(os.path.join(BaseDir, 'Log')):
+	# 		os.mkdir(os.path.join(BaseDir, 'Log'))
 		
 	# 	# (1) Save scene list as a temporary pickle file to be loaded by the RenderFile
 	# 	# Save scene list as a temporary pickle file to be loaded by the RenderFile
-	# 	rName = 'ScnListRender_%s%s_%s'%(self.Name,LogAdd,time.strftime('%Y%m%d_%H%M%S'))
-	# 	SLpickleFile = os.path.join(BaseDir,'Log',rName+'.pik') 
-	# 	with open(SLpickleFile,'wb') as fid:
-	# 		pickle.dump(self,fid,protocol=2)
-	# 	# (2,3) Setup: 
+	# 	rName = 'ScnListRender_%s%s_%s'%(self.Name, LogAdd, time.strftime('%Y%m%d_%H%M%S'))
+	# 	SLpickleFile = os.path.join(BaseDir, 'Log', rName+'.pik') 
+	# 	with open(SLpickleFile, 'wb') as fid:
+	# 		pickle.dump(self, fid, protocol=2)
+	# 	# (2, 3) Setup: 
 	# 	BlenderPyFileBase = self.RenderOptions.BVPopts['RenderFile']
 	# 	# Get this file into a list: 
-	# 	with open(BlenderPyFileBase,'r') as fid:
+	# 	with open(BlenderPyFileBase, 'r') as fid:
 	# 		RenderScript = fid.readlines()
 	# 	# Set up first of two lines to print into temp file:
-	# 	FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0],'Scripts','CurrentRender.pik')
+	# 	FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0], 'Scripts', 'CurrentRender.pik')
 		
 	# 	for x in range(nChunks):
-	# 		ScnToRenderLine = 'ScnToRender = range(%d,%d)\n'%(x*RenderGroupSize,min([(x+1)*RenderGroupSize,self.nScenes]))
+	# 		ScnToRenderLine = 'ScnToRender = range(%d, %d)\n'%(x*RenderGroupSize, min([(x+1)*RenderGroupSize, self.nScenes]))
 	# 		InsertLine1 = RenderScript.index('### --- REPLACE 1 --- ###\n')+1
 	# 		InsertLine2 = RenderScript.index('### --- REPLACE 2 --- ###\n')+1
 	# 		RenderScript[InsertLine1] = FileToLoadLine
 	# 		RenderScript[InsertLine2] = ScnToRenderLine
-	# 		ChunkfNm = '%s_chunk%03d.py'%(rName,x+1)
-	# 		BlenderPyFile = os.path.join(BaseDir,'Log',ChunkfNm) # Add datestr to "Log" ? 
-	# 		with open(BlenderPyFile,'w') as fid:
+	# 		ChunkfNm = '%s_chunk%03d.py'%(rName, x+1)
+	# 		BlenderPyFile = os.path.join(BaseDir, 'Log', ChunkfNm) # Add datestr to "Log" ? 
+	# 		with open(BlenderPyFile, 'w') as fid:
 	# 			fid.writelines(RenderScript)
 	# 		# Create & call slurm script for this chunk
-	# 		#TempScriptName = os.path.join(BaseDir,'Log','BlenderRenderTmp_chunk%03d.sh'%(x+1))
+	# 		#TempScriptName = os.path.join(BaseDir, 'Log', 'BlenderRenderTmp_chunk%03d.sh'%(x+1))
 	# 		#BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile+' --mem '+str(memory) # Specify output? stdout? File?
-	# 		BlenderCmd = [Blender,'-b',BlendFile,'-P',BlenderPyFile]
+	# 		BlenderCmd = [Blender, '-b', BlendFile, '-P', BlenderPyFile]
 	# 		subprocess.call(BlenderCmd)
-	def RenderSlurm(self,RenderType=('Image',),RenderGroupSize=3,Is_Overwrite=False,memory=7700,nCPUs='2'):
+	def RenderSlurm(self, RenderType=('Image', ), RenderGroupSize=3, Is_Overwrite=False, memory=7700, nCPUs='2'):
 		'''Calls separate instances of Blender via Slurm queue to render the scene list. 
 		
-		DEPRECATED. Simply calls bvpSceneList.Render(...,Is_Slurm=True). Please use that in the future.
+		DEPRECATED. Simply calls bvpSceneList.Render(..., Is_Slurm=True). Please use that in the future.
 		'''
-		self.Render(RenderType=RenderType,Is_Overwrite=Is_Overwrite,Is_Slurm=True,nCPUs=nCPUs,RenderGroupSize=RenderGroupSize,memory=memory)
+		self.Render(RenderType=RenderType, Is_Overwrite=Is_Overwrite, Is_Slurm=True, nCPUs=nCPUs, RenderGroupSize=RenderGroupSize, memory=memory)
 
-	def Render(self,RenderType=('Image',),Is_Overwrite=False,Is_Slurm=False,nCPUs='2',RenderGroupSize=3,memory=7700):
+	def Render(self, RenderType=('Image', ), Is_Overwrite=False, Is_Slurm=False, nCPUs='2', RenderGroupSize=3, memory=7700):
 		'''Renders the scene list. 
 		
 		Writes three different kinds of temporary files associated with the render job:
@@ -460,9 +460,9 @@ class bvpSceneList(object):
 		
 		Parameters
 		----------
-		RenderType : tuple | ('Image',)
+		RenderType : tuple | ('Image', )
 			A tuple of types of outputs to render for this SceneList. Can contain any of the following:
-			('Image','Clay'*,'ObjectMasks','Zdepth','Contours'*,'Normals')
+			('Image', 'Clay'*, 'ObjectMasks', 'Zdepth', 'Contours'*, 'Normals')
 			* Not working yet!
 		Is_Overwrite : bool | False
 			Whether to over-write extant files (True) or skip files that are already rendered (False)
@@ -489,8 +489,8 @@ class bvpSceneList(object):
         '''
 		### --- General set-up: --- ###
 		Blender = bvp.Settings['Paths']['BlenderCmd'] 
-		BlendFile = os.path.join(bvp.__path__[0],'BlendFiles','Blank.blend')
-		if isinstance(nCPUs,int):
+		BlendFile = os.path.join(bvp.__path__[0], 'BlendFiles', 'Blank.blend')
+		if isinstance(nCPUs, int):
 			nCPUs = str(nCPUs) 
 		### --- Set type of render --- ###
 		# Keep original render options for re-set at end:
@@ -500,7 +500,7 @@ class bvpSceneList(object):
 		else:
 			LogAdd = '' #self.RenderOptions.BVPopts['LogFileAdd']		
 		# TO DO: set available render options in settings / config file
-		for x in ['Image','Clay','ObjectMasks','Zdepth','Contours','Normals','Voxels']:
+		for x in ['Image', 'Clay', 'ObjectMasks', 'Zdepth', 'Contours', 'Normals', 'Voxels']:
 			self.RenderOptions.BVPopts[x] = x in RenderType
 			if x in RenderType:
 				LogAdd += '_'+x
@@ -508,12 +508,12 @@ class bvpSceneList(object):
 			if len(RenderType)>2 and not "Image" in RenderType:
 				raise Exception("I'm still too stupid to handle test renders of depth, normals, etc")
 			elif len(RenderType)==1 and not "Image" in RenderType:
-				RenderType = ("Test","Image")
+				RenderType = ("Test", "Image")
 			# Keep original values to re-set later:
 			resPctOrig  = copy.copy(self.RenderOptions.resolution_percentage)
 			# Set render options for test render
 			self.RenderOptions.resolution_percentage = 50 
-			self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes','Test')
+			self.RenderOptions.BVPopts['BasePath'] = self.RenderOptions.BVPopts['BasePath'].replace('Scenes', 'Test')
 			self.RenderOptions.BVPopts['Type'] = 'FirstAndLastFrame' #'FirstFrame'
 		### --- Creation of temporary files --- ###
 		# Pre: set up temp directory
@@ -525,9 +525,9 @@ class bvpSceneList(object):
 			if bvp.Verbosity_Level > 3:
 				print('made base dir!')
 		if bvp.Verbosity_Level > 3:
-			print('I think the log directory is :\n%s'%os.path.join(BaseDir,'Log'))
-		if not os.path.exists(os.path.join(BaseDir,'Log')):
-			os.mkdir(os.path.join(BaseDir,'Log'))
+			print('I think the log directory is :\n%s'%os.path.join(BaseDir, 'Log'))
+		if not os.path.exists(os.path.join(BaseDir, 'Log')):
+			os.mkdir(os.path.join(BaseDir, 'Log'))
 			if bvp.Verbosity_Level > 3:
 				print('made log dir!')
 		### --- [optionally] Cull list to remove already-rendered files --- ### 
@@ -537,9 +537,9 @@ class bvpSceneList(object):
 				BP = self.RenderOptions.BVPopts['BasePath']
 			else:
 				# Check only one type of output! There is no option to ONLY overwrite scenes of one type
-				BP = self.RenderOptions.BVPopts['BasePath'].replace('Scenes',RenderType[0])
+				BP = self.RenderOptions.BVPopts['BasePath'].replace('Scenes', RenderType[0])
 				if 'ObjectMasks' in BP:
-					BP = BP.replace('ObjectMasks','Masks')
+					BP = BP.replace('ObjectMasks', 'Masks')
 			# Get files in that path
 			if os.path.exists(os.path.dirname(BP.strip('%s'))):
 				fNm = os.listdir(os.path.dirname(BP))
@@ -547,7 +547,7 @@ class bvpSceneList(object):
 				fNm = [] # no files rendered yet if there's no directory!
 			ToKill = []
 			# Loop through scenes to see what has been rendered:
-			for iS,S in enumerate(self.ScnList):
+			for iS, S in enumerate(self.ScnList):
 				# Create list of file names to be rendered:
 				n = sum([x=='#' for x in S.fPath])
 				ss = '%0'+str(n)+'d'
@@ -561,10 +561,10 @@ class bvpSceneList(object):
 						stFr+=1
 					nn = 4
 				### ---- 
-				frNum = range(stFr,finFr+1,nn)
+				frNum = range(stFr, finFr+1, nn)
 				doneFr = 0
 				for fr in frNum:
-					fToRender = S.fPath.replace('#'*n,ss)%fr
+					fToRender = S.fPath.replace('#'*n, ss)%fr
 					if 'ObjectMasks' in RenderType:
 						# This may let ObjectMasks govern all overwriting behavior...
 						if any([(fToRender in x) and ('m01' in x) for x in fNm]):
@@ -578,7 +578,7 @@ class bvpSceneList(object):
 						if any([fToRender in x for x in fNm]):
 							# File found!
 							doneFr = copy.copy(fr)
-							self.ScnList[iS].FrameRange = (max([stFr,doneFr,1]),finFr)
+							self.ScnList[iS].FrameRange = (max([stFr, doneFr, 1]), finFr)
 							RenderMe = False
 						else:
 							RenderMe = True
@@ -591,61 +591,61 @@ class bvpSceneList(object):
 		# Change to nJobs for clarity?
 		nChunks = int(math.ceil(float(self.nScenes)/RenderGroupSize))
 		# Save scene list as a temporary pickle file to be loaded by the RenderFile
-		rName = 'ScnListRender_%s%s_%s'%(self.Name,LogAdd,time.strftime('%Y%m%d_%H%M%S'))
-		SLpickleFile = os.path.join(BaseDir,'Log',rName+'.pik') 
-		savePik(self,SLpickleFile)
+		rName = 'ScnListRender_%s%s_%s'%(self.Name, LogAdd, time.strftime('%Y%m%d_%H%M%S'))
+		SLpickleFile = os.path.join(BaseDir, 'Log', rName+'.pik') 
+		savePik(self, SLpickleFile)
 		# Set up text files to be loaded in the render process 
 		BlenderPyFileBase = self.RenderOptions.BVPopts['RenderFile']
 		# Get this file into a list: 
-		with open(BlenderPyFileBase,'r') as fid:
+		with open(BlenderPyFileBase, 'r') as fid:
 			RenderScript = fid.readlines()
 		# Set up first of two lines to print into temp file:
-		FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0],'Scripts','CurrentRender.pik')
+		FileToLoadLine = "TempFile = '%s'\n"%SLpickleFile #os.path.join(bvp.__path__[0], 'Scripts', 'CurrentRender.pik')
 		jobIDs = []
 		for x in range(nChunks):
 			if x == nChunks-1:
-				Ch,Leftovers = divmod(self.nScenes,nChunks)
+				Ch, Leftovers = divmod(self.nScenes, nChunks)
 				if Leftovers:
 					RenderTo=Leftovers
 				else:
 					RenderTo=RenderGroupSize
 			else:
 				RenderTo=RenderGroupSize
-			ScnToRenderLine = 'ScnToRender = range(%d,%d)\n'%(x*RenderGroupSize,x*RenderGroupSize+RenderTo)
+			ScnToRenderLine = 'ScnToRender = range(%d, %d)\n'%(x*RenderGroupSize, x*RenderGroupSize+RenderTo)
 			InsertLine1 = RenderScript.index('### --- REPLACE 1 --- ###\n')+1
 			InsertLine2 = RenderScript.index('### --- REPLACE 2 --- ###\n')+1
 			RenderScript[InsertLine1] = FileToLoadLine
 			RenderScript[InsertLine2] = ScnToRenderLine
-			ChunkfNm = '%s_chunk%03d.py'%(rName,x+1)
-			BlenderPyFile = os.path.join(BaseDir,'Log',ChunkfNm) # Add datestr to "Log" ? 
-			with open(BlenderPyFile,'w') as fid:
+			ChunkfNm = '%s_chunk%03d.py'%(rName, x+1)
+			BlenderPyFile = os.path.join(BaseDir, 'Log', ChunkfNm) # Add datestr to "Log" ? 
+			with open(BlenderPyFile, 'w') as fid:
 				fid.writelines(RenderScript)
 
 			if not Is_Slurm:
-				BlenderCmd = [Blender,'-b',BlendFile,'-P',BlenderPyFile]
+				BlenderCmd = [Blender, '-b', BlendFile, '-P', BlenderPyFile]
 				subprocess.call(BlenderCmd)
 			else:
 				### --- Call via slurm --- ###
 				BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile
 			
 				# Create & call slurm script for this chunk
-				TempScriptName = os.path.join(BaseDir,'Log','%s_chunk%03d.sh'%(rName,x+1))
-				with open(TempScriptName,'wb') as fid:
+				TempScriptName = os.path.join(BaseDir, 'Log', '%s_chunk%03d.sh'%(rName, x+1))
+				with open(TempScriptName, 'wb') as fid:
 					fid.write('#!/bin/sh\n')
 					fid.write('#SBATCH\n')
 					fid.write(BlenderCmd)
 					# Cleanup (move to .done file instead?)
 					#fid.write('rm '+BlenderPyFile) 
 					#fid.write('rm '+TempScriptName) 
-				SlurmOut = os.path.join(BaseDir,'Log','%s_chunk%03d_SlurmLog_hID=%%N'%(rName,x+1))
+				SlurmOut = os.path.join(BaseDir, 'Log', '%s_chunk%03d_SlurmLog_hID=%%N'%(rName, x+1))
 				#SlurmJob = "BVPrender_Chunk%03d"
-				SlurmCmd = ['sbatch','-c',nCPUs,'-p','all','--mem',str(memory),'-o',SlurmOut,TempScriptName]
-				#SlurmCmd = ['sbatch','-c',nCPUs,'-w','ibogaine',TempScriptName,'-o',SlurmOut]
+				SlurmCmd = ['sbatch', '-c', nCPUs, '-p', 'all', '--mem', str(memory), '-o', SlurmOut, TempScriptName]
+				#SlurmCmd = ['sbatch', '-c', nCPUs, '-w', 'ibogaine', TempScriptName, '-o', SlurmOut]
 				if bvp.Verbosity_Level>3:
 					print('Calling:')
 					print(SlurmCmd)
 				stdOut = subprocess.check_output(SlurmCmd).decode('utf-8')
-				jobID = re.search('(?<=Submitted batch job )[0-9]*',stdOut).group()
+				jobID = re.search('(?<=Submitted batch job )[0-9]*', stdOut).group()
 				jobIDs.append(jobID)
 		# Re-set SceneList rendering options:
 		self.RenderOptions.BVPopts = BVPoptOrig
@@ -657,11 +657,11 @@ class bvpSceneList(object):
 		else:
 			print('Done!')
 
-	def RenderCheck(self,Type='Scenes'):
+	def RenderCheck(self, Type='Scenes'):
 		'''
 		Check on render progress, show a bar graph of completion
 
-		rType is the kind of render on which you wish to check ('Scenes','Zdepth','Normals',etc)
+		rType is the kind of render on which you wish to check ('Scenes', 'Zdepth', 'Normals', etc)
 
 		'''
 		if not bvp.Is_Numpy:
@@ -672,11 +672,11 @@ class bvpSceneList(object):
 			FP = os.path.split(FP)[0]
 		if not 'Scenes' in FP:
 			raise Exception("I was kind of expecting 'Scenes' to be in your base rendering path. ..")
-		FP = FP.replace('Scenes',rType)
+		FP = FP.replace('Scenes', rType)
 		fNm = os.listdir(FP)
 		n = []
 		for S in self.ScnList:
-			ScF = S.fPath.replace('##','')
+			ScF = S.fPath.replace('##', '')
 			n.append(float(sum([ScF in f for f in fNm])))
 			if rType=='Masks':
 				n.pop()
@@ -693,11 +693,11 @@ class bvpSceneList(object):
 			Pct = n/a # This is still bogus for Counterstrike data, b/c scenes are not separately labeled
 		else:
 			Pct=n
-		plt.barh(range(self.nScenes),Pct)
+		plt.barh(range(self.nScenes), Pct)
 		if self.IncompleteScenes:
-			plt.plot([0]*len(self.IncompleteScenes),self.IncompleteScenes,'ro')
-		plt.ylim([0,self.nScenes])
-		plt.xlim([0,1.1])
+			plt.plot([0]*len(self.IncompleteScenes), self.IncompleteScenes, 'ro')
+		plt.ylim([0, self.nScenes])
+		plt.xlim([0, 1.1])
 		plt.xlabel('Pct. complete')
 		plt.ylabel('Scene')
 		plt.title('Render progress: %s'%self.Name)

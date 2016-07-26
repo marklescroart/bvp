@@ -1,7 +1,7 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports.
-import os,types,bvp
+import os, types, bvp
 from bvp.utils.blender import add_group
 #import logger
 # Blender imports
@@ -13,9 +13,9 @@ class bvpShadow(object):
 	'''
 	Class for abstract blender scene backgrounds
 	'''
-	def __init__(self,shID=None,Lib=None): 
+	def __init__(self, shID=None, Lib=None): 
 		'''
-		Usage: shadow = bvpBG(shID=None,Lib=None)
+		Usage: shadow = bvpBG(shID=None, Lib=None)
 
 		Class to store shadows 
 				
@@ -36,14 +36,14 @@ class bvpShadow(object):
 		self.nFaces=0
 
 		if Lib:
-			TmpSky = Lib.getSC(shID,'shadows')
+			TmpSky = Lib.getSC(shID, 'shadows')
 			# Replace default values with values from library
 			self.__dict__.update(TmpSky)
 	def __repr__(self):
 		S = '\n ~S~ bvpShadow "%s" ~S~\n'%self.grpName
 		return S
 		
-	def PlaceShadow(self,Scn=None,Scale=None):
+	def PlaceShadow(self, Scn=None, Scale=None):
 		'''
 		Usage: PlaceShadow(Scn=None)
 
@@ -54,13 +54,13 @@ class bvpShadow(object):
 			Scn = bpy.context.scene # Get current scene if input not supplied
 		if self.grpName:
 			# Add group of mesh object(s)
-			fDir,fNm = os.path.split(self.parentFile)
-			ShOb = add_group(self.grpName,fNm,fDir)
+			fDir, fNm = os.path.split(self.parentFile)
+			ShOb = add_group(self.grpName, fNm, fDir)
 		if not Scale is None:
 			if bvp.Verbosity_Level >3:
 				print('Resizing shadow...')
 			sz = Scale/self.realWorldSize[0] # most skies are 100x100 in area
-			bpy.ops.transform.resize(value=(sz,sz,sz))
+			bpy.ops.transform.resize(value=(sz, sz, sz))
 		else:
 			if bvp.Verbosity_Level > 3:
 				print("Shadow is empty!")
