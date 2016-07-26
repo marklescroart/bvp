@@ -106,7 +106,7 @@ class Object(object):
 
 	def __repr__(self):
 		"""Display string"""
-		S = '\n ~O~ bvpObject "%s" ~O~\n'%(self.name)
+		S = '\n ~O~ Object "%s" ~O~\n'%(self.name)
 		if self.parent_file:
 			S+='Parent File: %s\n'%self.parent_file
 		if self.semantic_cat:
@@ -285,7 +285,7 @@ class Object(object):
 	def ApplyAction(self, arm, action):
 		'''Apply an action to an armature.
 
-		Kept separate from bvpObject __init__ function so to be able to interactively apply actions 
+		Kept separate from Object __init__ function so to be able to interactively apply actions 
 		in an open Blender session.
 
 		Make this a method of Action instead??

@@ -28,7 +28,7 @@ def _memo(fn):
         return self._cache[id(fn)]
     return memofn
 
-class bvpShape(object):
+class Shape(object):
     """Class to hold geometric (triangulated manifold) information for bvpObjects.
     Mostly useful WITHIN Blender for now.
 
@@ -86,7 +86,7 @@ class bvpShape(object):
             Name for newly-formed shape object
         Returns
         -------
-        bvpShape : bvpShape instance
+        Shape : Shape instance
             Having defined `pts` & `polys`
 
         """

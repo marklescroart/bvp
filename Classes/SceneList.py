@@ -24,15 +24,15 @@ pickle = bvp.pickle
 if not bvp.Is_Blender:
 	from matplotlib import pyplot as plt
 
-class bvpSceneList(object):
+class SceneList(object):
 	'''
 	List of scenes. Potentially, a stimulus set for an experiment,  a few scenes for a demo, etc.
 	'''
 	def __init__(self, ScnList=None, ScnConstr=None, FrameRate=15., RenderOptions=None, Name='SceneList'):
 		'''
-		Usage: ScnList = bvpSceneList(ScnListParams)
+		Usage: ScnList = SceneList(ScnListParams)
 		
-		A list of class "bvpScene" instances. Potentially, a stimulus set for an experiment, 
+		A list of class "Scene" instances. Potentially, a stimulus set for an experiment, 
 		a few scenes for a demo, etc.
 		
 		Fields to set:
@@ -60,13 +60,13 @@ class bvpSceneList(object):
 		return S
 	def __add__(self, ScnOrList):
 		'''
-		Addition method for lists. Adds on new scenes (either a bvpSceneList or a single bvpScene).
+		Addition method for lists. Adds on new scenes (either a SceneList or a single Scene).
 		Name and render options of the FIRST argument are kept 
 		'''
-		if type(ScnOrList) is bvp.bvpScene:
+		if type(ScnOrList) is bvp.Scene:
 			self.ScnList+=[ScnOrList]
 			return self
-		elif type(ScnOrList) is bvp.bvpSceneList:
+		elif type(ScnOrList) is bvp.SceneList:
 			self.ScnList+=ScnOrList.ScnList
 			return self
 	def __getitem__(self, idx):
@@ -174,13 +174,13 @@ class bvpSceneList(object):
 		if CatType=='8':
 			for S in self.ScnList:
 				for O in S.Obj:
-					C.append(O.semanticCat[0].lower())
+					C.append(O.semantic_category[0].lower())
 			Cats, nExemplars = bvp.utils.basics.unique(C)
 			CatMat = []
 			for S in self.ScnList:
 				ScCat = [False]*len(Cats)
 				for O in S.Obj:
-					ScCat[Cats.index(O.semanticCat[0].lower())] = True
+					ScCat[Cats.index(O.semantic_category[0].lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
 		elif CatType=='BasicLevel':
 			# Should be done on LIBRARY basic level cats to assure no difference btw. scene lists
@@ -199,7 +199,7 @@ class bvpSceneList(object):
 			oCat = []
 			for o in Lib.objects: 
 				if o:
-					oCat+=[oo.lower() for oo in o['semanticCat']]
+					oCat+=[oo.lower() for oo in o['semantic_category']]
 			Cat, nOcc = bvp.utils.basics.unique(oCat)
 			# Hacky: Add special cats. For all dictionary entries, the key (string) will 
 			# be added to the (front of the) semantic category list for an object if that
@@ -214,8 +214,8 @@ class bvpSceneList(object):
 			for S in self.ScnList:
 				ScCat = [False]*len(Cat)
 				for O in S.Obj:
-					if O.semanticCat:
-						for sc in O.semanticCat:
+					if O.semantic_category:
+						for sc in O.semantic_category:
 							ScCat[Cat.index(sc.lower())] = True
 							# Additional categories: 
 							for k, v in CatAdd.items():
@@ -251,8 +251,8 @@ class bvpSceneList(object):
 				ScCat = [False]*len(Cat)
 				# Object categories
 				for O in S.Obj:
-					if O.semanticCat:
-						for sc in O.semanticCat:
+					if O.semantic_category:
+						for sc in O.semantic_category:
 							if sc in Cat:
 								ScCat[Cat.index(sc.lower())] = True
 							# Additional categories: 
@@ -268,8 +268,8 @@ class bvpSceneList(object):
 			CatMat = []
 			for S in self.ScnList:
 				ScCat = [False]*len(Cat)
-				if S.BG.semanticCat:
-					for sc in S.BG.semanticCat:
+				if S.BG.semantic_category:
+					for sc in S.BG.semantic_category:
 						if sc in Cat:
 							ScCat[Cat.index(sc.lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
@@ -281,8 +281,8 @@ class bvpSceneList(object):
 			CatMat = []
 			for S in self.ScnList:
 				ScCat = [False]*len(Cat)
-				if S.Sky.semanticCat:
-					for sc in S.Sky.semanticCat:
+				if S.Sky.semantic_category:
+					for sc in S.Sky.semantic_category:
 						if sc in Cat:
 							ScCat[Cat.index(sc.lower())] = True
 				CatMat += [ScCat for x in range(int((S.ScnParams['frame_end']-S.ScnParams['frame_start']+1)))]
@@ -294,11 +294,11 @@ class bvpSceneList(object):
 			Cat = Co+Cb+Cs
 		return CatMat, Cat
 	def Update(self, RaiseError=False):
-		'''Bring bvpSceneList up-to-date with library / code changes.
+		'''Bring SceneList up-to-date with library / code changes.
 
 		Assure that all objects / backgrounds are up-to-date with library files (semantic cats, real world size, etc.)
 		Also updates potentially out-dated functions?? (THIS NEEDS TO BE CLARIFIED / CHANGED)
-		Optionally, raise an error if the "grpName" (unique string designating each object) has changed in the bvpLibrary
+		Optionally, raise an error if the "name" (unique string designating each object) has changed in the bvpLibrary
 		since scene list creation.
 
 		Parameters
@@ -308,7 +308,7 @@ class bvpSceneList(object):
 
 		Returns
 		-------
-		(Nothing - modifies bvpSceneList in place)
+		(Nothing - modifies SceneList in place)
 		'''
 		Lib = bvp.bvpLibrary()
 		Fail=False
@@ -316,29 +316,29 @@ class bvpSceneList(object):
 			# Objects
 			for iO, O in enumerate(S.Obj):
 				try:
-					N = bvp.bvpObject(O.grpName, Lib)
-					self.ScnList[iS].Obj[iO].semanticCat = N.semanticCat
+					N = bvp.Object(O.name, Lib)
+					self.ScnList[iS].Obj[iO].semantic_category = N.semantic_category
 					self.ScnList[iS].Obj[iO].realWorldSize = N.realWorldSize
 				except:
 					Fail=True
-					print('Update failed because grpName has been changed for scene %d object %s!\nNeeds to be manually updated!'%(iS, O.grpName))
+					print('Update failed because name has been changed for scene %d object %s!\nNeeds to be manually updated!'%(iS, O.name))
 			# Background
 			try:
-				N = bvp.bvpBG(S.BG.grpName, Lib)
-				self.ScnList[iS].BG.semanticCat = N.semanticCat
+				N = bvp.Background(S.BG.name, Lib)
+				self.ScnList[iS].BG.semantic_category = N.semantic_category
 				self.ScnList[iS].BG.realWorldSize = N.realWorldSize
 			except:
 				Fail=True
-				print('Update failed because grpName has been changed for scene %d background %s! Needs to be manually updated!'%(iS, S.BG.grpName))
+				print('Update failed because name has been changed for scene %d background %s! Needs to be manually updated!'%(iS, S.BG.name))
 			# Skies
 			try:
-				N = bvp.bvpSky(S.Sky.grpName, Lib)
-				self.ScnList[iS].Sky.semanticCat = N.semanticCat
+				N = bvp.Sky(S.Sky.name, Lib)
+				self.ScnList[iS].Sky.semantic_category = N.semantic_category
 				self.ScnList[iS].Sky.realWorldSize = N.realWorldSize
 			except:
-				if S.Sky.grpName is not None:
+				if S.Sky.name is not None:
 					Fail=True
-					print('Update failed because grpName has been changed for scene %d sky %s! Needs to be manually updated!'%(iS, S.Sky.grpName))
+					print('Update failed because name has been changed for scene %d sky %s! Needs to be manually updated!'%(iS, S.Sky.name))
 		# Update render options
 		if hasattr(self.RenderOptions, 'file_format'):
 			# Assume both need changing:
@@ -445,7 +445,7 @@ class bvpSceneList(object):
 	def RenderSlurm(self, RenderType=('Image', ), RenderGroupSize=3, Is_Overwrite=False, memory=7700, nCPUs='2'):
 		'''Calls separate instances of Blender via Slurm queue to render the scene list. 
 		
-		DEPRECATED. Simply calls bvpSceneList.Render(..., Is_Slurm=True). Please use that in the future.
+		DEPRECATED. Simply calls SceneList.Render(..., Is_Slurm=True). Please use that in the future.
 		'''
 		self.Render(RenderType=RenderType, Is_Overwrite=Is_Overwrite, Is_Slurm=True, nCPUs=nCPUs, RenderGroupSize=RenderGroupSize, memory=memory)
 

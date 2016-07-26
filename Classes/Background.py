@@ -8,119 +8,100 @@ from .Constraint import ObConstraint, CamConstraint
 from .Object import Object as O
 
 try:
-	import bpy
-	import mathutils as bmu
-	is_blender = True
+    import bpy
+    import mathutils as bmu
+    is_blender = True
 except ImportError:
-	is_blender = False
+    is_blender = False
 
 class Background(object):
-	"""Backgrounds for scenes"""
-	def __init__(self, name=None, dbi=None): # Add BGinfo? (w/ obstacles, camera constraints)
-		"""Class to store (abstraction of) scene backgrounds.
+    """Backgrounds for scenes"""
+    def __init__(self, name=None, fname=None, n_vertices=None, n_faces=None, lens=50., 
+        semantic_category=None, object_semantic_category='all', sky_semantic_category='all',
+        camera_constraint=None, object_constraints=None, obstacles=None, 
+        bvptype='background', _id=None, _rev=None, dbi=None): 
+        """Class to store Backgrounds (floor, walls, maybe lights, + constraints on objects) 
 
-		Backgrounds consist of a floor, background objects, Object/Camera constraints, possibly lights. 
-		Backgrounds should be stored as scenes in one or more .blend files. File titles should be 
-		"Category_BG_<BGtype>.blend", e.g. "Category_BG_Floor.blend", and all elements of the background (floor, multiple
-		levels of floor, any objects) should be put into the same group (the import command used imports a group). Group 
-		titles should be sensible.
-		
-		Parameters
-		----------
-		bgID: string 
-			a unique identifier for the BG in question. Either a string 
-				(interpreted to be the name of the BG group) or a lambda function
-				(See bvpLibrary "getSceneComponent" function)
-		Notes
-		-----
-		name is a group name, not an individual blender object. Necessary; backgrounds are multiple things.
+        A Background consists of a floor, background objects (walls, maybe trees, etc), maybe 
+        lights, and constraints that partly determine the locations of objects, actions*, 
+        and cameras in a scene. Each Background is stored as a group in a .blend file. 
+        All elements of the background (floor, walls, buildings, emtpy objects defining 
+        bounds of space, what have you) should be in this group. 
+        
+        Parameters
+        ----------
+        name: string 
+            a unique identifier for the BG in question. Either a string 
+                (interpreted to be the name of the BG group) or a lambda function
+                (See bvpLibrary "getSceneComponent" function)
 
-		"""
-		# Defaults ?? Create Lib from default BG file instead ??
-		self.parentFile=None
-		self.name=None
-		self.semanticCat=None
-		# Kill? These should be probability distributions over all of WordNet, which will be complex
-		# enough to need their own classes. 
-		self.objectSemanticCat='all'
-		self.skySemanticCat='all'
-		self.realWorldSize=100.0 # size of whole space in meters
-		self.lens=50.
-		self.n_vertices=0
-		self.n_faces=0
-		# Camera position constraints w/ default values
-		self.camConstraints = CamConstraint()
-		# Object position constraints w/ default values
-		self.obConstraints = ObConstraint()
-		# Obstacles (positions to avoid for objects)
-		self.obstacles=None # list of bvpObjects
-		# if not bgID is None:
-		# 	if Lib is None:
-		# 		Lib = bvp.bvpLibrary()
-		# 	TmpBG = Lib.getSC(bgID, 'backgrounds')
-		# 	if not TmpBG is None:
-		# 		# Replace default values with values from library
-		# 		self.__dict__.update(TmpBG)
+        """
+        # Quick setting of attributes
+        inpt = locals()
+        self.bvptype = 'background'
+        for k, v in inpt: 
+            if not k in ('self', 'bvptype'):
+                setattr(self, k, v)
 
-		# lameness:
-		# Real world size (??)
-		# if isinstance(self.realWorldSize, (list, tuple)):
-		# 	self.realWorldSize = self.realWorldSize[0]
-	def __repr__(self):
-		S = '\n ~B~ Background "%s" ~B~\n'%(self.grpName)
-		if self.parentFile:
-			S+='Parent File: %s\n'%self.parentFile
-		if self.semanticCat:
-			S+=self.semanticCat[0]
-			for s in self.semanticCat[1:]: S+=', %s'%s
-			S+='\n'
-		# Add object semantic cat? (not done in most all scenes as of 2012.09.12)
-		if self.skySemanticCat:
-			S+='Skies allowed: %s'%self.skySemanticCat[0]
-			for s in self.skySemanticCat[1:]: S+=', %s'%s
-			S+='\n'
-		S+='Size: %.2f; Camera lens: %.2f'%(self.realWorldSize, self.lens)
-		if self.nVertices:
-			S+='%d Verts; %d Faces'%(self.nVertices, self.nFaces)
-		return(S)
+    def __repr__(self):
+        rstr = ('\n bvp Background {name}\n'
+                '\t File: {fname}\n'
+                '\t [{sem_cat}]\n'
+                '\t [{wn_lab}]\n'
+                '\t Size: {sz}, Lens: {cam}\n'
+                '\t Vertices: {verts}, Faces: {face}\n'
+                '\t Skies allowed: {skies}\n'
+                '\t Objects allowed: {obj}\n'
+                )
+        sem_cat = [] if self.semantic_category is None else self.semantic_category
+        wn_lab = [] if self.wordnet_label is None else self.wordnet_label
+        skies = [] if self.sky_semantic_category is None else self.sky_semantic_category
+        obj = [] if self.object_semantic_category is None else self.object_semantic_category
+        rstr.format(name=self.name, fname=self.fname, 
+                    sem_cat=', '.join(sem_cat),
+                    wn_lab =', ',join(wn_lab),
+                    sz=self.real_world_size, lens=self.lens,
+                    verts=self.n_vertices, face=self.n_faces,
+                    skies=', '.join(skies), obj=', '.join(obj))
+        return(rstr)
 
-	def place(self, Scn=None):
-		'''
-		Adds background to Blender scene
-		'''
-		if not Scn:
-			Scn = bpy.context.scene # Get current scene if input not supplied
-		if self.grpName:
-			# Add group of mesh object(s)
-			fDir, fNm = os.path.split(self.parentFile)
-			add_group(self.grpName, fNm, fDir)
-		else:
-			print("BG is empty!")
-			
-	def test_background(self, frames=(1, 1), ObL=(), nObj=0, EdgeDist=0., ObOverlap=.50):
-		'''
-		Tests object / camera constraints to see if they are working
-		** And shadows??
+    def place(self, scn=None):
+        '''
+        Adds background to Blender scene
+        '''
+        if not scn:
+            scn = bpy.context.scene # Get current scene if input not supplied
+        if self.name is not None:
+            # Add group of mesh object(s)
+            #fDir, fNm = os.path.split(self.fname)
+            bg_dir = CONFIG SHIT
+            add_group(self.name, self.fname, bg_dir)
+        else:
+            print("BG is empty!")
+            
+    def test_background(self, frames=(1, 1), ObL=(), nObj=0, EdgeDist=0., ObOverlap=.50):
+        '''
+        Tests object / camera constraints to see if they are working
+        ** And shadows??
 
-		Should be grouped with other testing functions, not here. Move.
-		'''
-		Lib = bvp.bvpLibrary('/Users/mark/Documents/BlenderFiles/')
-		Cam = bvp.bvpCamera(frames=frames)
-		Sky = bvp.bvpSky('*'+self.skySemanticCat[0], Lib) # Choose a sky according to semantic category of BG ## RELIES ON ONLY ONE ENTRY FOR SKY SEMANTIC CAT! Should be most specific specifier...
-		Scn = bvp.bvpScene(0, BG=self, Cam=Cam, Sky=Sky, FrameRange=frames)
-		if not ObL and not nObj:
-			ObL = [O('*animal', Lib, size3D=None), O('*vehicle', Lib, size3D=None), O('*appliance', Lib, size3D=None)]
-			nObj = 0
-		elif not ObL and nObj:
-			ObL = [O(None, None, size3D=None) for x in range(nObj)]
-		Scn.populate_scene(ObList=ObL, ResetCam=True, RaiseError=True, nIter=100, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
-		if bvp.Is_Blender:
-			RO = bvp.RenderOptions()
-			Scn.Create(RO)
-			# Add spheres if there are blank objects:
-			uv = bpy.ops.mesh.primitive_uv_sphere_add
-			for o in range(nObj):
-				print('Sz of obj %d = %.2f'%(o, Scn.Obj[o].size3D))
-				ObSz = Scn.Obj[o].size3D/2.
-				pos = bmu.Vector(Scn.Obj[o].pos3D) + bmu.Vector([0, 0, ObSz])
-				uv(location=pos, size=ObSz)
+        Should be grouped with other testing functions, not here. Move.
+        '''
+        Cam = bvp.Camera(frames=frames)
+        Sky = bvp.Sky('*'+self.sky_semantic_category[0], Lib) # Choose a sky according to semantic category of BG ## RELIES ON ONLY ONE ENTRY FOR SKY SEMANTIC CAT! Should be most specific specifier...
+        scn = bvp.Scene(0, BG=self, Cam=Cam, Sky=Sky, FrameRange=frames)
+        if not ObL and not nObj:
+            ObL = [O('*animal', Lib, size3D=None), O('*vehicle', Lib, size3D=None), O('*appliance', Lib, size3D=None)]
+            nObj = 0
+        elif not ObL and nObj:
+            ObL = [O(None, None, size3D=None) for x in range(nObj)]
+        scn.populate_scene(ObList=ObL, ResetCam=True, RaiseError=True, nIter=100, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
+        if bvp.Is_Blender:
+            RO = bvp.RenderOptions()
+            scn.Create(RO)
+            # Add spheres if there are blank objects:
+            uv = bpy.ops.mesh.primitive_uv_sphere_add
+            for o in range(nObj):
+                print('Sz of obj %d = %.2f'%(o, scn.Obj[o].size3D))
+                ObSz = scn.Obj[o].size3D/2.
+                pos = bmu.Vector(scn.Obj[o].pos3D) + bmu.Vector([0, 0, ObSz])
+                uv(location=pos, size=ObSz)

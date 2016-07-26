@@ -10,13 +10,13 @@ import math as bnp
 if bvp.Is_Blender:
 	import bpy
 
-class bvpSky(object):
+class Sky(object):
 	'''Class for skies and lighting (sun, lamps, world) for scenes
 
 	Fields in skyParams are:
-	  .parentFile - parent .blend file housing this sky
-	  .grpName - group name to be imported from category file, e.g. 'BG_Sky001'
-	  .semanticCat - semantic category of this sky - a list, e.g. ['dome', 'day', 'sunny']
+	  .fname - parent .blend file housing this sky
+	  .name - group name to be imported from category file, e.g. 'BG_Sky001'
+	  .semantic_category - semantic category of this sky - a list, e.g. ['dome', 'day', 'sunny']
 	  .lightLoc - location of light(s) for scene.
 	  .lightRot - rotation of light(s) for scene. Single lights should always be on the y=0, x<0 half-plane, w/ rotation (x, 0, 90) (w/ a negative x value)
 	Usually, world parameters and lighting parameters for skies are stored in the library .blend files for each sky. However, those parameters can be optionally over-ridden by the following fields:
@@ -41,9 +41,9 @@ class bvpSky(object):
 		Initialization.
 		'''
 		# Defaults ?? Create Lib from default BG file instead ??
-		self.parentFile=None
-		self.grpName=None
-		self.semanticCat=None
+		self.fname=None
+		self.name=None
+		self.semantic_category=None
 		self.lightLoc=[[0., 0., 35.]] # lamp location (default = straight up)
 		self.lightRot=[[bnp.degrees(x) for x in (0.6503279805183411, 0.055217113345861435, 1.8663908243179321)]]
 		self.lightType='SUN' # Type of Blender lamp that is in this sky/light setup. 
@@ -90,7 +90,7 @@ class bvpSky(object):
 		if isinstance(self.realWorldSize, (list, tuple)):
 			self.realWorldSize = self.realWorldSize[0]
 
-		if self.grpName is None:
+		if self.name is None:
 			if self.lightType.lower()=='sun':
 				self.OverrideWorldProps = True
 				self.WorldParams = fixedKeyDict({
@@ -177,10 +177,10 @@ class bvpSky(object):
 		LampOb = []
 		if not Scn:
 			Scn = bpy.context.scene # Get current scene if input not supplied
-		if not self.grpName is None:
+		if not self.name is None:
 			# Add proxies of mesh objects
-			fDir, fNm = os.path.split(self.parentFile)
-			SkyOb = add_group(self.grpName, fNm, fDir)
+			fDir, fNm = os.path.split(self.fname)
+			SkyOb = add_group(self.name, fNm, fDir)
 			if not Scale is None:
 				print('Resizing...')
 				sz = Scale/self.realWorldSize # most skies are 100x100 in area
@@ -247,8 +247,8 @@ class bvpSky(object):
 		'''
 		if not Scn:
 			Scn = bpy.context.scene
-		fPath, fName = os.path.split(self.parentFile)
-		WorldName = self.grpName
+		fPath, fName = os.path.split(self.fname)
+		WorldName = self.name
 		bpy.ops.wm.link_append(
 			directory=os.path.join(fPath, fName)+"\\World\\", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
 			filepath="//"+fName+"\\World\\"+WorldName, # local filepath within .blend file to the world to be imported
@@ -256,15 +256,15 @@ class bvpSky(object):
 			link=False, 
 			relative_path=False, 
 			autoselect=True)
-		Scn.world = bpy.data.worlds[self.grpName]
+		Scn.world = bpy.data.worlds[self.name]
 
 	def __repr__(self):
-		S = '\n ~S~ bvpSky "%s" ~S~\n'%(self.grpName)
-		if self.parentFile:
-			S+='Parent File: %s\n'%self.parentFile
-		if self.semanticCat:
-			S+=self.semanticCat[0]
-			for s in self.semanticCat[1:]: S+=', %s'%s
+		S = '\n ~S~ Sky "%s" ~S~\n'%(self.name)
+		if self.fname:
+			S+='Parent File: %s\n'%self.fname
+		if self.semantic_category:
+			S+=self.semantic_category[0]
+			for s in self.semantic_category[1:]: S+=', %s'%s
 			S+='\n'
 		if self.nVertices:
 			S+='%d Verts; %d Faces'%(self.nVertices, self.nFaces)

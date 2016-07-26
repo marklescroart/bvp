@@ -9,7 +9,7 @@ from bvp.utils.bvpMath import ImPosCount
 if bvp.Is_Blender:
 	import bpy
 
-class bvpScene(object):
+class Scene(object):
 	'''Class for storing an abstraction of a Blender scene. 
 
 	Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
@@ -22,14 +22,14 @@ class bvpScene(object):
 		Scene number (one-based by convention) within a list of scenes. Determines default scene name.
 	objects : list of bvpObjects | None
 		Objects with which to populate the scene. Defaults to none (no objects)
-	bg : bvpBG instance | None
+	bg : Background instance | None
 		Scene background; controls background and constraints on object / camera positions. Defaults
 		to complete blank scene. 
-	sky : bvpSky instance | None
+	sky : Sky instance | None
 		Sky and lights; controls sky appearance, world settings, and lighting. Defaults to single
 		sun lamp angled to the back-left of the whole scene, mild environment lighting, and no sky 
 		(all alpha with no image/sky texture)
-	shadow : bvpShadow instance | None
+	shadow : Shadow instance | None
 		Controls added shadows, if any. Defaults to none (no added shadows)
 	cam : bvpCam instance | None
 		Camera for the scene. Defaults to slight up-right camera with no camera motion.
@@ -47,7 +47,7 @@ class bvpScene(object):
 	Notes
 	-----
 	Objects can be placed in a scene without their positions / scales specified. You can then use the 
-	bvpScene.populate_scene() method to set positions for the objects, given the background constraints.
+	Scene.populate_scene() method to set positions for the objects, given the background constraints.
 	'''
 	#def __init__(self, scnParams={}):
 	def __init__(self, num=0, objects=None, bg=None, sky=None, shadow=None, cam=None, frame_range=(1, 1), fpath=None, frame_rate=bvp.Settings['RenderDefaults']['FrameRate']): 
@@ -64,13 +64,13 @@ class bvpScene(object):
 			self.objects = []
 		# Set default sky parameters
 		if self.sky is None: 
-			self.sky = bvp.bvpSky()
+			self.sky = bvp.Sky()
 		# Set default background parameters
 		if self.bg is None:
-			self.bg = bvp.bvpBG()
+			self.bg = bvp.Background()
 		# Default camera: Fixed position!
 		if self.cam is None:
-			self.cam = bvp.bvpCamera(lens=self.bg.lens) # TO DO: Set cam default to file "Settings"! 
+			self.cam = bvp.Camera(lens=self.bg.lens) # TO DO: Set cam default to file "Settings"! 
 		# Final elements, shadows, are not necessary
 		# Set file path for renders:
 		if self.fpath is None:
@@ -89,7 +89,7 @@ class bvpScene(object):
 			})
 		return d
 	def __repr__(self):
-		S = 'Class "bvpScene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
+		S = 'Class "Scene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
 		S+='BACKGROUND%s\n\n'%self.bg
 		S+='SKY%s\n\n'%self.sky
 		S+='SHADOW%s\n\n'%self.shadow
@@ -121,9 +121,9 @@ class bvpScene(object):
 				print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
 			if ResetCam:
 				# Start w/ random cam, fixation position
-				cPos = self.bg.camConstraints.sampleCamPos(self.frame_range)
-				fPos = self.bg.camConstraints.sampleFixPos(self.frame_range)
-				self.cam = bvp.bvpCamera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.bg.lens)
+				cPos = self.bg.CamConstraint.sampleCamPos(self.frame_range)
+				fPos = self.bg.CamConstraint.sampleFixPos(self.frame_range)
+				self.cam = bvp.Camera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.bg.lens)
 			# Multiple object constraints for moving objects
 			OC = []
 			for o in ObList:
@@ -140,7 +140,7 @@ class bvpScene(object):
 					Obst = self.bg.obstacles+ObToAdd
 				else:
 					Obst = ObToAdd
-				if not o.semanticCat:
+				if not o.semantic_category:
 					# Sample semantic category based on bg??
 				 	# UNFINISHED as of 2012.10.22
 				 	pass #etc.
@@ -164,12 +164,12 @@ class bvpScene(object):
 				Attempt+=1
 		# Check for failure
 		if Attempt>nIter and RaiseError:
-			raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.bg.grpName, nIter))
+			raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.bg.name, nIter))
 		elif Attempt>nIter and not RaiseError:
 			print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
 		self.objects = ObToAdd
 		# Make sure last fixation hasn't "wandered" away from objects: 
-		fPosFin = self.bg.camConstraints.sampleFixPos((1, ), obj=ObToAdd)
+		fPosFin = self.bg.CamConstraint.sampleFixPos((1, ), obj=ObToAdd)
 		self.cam.fixPos = self.cam.fixPos[:-1]+[fPosFin[0], ]
 
 	def apply_opts(self, scn=None, render_options=None):
@@ -217,7 +217,7 @@ class bvpScene(object):
 		set_cursor((0, 0, 0))
 		# place bg
 		self.bg.Place()
-		if self.bg.realWorldSize<50. and 'indoor' in self.bg.semanticCat:
+		if self.bg.realWorldSize<50. and 'indoor' in self.bg.semantic_category:
 			# Due to a problem with skies coming inside the corners of rooms
 			Scale = self.bg.realWorldSize*1.5
 		else:
@@ -234,7 +234,7 @@ class bvpScene(object):
 	def create_working(self, render_options=None, scn=None):
 		'''Creates the stored scene, but allows for objects without set positions.
 
-		See bvpScene.create() help.
+		See Scene.create() help.
 		'''
 		if not scn:
 			scn = bpy.context.scene

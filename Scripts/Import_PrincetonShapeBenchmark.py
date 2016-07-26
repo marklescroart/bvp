@@ -115,10 +115,10 @@ def import_psb(sdir,psd_dir,dbname='bvp_psb',port=9194):
 			# Run script to insert object into Blender file
 			name = 'psb%04d_%s'%(n, os.path.split(ob_dict['url'])[-1])
 			# TO DO : Construct database representation
-			dbob = dict(grpName=name,basicCat=None,semanticCat=None,
+			dbob = dict(name=name,basicCat=None,semantic_category=None,
 				wordnet_label=None,realWorldSize=[ob_dict['scale']],
 				nFaces=ob_dict['polygons'],nVertices=None,nPoses=None,
-				constraints=None,verified=False,parentFile=blend_file)
+				constraints=None,verified=False,fname=blend_file)
 			dbi.objects.insert([dbob])
 			script = off_object_import.format(blend_file=blend_file,
 				off_file=os.path.join(mdir,mm+'.off'),
@@ -253,10 +253,10 @@ if __name__=='__main__':
 # 			# Run script to insert object into Blender file
 # 			name = 'psb%04d_%s'%(n, os.path.split(ob_dict['url'])[-1])
 # 			# TO DO : Construct database representation
-# 			dbob = dict(grpName=name,basicCat=None,semanticCat=None,
+# 			dbob = dict(name=name,basicCat=None,semantic_category=None,
 # 				wordnet_label=None,realWorldSize=[ob_dict['scale']],
 # 				nFaces=ob_dict['polygons'],nVertices=None,nPoses=None,
-# 				constraints=None,verified=False,parentFile=blend_file)
+# 				constraints=None,verified=False,fname=blend_file)
 # 			dbi.objects.insert([dbob])
 # 			script = off_object_import.format(blend_file=blend_file,
 # 				off_file=os.path.join(mdir,mm+'.off'),

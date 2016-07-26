@@ -7,7 +7,7 @@ LibDir = '/auto/k6/mark/BlenderFiles/' # Load from settings??
 Lib = bvp.bvpLibrary(LibDir)
 
 # Optional sub-category to render
-SubCat = None #lambda x: x['grpName']=='BG_201_mHouse_1fl_1' #None #'outdoor'
+SubCat = None #lambda x: x['name']=='BG_201_mHouse_1fl_1' #None #'outdoor'
 nCamLoc = 5
 RO = bvp.RenderOptions()
 RO.filepath = '/auto/k6/mark/BlenderFiles/LibBackgrounds/%s'
@@ -20,24 +20,24 @@ else:
 # Frame count
 frames = (1,1)
 # set standard lights (Sky)
-Sky = bvp.bvpSky()
+Sky = bvp.Sky()
 # Get dummy objects to put in scenes:
 ObL = []
 for o in DummyObjects:
-	ObL.append(bvp.bvpObject(obID=o,Lib=Lib,size3D=None)
+	ObL.append(bvp.Object(obID=o,Lib=Lib,size3D=None)
 # Misc Setup
 BGCt = 0;
 ScnL = []
 for bg in ToRender:
 	BGCt+=1
 	# Create Scene
-	BG = bvp.bvpBG(bgID=bg['grpName'],Lib=Lib)
+	BG = bvp.Background(bgID=bg['name'],Lib=Lib)
 	for p in range(nCamLoc):
 		cNum = p+1
-		Cam = bvp.bvpCamera(location=BG.camConstraints.sampleCamPos(frames),fixPos=BG.camConstraints.sampleFixPos(frames),frames=frames)
-		S = bvp.bvpScene(Num=BGCt,BG=BG,Sky=Sky,Obj=None,
+		Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames),fixPos=BG.CamConstraint.sampleFixPos(frames),frames=frames)
+		S = bvp.Scene(Num=BGCt,BG=BG,Sky=Sky,Obj=None,
 							Shadow=None,Cam=Cam,FrameRange=(1,1),
-							fPath='%s_%s_cp%d_fr##'%(BG.semanticCat[0],BG.grpName,cNum),
+							fPath='%s_%s_cp%d_fr##'%(BG.semantic_category[0],BG.name,cNum),
 							FrameRate=15)
 		try:
 			# Allow re-set of camera position with each attempt to populate scene
@@ -46,6 +46,6 @@ for bg in ToRender:
 			print('Unable to populate scene %s!'%S.fPath)
 		ScnL.append(S)
 # Convert list of scenes to SceneList	
-SL = bvp.bvpSceneList(ScnList=ScnL,RenderOptions=RO)
+SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)
 #SL.ScnList[0].Create(RO)
 #SL.RenderSlurm(RenderGroupSize=nCamLoc)

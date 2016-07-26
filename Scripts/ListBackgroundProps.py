@@ -11,9 +11,9 @@ way, it's possible to modify the properties of the groups within many files
 at once.
 
 Each group will have its own line in the text file, thus:
-GrpName :: NewGrpName :: realWorldSize :: semanticCatString :: ob
+name :: NewGrpName :: realWorldSize :: semanticCatString :: ob
 
-GrpName = the name of the group in the .blend file
+name = the name of the group in the .blend file
 NewGrpName = "x" by default. If it is changed from "x", 
 	then "SetBGProps" will change the name of the group 
 	to the NewGrpName
@@ -53,7 +53,7 @@ with open(sName,'a') as fid:
 		except:
 			Sz = 100.000
 		try:
-			SemStr = gOb['SemanticCat']
+			SemStr = gOb['semantic_category']
 		except:
 			SemStr = BaseCat.lower()
 		try:
@@ -61,7 +61,7 @@ with open(sName,'a') as fid:
 		except:
 			obStr = 'all'
 		try:
-			skyStr = gOb['SkySemanticCat']
+			skyStr = gOb['sky_semantic_category']
 		except:
 			skyStr = 'all'
 		try:

@@ -9,7 +9,7 @@ except ImportError:
 	import pickle
 import imp
 #import mlBPY_Utils as bvp
-#import bvp_Classes as bvpC # classes for bvpObject,bvpScene,bvpSceneList
+#import bvp_Classes as bvpC # classes for Object,Scene,SceneList
 import bvp
 from bvp.utils import GetGroups
 from bvp.RenderOptions import RenderOptions
@@ -88,8 +88,8 @@ def TestSkies():
 
 	ScnParams.update(ScnParamsTmp)
 	#ScnParams['']
-	# Create "bvpSceneList" from parameters
-	ScnList = bvp.bvpSceneList(ScnParams)
+	# Create "SceneList" from parameters
+	ScnList = bvp.SceneList(ScnParams)
 	sName = '/Users/Work/Desktop/TempSkyScnList.pik'
 	with open(sName,'wb') as fOut:
 		pickle.dump(ScnList,fOut,protocol=2)
@@ -126,7 +126,7 @@ def ObjectBGSkyImages():
 		"CamSpeed_min":0
 		# (Camera position is determined by individual backgrounds)
 		}
-	# Create "bvpSceneList" from parameters
+	# Create "SceneList" from parameters
 	
 	# Export design matrices, etc.
 	
@@ -195,8 +195,8 @@ def BVPpilot2():
 
 		}
 	ScnParams.update(ScnParamsTmp)
-	# Create "bvpSceneList" from parameters
-	ScnList = bvp.bvpSceneList(ScnParams)
+	# Create "SceneList" from parameters
+	ScnList = bvp.SceneList(ScnParams)
 	sName = '/Users/Work/Desktop/TempScnList.pik'
 	with open(sName,'wb') as fOut:
 		pickle.dump(ScnList,fOut,protocol=2)

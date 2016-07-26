@@ -1,7 +1,7 @@
 '''
 Script to render via Blender using SLURM / other parallel computing. 
 
-This file is called by the Render() and RenderSlurm() commands in bvpSceneList 
+This file is called by the Render() and RenderSlurm() commands in SceneList 
 class. In order to render many files, multiple instances of Blender need to be
 opened, and each one needs to call this script (or, a modified version of this
 script). 

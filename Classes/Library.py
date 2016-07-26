@@ -3,16 +3,17 @@
 """
 Notes on blender Library: 
 
-Any poseable object must be saved with a rig that is titled, "<grpName>_Rig" (or do they have to be...?  
+Any poseable object must be saved with a rig that is titled, "<name>_Rig" (or do they have to be...?  
 So long as there is only one rig in the group, and that group has a pose library attached to it, all should be fine)
 
 
 """
 
+#raise Exception("DELETE ME")
 # Imports
 import subprocess, bvp, math, os, re, random, shutil, time
 from bvp.utils.basics import GetHostName, unique, loadPik, RunScriptForAllFiles#, dotDict
-from bvp.bvpObject import bvpObject as bvpObj
+from bvp.Object import Object as bvpObj
 if bvp.Is_Blender:
 	import bpy
 
@@ -88,11 +89,11 @@ class bvpLibrary(object):
 		L = getattr(self, ComponentType)
 		if type(filterFn)==type('string'):
 			# If filterFn is a string, it is a semantic category
-			Out = [x for x in L if filterFn in x['semanticCat']]
+			Out = [x for x in L if filterFn in x['semantic_category']]
 		elif isinstance(filterFn, list):
-			Out = [x for x in L if any([ff in x['semanticCat'] for ff in filterFn])]
+			Out = [x for x in L if any([ff in x['semantic_category'] for ff in filterFn])]
 		elif isinstance(filterFn, tuple):
-			Out = [x for x in L if all([ff in x['semanticCat'] for ff in filterFn])]
+			Out = [x for x in L if all([ff in x['semantic_category'] for ff in filterFn])]
 		else:
 			# filterFn is a function:
 			Out = [x for x in L if filterFn(x)]
@@ -108,10 +109,10 @@ class bvpLibrary(object):
 		(or, equivalently, "getSCL")
 
 		filterFn can be:
-		- a string that designates a particular object in the library by its "grpName" 
+		- a string that designates a particular object in the library by its "name" 
 			within its .blend file
 		- a string containing a "*", which will be interpreted as a semantic category
-			to be matched with an object's "semanticCat" string.
+			to be matched with an object's "semantic_category" string.
 		- a list of string semantic categories to be matched (all must match)
 		- a lambda function (see getSceneComponentList help)
 
@@ -132,11 +133,11 @@ class bvpLibrary(object):
 		if IsStr:
 			if '*' in filterFn:
 				# interpret string with * as semantic category
-				fn = lambda x: filterFn.replace('*', '') in x['semanticCat']
+				fn = lambda x: filterFn.replace('*', '') in x['semantic_category']
 				TmpOb = self.getSCL(fn, ComponentType)
 			else:
 				# interpret string as group name
-				fn = lambda x: x['grpName']==filterFn
+				fn = lambda x: x['name']==filterFn
 				TmpOb = self.getSCL(fn, ComponentType)
 		elif isinstance(filterFn, list):
 			TmpOb = self.getSCL(filterFn, ComponentType)
@@ -172,7 +173,7 @@ class bvpLibrary(object):
 		if not filterFn:
 			filterFn = lambda x: isinstance(x, dict)
 		L = self.getSCL(filterFn, ComponentType)
-		Nm = [x['grpName'] for x in L]
+		Nm = [x['name'] for x in L]
 		Nm.sort()
 		return Nm
 		
@@ -283,9 +284,9 @@ class bvpLibrary(object):
 		for o in self.objects:
 			if o['nPoses']:
 				for p in range(o['nPoses']):
-					ObList.append(bvpObj(o['grpName'], self, size3D=None, pose=p))
+					ObList.append(bvpObj(o['name'], self, size3D=None, pose=p))
 			else:
-				ObList.append(bvpObj(o['grpName'], self, size3D=None, pose=None))
+				ObList.append(bvpObj(o['name'], self, size3D=None, pose=None))
 		return ObList
 
 	def RenderObjects(self, Type=('Image', ), subCat=None, rotList=(0, ), render_Pose=True, renderGroupSize=1, Is_Overwrite=False, scaleObj=None):
@@ -313,22 +314,22 @@ class bvpLibrary(object):
 			for rotZ in rotList:
 				if o['nPoses'] and render_Pose:
 					for p in range(o['nPoses']):
-						O = bvp.bvpObject(obID=o['grpName'], Lib=self, pos3D=(0, 0, 0), size3D=10, rot3D=(0, 0, rotZ), pose=p)
+						O = bvp.Object(obID=o['name'], Lib=self, pos3D=(0, 0, 0), size3D=10, rot3D=(0, 0, rotZ), pose=p)
 						ObToAdd.append(O)
 						if scaleObj:
 							ScObSz = 10.*scaleObj.size3D/O.size3D
 							ScObToAdd.append
 				else:
-					O = bvp.bvpObject(obID=o['grpName'], Lib=self, pos3D=(0, 0, 0), size3D=10, rot3D=(0, 0, rotZ))
+					O = bvp.Object(obID=o['name'], Lib=self, pos3D=(0, 0, 0), size3D=10, rot3D=(0, 0, rotZ))
 					ObToAdd.append(O)
 					# Add scale object in here somehwhere... Scale for each object!
 					if scaleObj:
 						ScObSz = 10.*scaleObj.size3D/O.size3D
 						ScObToAdd.append
 			# Camera, Lights (Sky), Background
-			Cam = bvp.bvpCamera()
-			Sky = bvp.bvpSky()
-			BG = bvp.bvpBG()
+			Cam = bvp.Camera()
+			Sky = bvp.Sky()
+			BG = bvp.Background()
 			# Objects
 			for Obj in ObToAdd:
 				# Create Scene
@@ -337,12 +338,12 @@ class bvpLibrary(object):
 					pNum = Obj.pose+1
 				else:
 					pNum = 1
-				fPath = '%s_%s_p%d_r%d_fr##'%(Obj.semanticCat[0], Obj.grpName, pNum, Obj.rot3D[2])
-				ScnL.append(bvp.bvpScene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
+				fPath = '%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0], Obj.name, pNum, Obj.rot3D[2])
+				ScnL.append(bvp.Scene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
 									Shadow=None, Cam=Cam, FrameRange=(1, 1), 
 									fPath=fPath, FrameRate=15))
 		# Convert list of scenes to SceneList	
-		SL = bvp.bvpSceneList(ScnList=ScnL, RenderOptions=RO)
+		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=renderGroupSize, RenderType=Type)
 		#SL.Render(RenderGroupSize=renderGroupSize, RenderType=Type)
 
@@ -375,15 +376,15 @@ class bvpLibrary(object):
 			ObToAdd = []
 			if o['nPoses'] and render_Pose:
 				for p in range(o['nPoses']):
-					O = bvp.bvpObject(obID=o['grpName'], Lib=self, pos3D=(0, 0, 0), size3D=10, pose=p)
+					O = bvp.Object(obID=o['name'], Lib=self, pos3D=(0, 0, 0), size3D=10, pose=p)
 					ObToAdd.append(O)
 			else:
-				O = bvp.bvpObject(obID=o['grpName'], Lib=self, pos3D=(0, 0, 0), size3D=10)
+				O = bvp.Object(obID=o['name'], Lib=self, pos3D=(0, 0, 0), size3D=10)
 				ObToAdd.append(O)
 			# Lights (Sky) & Background
-			Sky = bvp.bvpSky()
+			Sky = bvp.Sky()
 			Sky.WorldParams['horizon_color'] = (0, 0, 0)
-			BG = bvp.bvpBG()
+			BG = bvp.Background()
 			# Get all (nGrid**3) camera positions
 			cPos = bvp.utils.basics.gridPos(nGrid, xL, yL, zL)
 			# Center (fixation) Position
@@ -403,13 +404,13 @@ class bvpLibrary(object):
 						pNum = 1
 					# Frame range
 					FR = (d*maxFilesPerDir+1, min(nGrid**3, maxFilesPerDir*(d+1)))
-					Cam = bvp.bvpCamera(location=cPos[FR[0]-1:FR[1]], fixPos=fPos[FR[0]-1:FR[1]], frames=fr[FR[0]-1:FR[1]])
-					fPath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semanticCat[0], Obj.grpName, pNum, nGrid, d*maxFilesPerDir, '#'*len(str(nGrid**3)))
-					ScnL.append(bvp.bvpScene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
+					Cam = bvp.Camera(location=cPos[FR[0]-1:FR[1]], fixPos=fPos[FR[0]-1:FR[1]], frames=fr[FR[0]-1:FR[1]])
+					fPath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semantic_category[0], Obj.name, pNum, nGrid, d*maxFilesPerDir, '#'*len(str(nGrid**3)))
+					ScnL.append(bvp.Scene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
 										Shadow=None, Cam=Cam, FrameRange=FR, 
 										fPath=fPath))
 			# Convert list of scenes to SceneList	
-			SL = bvp.bvpSceneList(ScnList=ScnL, RenderOptions=RO)
+			SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 			#return SL
 			jIDs = SL.RenderSlurm(RenderGroupSize=1, RenderType=('Voxels', ), Is_Overwrite=True)
 			ConcatCmd = """import bvp, pickle, os
@@ -452,9 +453,9 @@ for f in fNm:
 
 	def RenderBGs(self, subCat=None, dummyObjects=(), nCamLoc=5, Is_Overwrite=False):
 		'''
-		Render (all) backgrounds in bvpLibrary to folder <LibDir>/Images/Backgrounds/<category>_<grpName>.png
+		Render (all) backgrounds in bvpLibrary to folder <LibDir>/Images/Backgrounds/<category>_<name>.png
 
-		subCat = None #lambda x: x['grpName']=='BG_201_mHouse_1fl_1' #None #'outdoor'		
+		subCat = None #lambda x: x['name']=='BG_201_mHouse_1fl_1' #None #'outdoor'		
 		dummyObjects = ['*human', '*artifact', '*vehicle']
 		'''
 		RO = bvp.RenderOptions()
@@ -473,38 +474,38 @@ for f in fNm:
 		for bg in ToRender:
 			BGCt+=1
 			# Create Scene
-			BG = bvp.bvpBG(bgID=bg['grpName'], Lib=self)
+			BG = bvp.Background(bgID=bg['name'], Lib=self)
 			ObL = []
 			for o in dummyObjects:
-				ObL.append(bvp.bvpObject(obID=o, Lib=self, size3D=None))
+				ObL.append(bvp.Object(obID=o, Lib=self, size3D=None))
 
 			for p in range(nCamLoc):
 				cNum = p+1
-				fPath = '%s_%s_cp%02d_fr##'%(BG.semanticCat[0], BG.grpName, cNum)
+				fPath = '%s_%s_cp%02d_fr##'%(BG.semantic_category[0], BG.name, cNum)
 				fChk = RO.BVPopts['BasePath']%fPath.replace('##', '01.'+RO.image_settings['file_format'].lower())
 				print('Checking for file: %s'%(fChk))
 				if os.path.exists(fChk) and not Is_Overwrite:
 					print('Found it!')
 					# Only append scenes to render that DO NOT have previews already rendered!
 					continue				
-				Cam = bvp.bvpCamera(location=BG.camConstraints.sampleCamPos(frames), fixPos=BG.camConstraints.sampleFixPos(frames), frames=frames)
-				Sky = bvp.bvpSky('*'+BG.skySemanticCat[0], Lib=self)
-				if Sky.semanticCat:
-					if 'dome' in Sky.semanticCat:
+				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+				Sky = bvp.Sky('*'+BG.sky_semantic_category[0], Lib=self)
+				if Sky.semantic_category:
+					if 'dome' in Sky.semantic_category:
 						if len(Sky.lightLoc)>1:
 							Shad=None
 						elif len(Sky.lightLoc)==1:
-							if 'sunset' in Sky.semanticCat:
-								Shad = bvp.bvpShadow('*west', self)
+							if 'sunset' in Sky.semantic_category:
+								Shad = bvp.Shadow('*west', self)
 							else:
-								fn = lambda x: 'clouds' in x['semanticCat'] and not 'west' in x['semanticCat']
-								Shad = bvp.bvpShadow(fn, self)
+								fn = lambda x: 'clouds' in x['semantic_category'] and not 'west' in x['semantic_category']
+								Shad = bvp.Shadow(fn, self)
 						else:
 							Shad=None
 				else:
 					Shad = None
 
-				S = bvp.bvpScene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
+				S = bvp.Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
 									Shadow=Shad, Cam=Cam, FrameRange=frames, 
 									fPath=fPath, 
 									FrameRate=15)
@@ -515,13 +516,13 @@ for f in fNm:
 					print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)
 		# Convert list of scenes to SceneList	
-		SL = bvp.bvpSceneList(ScnList=ScnL, RenderOptions=RO)
+		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=nCamLoc)
 	def RenderSkies(self, subCat=None, Is_Overwrite=False):
 		'''
-		Render (all) skies in bvpLibrary to folder <LibDir>/LibBackgrounds/<category>_<grpName>.png
+		Render (all) skies in bvpLibrary to folder <LibDir>/LibBackgrounds/<category>_<name>.png
 
-		subCat = None # lambda x: 'dome' in x['semanticCat']
+		subCat = None # lambda x: 'dome' in x['semantic_category']
 		'''
 		raise Exception('Not done yet!')
 		RO = bvp.RenderOptions()
@@ -534,29 +535,29 @@ for f in fNm:
 		# Frame count
 		frames = (1, 1)
 		# set standard lights (Sky)
-		Sky = bvp.bvpSky()
+		Sky = bvp.Sky()
 		# Get dummy objects to put in scenes:
 		ObL = []
 		for o in dummyObjects:
-			ObL.append(bvp.bvpObject(obID=o, Lib=self, size3D=None))
+			ObL.append(bvp.Object(obID=o, Lib=self, size3D=None))
 		# Misc Setup
 		BGCt = 0;
 		ScnL = []
 		for bg in ToRender:
 			BGCt+=1
 			# Create Scene
-			BG = bvp.bvpBG(bgID=bg['grpName'], Lib=self)
+			BG = bvp.Background(bgID=bg['name'], Lib=self)
 			for p in range(nCamLoc):
 				cNum = p+1
-				fPath = '%s_%s_cp%d_fr##'%(BG.semanticCat[0], BG.grpName, cNum)
+				fPath = '%s_%s_cp%d_fr##'%(BG.semantic_category[0], BG.name, cNum)
 				fChk = RO.BVPopts['BasePath']%fPath.replace('##', '01.'+RO.file_format.lower())
 				print('Checking for file: %s'%(fChk))
 				if os.path.exists(fChk) and not Is_Overwrite:
 					print('Found it!')
 					# Only append scenes to render that DO NOT have previews already rendered!
 					continue				
-				Cam = bvp.bvpCamera(location=BG.camConstraints.sampleCamPos(frames), fixPos=BG.camConstraints.sampleFixPos(frames), frames=frames)
-				S = bvp.bvpScene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
+				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+				S = bvp.Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
 									Shadow=None, Cam=Cam, FrameRange=(1, 1), 
 									fPath=fPath, 
 									FrameRate=15)
@@ -567,7 +568,7 @@ for f in fNm:
 				#	print('Unable to populate scene %s!'%S.fPath)
 				ScnL.append(S)
 		# Convert list of scenes to SceneList	
-		SL = bvp.bvpSceneList(ScnList=ScnL, RenderOptions=RO)
+		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=nCamLoc)
 	def CreateSolidVol(self, obj=None, vRes=96, buf=4):
 		'''
@@ -597,11 +598,11 @@ for f in fNm:
 			obj = self.objects
 		for o in obj:
 			# Check for existence of .verts file:
-			ff = '%s_%s.%dx%dx%d.verts'%(o['semanticCat'][0].capitalize(), o['grpName'], vRes+buf, vRes+buf, vRes+buf*2)
+			ff = '%s_%s.%dx%dx%d.verts'%(o['semantic_category'][0].capitalize(), o['name'], vRes+buf, vRes+buf, vRes+buf*2)
 			fNm = os.path.join(bvp.Settings['Paths']['LibDir'], 'Objects', 'VOL_Files', ff)
 			if not os.path.exists(fNm):
 				if bvp.Verbosity_Level>3:
-					print('Could not find .verts file for %s'%o['grpName'])
+					print('Could not find .verts file for %s'%o['name'])
 					print('(Searched for %s'%fNm)
 				continue
 			# Get voxelized vert list
@@ -629,11 +630,11 @@ for f in fNm:
 			# Trim?? for more efficient computation? 
 			# ?
 			# Save volume in binary format for pfSkel (or other) code:
-			PF = o['parentFile']
+			PF = o['fname']
 			fDir = os.path.split(PF)[0]
 			Cat = re.search('(?<=Category_)[^_^.]*', PF).group()
 			Res = '%dx%dx%d'%(vRes+buf, vRes+buf, vRes+buf+buf)
-			fName = os.path.join(fDir, 'VOL_Files', Cat+'_'+o['grpName']+'.'+Res+'.vol')
+			fName = os.path.join(fDir, 'VOL_Files', Cat+'_'+o['name']+'.'+Res+'.vol')
 			# Write to binary file
 			print('Saving %s'%fName)
 			with open(fName, 'wb') as fid:

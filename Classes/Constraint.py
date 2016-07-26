@@ -820,10 +820,10 @@ class SLConstraint(Constraint):
 					#'oParams':{}
 					}
 				bgParams.update(self.bgParams)
-				ScBG = bvpBG(bgParams)
+				ScBG = Background(bgParams)
 			else:
 				# Create default BG (empty)
-				ScBG = bvpBG(self.bgParams)
+				ScBG = Background(self.bgParams)
 				
 			# Get Sky
 			if skyIdx:
@@ -838,10 +838,10 @@ class SLConstraint(Constraint):
 					#'skyList':self.skyList, 
 					}
 				skyParams.update(self.skyParams)
-				ScSky = bvpSky(skyParams)
+				ScSky = Sky(skyParams)
 			else:
 				# Create default sky
-				ScSky = bvpSky(self.skyParams)
+				ScSky = Sky(self.skyParams)
 			# Get Camera
 			# GET cParams from BG??? have to do that here???
 			ScCam = Camera(self.cParams)
@@ -858,7 +858,7 @@ class SLConstraint(Constraint):
 				'Cam':ScCam, 
 				'ScnParams':self.ScnParams, 
 				}
-			Scn = bvpScene(newScnParams)
+			Scn = Scene(newScnParams)
 			# Object positions are committed as scene is created...
 			self.ScnList.append(Scn)
 	def MakeListFromLib(self, Type='Obj'):

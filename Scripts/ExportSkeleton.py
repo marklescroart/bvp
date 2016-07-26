@@ -34,10 +34,10 @@ Res = sk.Settings['VolRes'] # Default (2012.08.13) = 96
 #	raise Exception('Path problem! pfSkel settings "LibDir" does not match bvp settings "LibDir". GAAAAAA!')
 
 Lib = bvp.bvpLibrary()
-grpName = 'Reptile_005_Frog' #'Mammal_005_Cat'
-#for grpName in Lib.getGrpNames():
+name = 'Reptile_005_Frog' #'Mammal_005_Cat'
+#for name in Lib.getGrpNames():
 # Get & add object
-O = bvp.bvpObject(grpName,Lib,size3D=10)
+O = bvp.Object(name,Lib,size3D=10)
 O.Place()
 G = bpy.context.object
 # Make proxy objects & create render mesh for all objects in group
@@ -62,7 +62,7 @@ bpy.ops.object.join()
 Ob = bpy.context.object
 bvp.utils.blender.grab_only(Ob)
 # Export off
-OFFf = os.path.join(sk.OFFdir,grpName+'.off')
+OFFf = os.path.join(sk.OFFdir,name+'.off')
 off_export.write(OFFf)
 # Voxelize off @ (default) resolution
 sk.preproc.Voxelize(OFFf,Res=Res)

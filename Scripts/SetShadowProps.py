@@ -10,7 +10,7 @@ import bpy,sys,os
 from bvp.utils.blender import DeclareProperties
 # Get groups in this file
 AllGrp = bpy.data.groups
-# Define RealWorldSize, SemanticCat (more?) as object properites in Blender
+# Define RealWorldSize, semantic_category (more?) as object properites in Blender
 DeclareProperties() 
 ###--- Modify these lines to change object file ---###
 if len(sys.argv)>1:
@@ -26,12 +26,12 @@ with open(fRead,'r') as fid:
 f = [x for x in f if not '<' in x]
 for ss in f:
 	Tmp = [x.strip() for x in ss.split('::')]
-	GrpNm,NewGrpNm,RealWorldSz,SemanticCat = Tmp
+	GrpNm,NewGrpNm,RealWorldSz,semantic_category = Tmp
 	if GrpNm in AllGrp:
 		G = AllGrp[GrpNm]
 		for o in G.objects:
 			o.RealWorldSize = float(RealWorldSz)
-			o.SemanticCat = SemanticCat
+			o.semantic_category = semantic_category
 		if not NewGrpNm=='x':
 			G.name = NewGrpNm
 # Save file w/ new props:

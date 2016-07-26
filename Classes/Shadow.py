@@ -9,13 +9,13 @@ if bvp.Is_Blender:
 	import bpy
 
 # Class def
-class bvpShadow(object):
+class Shadow(object):
 	'''
 	Class for abstract blender scene backgrounds
 	'''
 	def __init__(self, shID=None, Lib=None): 
 		'''
-		Usage: shadow = bvpBG(shID=None, Lib=None)
+		Usage: shadow = Background(shID=None, Lib=None)
 
 		Class to store shadows 
 				
@@ -28,9 +28,9 @@ class bvpShadow(object):
 		ML 2012.01.23
 		'''
 		# Defaults ?? Create Lib from default BG file instead ??
-		self.parentFile=None
-		self.grpName=None
-		self.semanticCat=None
+		self.fname=None
+		self.name=None
+		self.semantic_category=None
 		self.realWorldSize=100.0 # size of whole space in meters
 		self.nVertices=0
 		self.nFaces=0
@@ -40,7 +40,7 @@ class bvpShadow(object):
 			# Replace default values with values from library
 			self.__dict__.update(TmpSky)
 	def __repr__(self):
-		S = '\n ~S~ bvpShadow "%s" ~S~\n'%self.grpName
+		S = '\n ~S~ Shadow "%s" ~S~\n'%self.name
 		return S
 		
 	def PlaceShadow(self, Scn=None, Scale=None):
@@ -52,10 +52,10 @@ class bvpShadow(object):
 		'''
 		if not Scn:
 			Scn = bpy.context.scene # Get current scene if input not supplied
-		if self.grpName:
+		if self.name:
 			# Add group of mesh object(s)
-			fDir, fNm = os.path.split(self.parentFile)
-			ShOb = add_group(self.grpName, fNm, fDir)
+			fDir, fNm = os.path.split(self.fname)
+			ShOb = add_group(self.name, fNm, fDir)
 		if not Scale is None:
 			if bvp.Verbosity_Level >3:
 				print('Resizing shadow...')

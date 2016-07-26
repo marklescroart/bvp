@@ -139,8 +139,8 @@ class Action(MappedClass):
 		## Frames
 		n_frames = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
 		## WordNet labels
-		wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
-		wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
+		wordnet_labels = [s.name for s in act.Action.wordnet_label]
+		wordnet_frames = [s.frame for s in act.Action.wordnet_label]
 		## Bounding box
 		if isinstance(ob.data, bpy.types.Armature):
 			# Get child objects, armatures have no position information
@@ -159,7 +159,7 @@ class Action(MappedClass):
 		#bvpu.blender.make_cube('bbox', min_xyz, max_xyz) # works. This shows the bounding box, if you want. 
 		bvpu.blender.grab_only(ob)
 		## Parent file
-		#pfile = act.bvpAction.parent_file
+		#pfile = act.Action.parent_file
 		# The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
 		# of the current file (group/action/whatever) and save them (append them) to another specfied file
 		# in the database. Currently NOT IMPLEMENTED.
@@ -177,17 +177,17 @@ class Action(MappedClass):
 			wordnet_labels=wordnet_labels, 
 			wordnet_frames=wordnet_frames, 
 			# Flags
-			is_cyclic=act.bvpAction.is_cyclic, 
-			is_translating=act.bvpAction.is_translating, 
-			is_broken=act.bvpAction.is_broken, 
-			is_armature=act.bvpAction.is_armature, 
-			bg_interaction=act.bvpAction.bg_interaction, 
-			obj_interaction=act.bvpAction.obj_interaction, 
-			is_interactive=act.bvpAction.is_interactive, 
-			is_animal=act.bvpAction.is_animal, 
+			is_cyclic=act.Action.is_cyclic, 
+			is_translating=act.Action.is_translating, 
+			is_broken=act.Action.is_broken, 
+			is_armature=act.Action.is_armature, 
+			bg_interaction=act.Action.bg_interaction, 
+			obj_interaction=act.Action.obj_interaction, 
+			is_interactive=act.Action.is_interactive, 
+			is_animal=act.Action.is_animal, 
 			# Computed / assumed
 			n_frames=n_frames, 
-			fps=act.bvpAction.fps, 
+			fps=act.Action.fps, 
 			min_xyz=min_xyz, 
 			max_xyz=max_xyz, 
 			dbi=dbi)

@@ -9,18 +9,18 @@ These .pik files are loaded by the bvpLibrary class.
 
 dictionaries are of the form:
 {
-'parentFile':'/path/to/Category_Blah.blend',
-'grpName':'BG_001_Whatever',
-'semanticCat':['outside','natural']
+'fname':'/path/to/Category_Blah.blend',
+'name':'BG_001_Whatever',
+'semantic_category':['outside','natural']
 'realWorldSize':100.000, # size of whole space in meters
 'lens':50., # focal length for scene camera, in mm
 'nVertices':1000,
 'nFaces':900,
 'obConstraints':bvpObConstraints(), # Derived from empty objects in the scene
-'camConstraints':bvpCamConstraints(),
+'CamConstraint':bvpCamConstraints(),
 'obstacles':None # To come!
 'obSemanticCat':'all', ## List of object categories that can (reasonably) populate this scene
-'skySemanticCat': 'all', ## List of sky categories that can go with this background.
+'sky_semantic_category': 'all', ## List of sky categories that can go with this background.
 'obstacles':None, ## TO DO! background objects  ##
 
 }
@@ -44,7 +44,7 @@ for G in Grp:
 	print(Obst)
 	# Semantic category of background
 	try:
-		semCat = gOb['SemanticCat'].split(',')
+		semCat = gOb['semantic_category'].split(',')
 	except:
 		semCat = [BaseCat.lower()]
 	# Add file title category to list of categories, if not present:
@@ -56,7 +56,7 @@ for G in Grp:
 	except:
 		obCat = ['all']
 	try:
-		skyCat = gOb['SkySemanticCat'].split(',')
+		skyCat = gOb['sky_semantic_category'].split(',')
 	except:
 		skyCat = ['all']
 	
@@ -89,18 +89,18 @@ for G in Grp:
 	except:
 		Lens = 50.
 	d.append(dict(
-			parentFile=bpy.data.filepath,
-			grpName=G.name,
-			semanticCat=semCat,
+			fname=bpy.data.filepath,
+			name=G.name,
+			semantic_category=semCat,
 			realWorldSize=rws,
 			lens=Lens,
 			nVertices=sum([len(oo.data.vertices) for oo in G.objects if oo.type=='MESH']),
 			nFaces=sum([len(oo.data.polygons) for oo in G.objects if oo.type=='MESH']),
 			obConstraints=obConstr,
-			camConstraints=camConstr,
+			CamConstraint=camConstr,
 			obSemanticCat=obCat, ## List of object categories that can (reasonably) populate this scene
-			skySemanticCat=skyCat, ## List of sky categories that can go with this background.
-			obstacles=[bvp.bvpObject(pos3D=list(o.location),size3D=max(o.dimensions)) for o in Obst], ## To come! ##
+			sky_semantic_category=skyCat, ## List of sky categories that can go with this background.
+			obstacles=[bvp.Object(pos3D=list(o.location),size3D=max(o.dimensions)) for o in Obst], ## To come! ##
 			))
 sName = bpy.data.filepath.replace('.blend','.pik')
 savePik(d,sName)

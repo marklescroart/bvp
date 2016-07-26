@@ -12,10 +12,10 @@ objects and store meta-data about each element (for example, the semantic catego
 size of an object). Each individual scene element is stored in a archival .blend files, 
 and managed by a database system based on mongodb (http://www.mongodb.com/).
 
-Scene elements can be combined using a bvpScene class, which has methods to populate a 
+Scene elements can be combined using a Scene class, which has methods to populate a 
 given scene with objects in random locations, render the scene, and more.
 
-All relevant information for a set of scenes is stored in the bvpSceneList 
+All relevant information for a set of scenes is stored in the SceneList 
 class, which has* methods for permanent storage* / write-out of stimulus lists to 
 archival hdf5 files*. 
 

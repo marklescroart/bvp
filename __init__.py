@@ -9,10 +9,10 @@ objects and store meta-data about each element (for example, the semantic catego
 size of an object). Each individual scene element is stored in a archival .blend files,
 and managed by a database system based on mongodb (http://www.mongodb.com/).
 
-Scene elements can be combined using a bvpScene class, which has methods to populate a 
+Scene elements can be combined using a Scene class, which has methods to populate a 
 given scene with objects in random locations, render the scene, and more.
 
-All relevant information for a set of scenes is stored in the bvpSceneList 
+All relevant information for a set of scenes is stored in the SceneList 
 class, which has* methods for permanent storage* / write-out of stimulus lists to 
 archival hf5 files*. 
 
@@ -32,10 +32,7 @@ pymongo # MOVE to optional dependency...
 
 """
 ## -- Startup stuff -- ##
-version = '1.0' # Read from git repo??
-Verbosity_Level = 3 # 0=none, 1=minimal, 2=informative status outputs, 3=basic debugging, ... 10=everything you never wanted to know
-if Verbosity_Level>0:
-	print('Loading BVP version %s'%version)
+__version__ = '0.2a' 
 
 ## -- Imports -- ##
 import re
@@ -49,120 +46,130 @@ import pickle
 
 # Blender imports
 try:
-	import bpy
-	import mathutils as bmu
+    # Working inside of Blender
+    import bpy
+    import mathutils as bmu
+    is_blender = True
 except ImportError: 
-	# Working outside of Blender
-	pass
+    # Working outside of Blender
+    is_blender = False
+
+from . import utils 
+
+# Classes
+from .Classes.Action import Action
+#from .Classes.Background import Background
+from .Classes.Camera import Camera
+from .Classes.Constraint import  ObConstraint, CamConstraint
+from .Classes.DBInterface import DBInterface
+from .Classes.Object import Object
+#from .Classes.RenderOptions import RenderOptions
+#from .Classes.Scene import Scene
+#from .Classes.SceneList import SceneList
+from .Classes.Shadow import Shadow
+#from .Classes.Shape import Shape # Move to Object...?
+#from .Classes.Sky import Sky
+
 
 # REPLACE ME WITH A MORE STANDARD CONFIG FILE
 ## -- Default Settings -- ##
-_SettingFile = os.path.join(os.path.dirname(__file__), 'Settings', 'Settings.json')
-Settings = json.load(open(_SettingFile, 'r'))
+_settings_file = os.path.join(os.path.dirname(__file__), 'Settings', 'Settings.json')
+Settings = json.load(open(_settings_file, 'r'))
 
 ## -- Useful functions -- ##
 def _getuuid():
-	"""Overkill for unique file names"""
-	import uuid # Overkill for unique file name
-	uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
-	return uu
-	
+    """Overkill for unique file names"""
+    import uuid # Overkill for unique file name
+    uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
+    return uu
+    
 def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
-	"""Run a job on the cluster."""
-	# Command to write to file to execute
-	cmd = ' '.join(cmd)
-	cmd = '#!/bin/sh\n#SBATCH\n'+cmd
-	# Command to 
-	slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'all', '--mem', str(mem), '-o', logfile]
-	clust = subprocess.Popen(slurm_cmd,
-		stdin=subprocess.PIPE,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.PIPE)
-	stdout, stderr = clust.communicate(cmd)
-	jobid = re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
-	return jobid, stderr
+    """Run a job on the cluster."""
+    # Command to write to file to execute
+    cmd = ' '.join(cmd)
+    cmd = '#!/bin/sh\n#SBATCH\n'+cmd
+    # Command to 
+    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'all', '--mem', str(mem), '-o', logfile]
+    clust = subprocess.Popen(slurm_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = clust.communicate(cmd)
+    jobid = re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
+    return jobid, stderr
 
 def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
-	"""Run Blender with a given script.
+    """Run Blender with a given script.
 
-	Parameters
-	----------
-	script : string file name or script
-		if `script` is a file that exists (os.path.exists), this function will open
-		an instance of Blender and run that file in Blender. If it is a string, it 
-		will create a dummy temp file, write the string to it, and delete the dummy 
-		file once it has run (or failed). 
-	blend_file : string (optional)
-		File path to Blender file
-	is_local : bool
-		True = run locally, False = run on cluster (if available)
+    Parameters
+    ----------
+    script : string file name or script
+        if `script` is a file that exists (os.path.exists), this function will open
+        an instance of Blender and run that file in Blender. If it is a string, it 
+        will create a dummy temp file, write the string to it, and delete the dummy 
+        file once it has run (or failed). 
+    blend_file : string (optional)
+        File path to Blender file
+    is_local : bool
+        True = run locally, False = run on cluster (if available)
 
-	Other Parameters
-	----------------
-	tmpdir : string file path
-		Where to create a temp file (if so desired). 
-	kwargs are fed to _cluster, if necessary
+    Other Parameters
+    ----------------
+    tmpdir : string file path
+        Where to create a temp file (if so desired). 
+    kwargs are fed to _cluster, if necessary
 
-	Returns
-	-------
-	jobid : string
-		ID for cluster job (or None, if cluster doesn't return job ids)
-	"""
-	# Inputs
-	if blend_file is None:
-		blend_file = os.path.join(__path__[0], 'BlendFiles', 'Blank.blend')
-	# Check for existence of script
-	if not os.path.exists(script):
-		# TO DO: look into doing this with pipes??
-		del_tmp_script = True
-		tmpf = os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
-		with open(tmpf, 'w') as fid:
-			fid.writelines(script)
-		script = tmpf
-	else:
-		del_tmp_script = False
-	# Run 
-	blender = Settings['Paths']['BlenderCmd']
-	blender_cmd = [blender, '-b', blend_file, '-P', script]
-	if is_local:
-		# To do (?) 
-		# - Use subprocess.Popen and PIPE instead of writing temp script? 
-		# - check output for error?
-		proc = subprocess.Popen(blender_cmd,
-			stdin=subprocess.PIPE,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.PIPE)
-		stdout, stderr = proc.communicate()
-		if del_tmp_script and not stderr:
-			os.unlink(tmpf)
-		return stdout, stderr
-		# Raise exception if stderr? Or leave that to calling function? Optional?
-	else:
-		# Call via cluster
-		if Verbosity_Level>3:
-			print('Calling via cluster: %s'%(' '.join(blender_cmd)))
-		jobid, stderr = _cluster(blender_cmd, **kwargs)
-		# To do (?)
-		# - Check standard error for boo-boos??
-		return jobid
+    Returns
+    -------
+    jobid : string
+        ID for cluster job (or None, if cluster doesn't return job ids)
+    """
+    # Inputs
+    if blend_file is None:
+        blend_file = os.path.join(__path__[0], 'BlendFiles', 'Blank.blend')
+    # Check for existence of script
+    if not os.path.exists(script):
+        # TO DO: look into doing this with pipes??
+        del_tmp_script = True
+        tmpf = os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
+        with open(tmpf, 'w') as fid:
+            fid.writelines(script)
+        script = tmpf
+    else:
+        del_tmp_script = False
+    # Run 
+    blender = Settings['Paths']['BlenderCmd']
+    blender_cmd = [blender, '-b', blend_file, '-P', script]
+    if is_local:
+        # To do (?) 
+        # - Use subprocess.Popen and PIPE instead of writing temp script? 
+        # - check output for error?
+        proc = subprocess.Popen(blender_cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE)
+        stdout, stderr = proc.communicate()
+        if del_tmp_script and not stderr:
+            os.unlink(tmpf)
+        return stdout, stderr
+        # Raise exception if stderr? Or leave that to calling function? Optional?
+    else:
+        # Call via cluster
+        if Verbosity_Level>3:
+            print('Calling via cluster: %s'%(' '.join(blender_cmd)))
+        jobid, stderr = _cluster(blender_cmd, **kwargs)
+        # To do (?)
+        # - Check standard error for boo-boos??
+        return jobid
 
-def save_settings(S=None, sFile=_SettingFile):
-	'''
-	Save any modification to bvp.Settings. This is PERMANENT across sessions - use with caution!
-	'''
-	if S is None:
-		S = Settings
-	json.dump(S, open(sFile, 'w'), indent=2)
+def save_settings(S=None, settings_file=_settings_file):
+    '''
+    Save any modification to bvp.Settings. This is PERMANENT across sessions - use with caution!
+    '''
+    if S is None:
+        S = Settings
+    json.dump(S, open(settings_file, 'w'), indent=2)
 
-## -- Top-level class imports -- ##
-for module in os.listdir(os.path.dirname(__file__)):
-	if module == '__init__.py' or not module.endswith('.py'):
-		continue
-	if Verbosity_Level>3: 
-		print('loading ' + module)
-	#logger.info("Loading bvp class: %s" % module[:-3])
-	temp = __import__(module[:-3], locals(), globals(), fromlist=[module[:-3]], level=1)
-	locals()[module[:-3]] = temp.__getattribute__(module[:-3])
-# Misc. cleanup
-del module
-del temp
+
+__all__ = ['Action', 'Camera', 'ObConstraint', 'CamConstraint', 
+           'DBInterface', 'Object', 'Shadow', 'Settings'] # Lose Settings, make config.

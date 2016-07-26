@@ -11,9 +11,9 @@ way, it's possible to modify the properties of the groups within many files
 at once.
 
 Each group will have its own line in the text file, thus:
-GrpName :: NewGrpName :: realWorldSize :: semanticCatString
+name :: NewGrpName :: realWorldSize :: semanticCatString
 
-GrpName = the name of the group in the .blend file
+name = the name of the group in the .blend file
 NewGrpName = "x" by default. If it is changed from "x", 
 	then "SetGroupProps" will change the name of the group 
 	to the NewGrpName
@@ -53,7 +53,7 @@ with open(sName,'a') as fid:
 		except:
 			Sz = 1.000
 		try:
-			SemStr = G.objects[0]['SemanticCat']
+			SemStr = G.objects[0]['semantic_category']
 		except:
 			SemStr = BaseCat.lower()
 		S = '%s:: x :: %.3f :: %s\n'%(G.name,Sz,SemStr)

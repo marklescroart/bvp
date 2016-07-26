@@ -190,7 +190,7 @@ def declare_properties():
 	# bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
 	# # Imprecise list of semantic labels for an object; for convenience 
 	# # (a string, w/ comma-separated descriptors/categories for the object in question)
-	# bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
+	# bpy.types.Object.semantic_category = bpy.props.StringProperty(name='semantic_category',default='thing')
 	# # Precise definitional label for object
 	# bpy.types.Object.wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='entity.n.01')
 	# # Reasonably realistic-looking, not cartoony or otherwise bad.
@@ -204,7 +204,7 @@ def declare_properties():
 	# Semantic Category of allowable objects (within scene)
 	bpy.types.Object.ObjectSemanticCat = bpy.props.StringProperty(name='ObjectSemanticCat',default='thing')
 	# Semantic Category of allowable skies (for scene)
-	bpy.types.Object.SkySemanticCat = bpy.props.StringProperty(name='SkySemanticCat',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
+	bpy.types.Object.sky_semantic_category = bpy.props.StringProperty(name='sky_semantic_category',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 	# Focal length of camera (for background)
 	bpy.types.Object.Lens = bpy.props.FloatProperty(name='Lens',min=25.,max=50.,default=50.) # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 
@@ -213,13 +213,13 @@ def declare_properties():
 	## -- By class -- ## 
 	bpy.types.Object.groups = bpy.props.EnumProperty(name='groups',description='Groups using this object',items=enum_groups)
 	
-	bpy.types.Group.bvpObject = bpy.props.PointerProperty(type=ObjectProps)
+	bpy.types.Group.Object = bpy.props.PointerProperty(type=ObjectProps)
 	bpy.types.Group.is_object = bpy.props.BoolProperty(name='is_object',default=True)
 
-	bpy.types.Group.bvpBG = bpy.props.PointerProperty(type=BGProps)
+	bpy.types.Group.Background = bpy.props.PointerProperty(type=BGProps)
 	#bpy.types.Group.is_bg = bpy.props.BoolProperty(name='is_bg',default=False)
 	
-	bpy.types.Action.bvpAction = bpy.props.PointerProperty(type=ActionProps)
+	bpy.types.Action.Action = bpy.props.PointerProperty(type=ActionProps)
 	
 	bpy.types.Scene.bvpRenderOptions = bpy.props.PointerProperty(type=RenderOptions)
 	## -- For database management -- ##
@@ -361,8 +361,8 @@ class DBSaveObject(bpy.types.Operator):
 		wm = context.window_manager
 		ob = context.object
 		grp = bpy.data.groups[wm.active_group]
-		# Parent file nonsense because we can't set bvpObject.parent_file here:
-		pfile = grp.bvpObject.parent_file
+		# Parent file nonsense because we can't set Object.parent_file here:
+		pfile = grp.Object.parent_file
 		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
 		if thisfile=="":
 			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Objects/')))		
@@ -389,10 +389,10 @@ class DBSaveObject(bpy.types.Operator):
 		## Vertices
 		nverts = sum([len(oo.data.vertices) for oo in grp.objects if oo.type=='MESH'])
 		## Semantic categories
-		semcat = [s.strip() for s in grp.bvpObject.semantic_cat.split(',')]
+		semcat = [s.strip() for s in grp.Object.semantic_cat.split(',')]
 		semcat = [s.lower() for s in semcat if s]
 		## WordNet labels
-		wordnet = [s.strip() for s in grp.bvpObject.wordnet_label.split(',')]
+		wordnet = [s.strip() for s in grp.Object.wordnet_label.split(',')]
 		wordnet = [s.lower() for s in wordnet if s]
 		#is_manifold = False # worth it? 
 		# Create database instance
@@ -404,10 +404,10 @@ class DBSaveObject(bpy.types.Operator):
 			parent_file=pfile, # hacky. ugly. 
 			wordnet_label=wordnet,
 			semantic_cat=semcat,
-			basic_cat=grp.bvpObject.basic_cat,
-			real_world_size=grp.bvpObject.real_world_size,
-			is_realistic=grp.bvpObject.is_realistic,
-			is_cycles=grp.bvpObject.is_cycles,
+			basic_cat=grp.Object.basic_cat,
+			real_world_size=grp.Object.real_world_size,
+			is_realistic=grp.Object.is_realistic,
+			is_cycles=grp.Object.is_cycles,
 			# Computed
 			nfaces=nfaces,
 			nvertices=nverts,
@@ -582,7 +582,7 @@ class WordNetAddLabel(bpy.types.Operator):
 		# Add current label at current frame
 		wm = context.window_manager
 		act = context.object.animation_data.action
-		added = act.bvpAction.wordnet_label.add()
+		added = act.Action.wordnet_label.add()
 		added.name = wm.wn_results
 		added.frame = bpy.context.scene.frame_current
 		return {'FINISHED'}
@@ -594,7 +594,7 @@ class WordNetRemoveLabel(bpy.types.Operator):
 	def execute(self,context): 
 		wm = context.window_manager
 		act = context.object.animation_data.action
-		act.bvpAction.wordnet_label.remove(wm.wn_label_index)
+		act.Action.wordnet_label.remove(wm.wn_label_index)
 		return {'FINISHED'}
 
 class DBImport(bpy.types.Operator):
@@ -611,7 +611,7 @@ class DBImport(bpy.types.Operator):
 		if last_import=='object':
 			print('--- importing: ---')
 			print(to_import)
-			O = bvp.bvpObject(**to_import)
+			O = bvp.Object(**to_import)
 			O.Place(proxy=self.proxy_import)
 		elif last_import=='action':
 			raise NotImplementedError('Not yet! need to apply actions to objects!')
@@ -730,19 +730,19 @@ class BVP_PANEL_object_tools(View3DPanel,Panel):
 				col.label("WordNet:")
 				col.label('Real size:')
 				# Boolean properties
-				col.prop(grp.bvpObject,'is_realistic',text='realistic')
+				col.prop(grp.Object,'is_realistic',text='realistic')
 				# Button for re-scaling object groups 
 				col.operator('bvp.rescale_group',text='Rescale')	
 				
 				## -- 2nd column -- ##
 				col = spl.column()
 				col.prop(ob,'groups',text="")
-				col.prop(grp.bvpObject,'parent_file',text='')
-				col.prop(grp.bvpObject,'semantic_cat',text='')
-				col.prop(grp.bvpObject,'basic_cat',text='')
-				col.prop(grp.bvpObject,'wordnet_label',text='')
-				col.prop(grp.bvpObject,'real_world_size',text='')
-				col.prop(grp.bvpObject,'is_cycles',text='cycles')
+				col.prop(grp.Object,'parent_file',text='')
+				col.prop(grp.Object,'semantic_cat',text='')
+				col.prop(grp.Object,'basic_cat',text='')
+				col.prop(grp.Object,'wordnet_label',text='')
+				col.prop(grp.Object,'real_world_size',text='')
+				col.prop(grp.Object,'is_cycles',text='cycles')
 				# Button for re-scaling object groups 
 				col.operator('bvp.db_save_object',text='Save to DB')
 
@@ -777,14 +777,14 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		## -- 2nd column -- ##
 		col = spl.column()
 		col.prop(act,'name',text="")
-		#col.prop(act.bvpAction,'parent_file',text='')
-		#col.prop(act.bvpAction,'semantic_cat',text='')
+		#col.prop(act.Action,'parent_file',text='')
+		#col.prop(act.Action,'semantic_cat',text='')
 		row = col.row(align=True)
 		row.prop(wm,'wn_results',text="")
 		#row.prop(wm,'label_frame',text="")
 		row.operator('bvp.wn_addlabel',text="Add label")
 		row = layout.row()
-		row.template_list("WordNet_Label_List", "wordnet labels", act.bvpAction, "wordnet_label",wm,"wn_label_index")
+		row.template_list("WordNet_Label_List", "wordnet labels", act.Action, "wordnet_label",wm,"wn_label_index")
 		col = row.column(align=True)
 		col.operator("bvp.wn_removelabel", icon='ZOOMOUT', text="")
 		#col.operator("object.material_slot_remove", icon='ZOOMOUT', text="")
@@ -793,16 +793,16 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		# Boolean properties - column 1
 		spl = layout.split()		
 		col = spl.column()
-		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
-		col.prop(act.bvpAction,'bg_interaction',text='needs bg')
-		col.prop(act.bvpAction,'is_translating',text='translating')
-		col.prop(act.bvpAction,'is_interactive',text='interactive')
+		col.prop(act.Action,'is_cyclic',text='cyclic')
+		col.prop(act.Action,'bg_interaction',text='needs bg')
+		col.prop(act.Action,'is_translating',text='translating')
+		col.prop(act.Action,'is_interactive',text='interactive')
 		# Boolean properties - column 2
 		col = spl.column()
-		col.prop(act.bvpAction,'is_broken',text='broken')
-		col.prop(act.bvpAction,'obj_interaction',text='needs obj.')
-		col.prop(act.bvpAction,'is_armature',text='armature')
-		col.prop(act.bvpAction,'is_animal',text='animal/unique')
+		col.prop(act.Action,'is_broken',text='broken')
+		col.prop(act.Action,'obj_interaction',text='needs obj.')
+		col.prop(act.Action,'is_armature',text='armature')
+		col.prop(act.Action,'is_animal',text='animal/unique')
 		## -- Break -- ##
 		spl = layout.split()
 		col = spl.column()
@@ -838,7 +838,7 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 		row = layout.row()
 		row.label('(Work in progress)')
 		# Search through scene objects to determine if any are BVP bg objects
-		# Display bvpBG properties (constraints,realworldsize,wordnet_label,etc...)
+		# Display Background properties (constraints,realworldsize,wordnet_label,etc...)
 		# Editing:
 		# Buttons to add constraints of different types
 		# Buttons to test constraints / reset scene
@@ -873,7 +873,7 @@ class BVP_PANEL_render(RenderPanel,Panel):
 		row = layout.row()
 		row.label('for scene: %s'%context.scene.name)
 		# Search through scene objects to determine if any are BVP bg objects
-		# Display bvpBG properties (constraints,realworldsize,wordnet_label,etc...)
+		# Display Background properties (constraints,realworldsize,wordnet_label,etc...)
 		# Editing:
 		# Buttons to add constraints of different types
 		# Buttons to test constraints / reset scene

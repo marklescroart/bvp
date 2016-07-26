@@ -2,15 +2,18 @@
 Initialization of utils.
 Couple handy-dandy functions:
 '''
-import bvp
+
+from . import basics
+from . import blender
+from . import bvpMath
+#from . import plot # ? necessary? NO. Kill me.
 
 def set_scn():
+	'''Quickie default setup of camera + lighting for an object
 	'''
-	Quickie camera + lighting for an object
-	'''
-	cam = bvp.bvpCamera()
-	sky = bvp.bvpSky()
-	RO = bvp.RenderOptions()
-	scn = bvp.bvpScene(cam=cam,sky=sky)
+	cam = bvp.Camera()
+	sky = bvp.Sky()
+	ropts = bvp.RenderOptions()
+	scn = bvp.Scene(cam=cam, sky=sky)
 	scn.create()
-	scn.apply_opts(render_options=RO)
+	scn.apply_opts(render_options=ropts)

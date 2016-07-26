@@ -4,7 +4,8 @@ Class to control BVP Render options
 # Imports
 import bvp, os, sys
 import math as bnp
-from .utils.blender import set_layers
+from .utils import blender as butils
+#from .utils.blender import butils.set_layers
 from .utils.basics import fixedKeyDict
 try:
 	import bpy
@@ -87,7 +88,7 @@ class RenderOptions(object):
 		Notes
 		-----
 		RenderOptions does not directly modify a scene's file path; it only provides the base file (parent directory) for all rendering.
-		bvpScene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
+		Scene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
 
 		'''
 		
@@ -312,12 +313,12 @@ class RenderOptions(object):
 					o.pass_index = PassCt
 					for po in o.dupli_group.objects:
 						po.pass_index = PassCt
-					set_layers(o, [0, PassCt])
+					butils.set_layers(o, [0, PassCt])
 					PassCt +=1
 			# Check for mesh objects:
 			elif o.type=='MESH':
 				o.pass_index = PassCt
-				set_layers(o, [0, PassCt])
+				butils.set_layers(o, [0, PassCt])
 				PassCt +=1
 			# Other types of objects?? 
 		
@@ -696,8 +697,7 @@ class RenderOptions(object):
 		Cam.data.cycles.panorama_type='FISHEYE_EQUISOLID'
 
 		# Get all-white cycles emission material 
-		fPath, bvpfNm = os.path.split(bvp.__file__)
-		fPath = os.path.join(fPath, 'BlendFiles')
+		fPath = os.path.join(bvp_basedir, 'BlendFiles')
 		fName = 'Cycles_Render.blend'
 		MatNm = 'CycWhite'
 		bpy.ops.wm.link_append(
@@ -707,15 +707,13 @@ class RenderOptions(object):
 			link=False, 
 			relative_path=False, 
 			)
-		if bvp.Verbosity_Level >= 3:
-			print('loaded "CycWhite" material!')
 		
 		# For all dupli-objects in scene, create proxies
 		for bOb in bpy.context.scene.objects:
 			# Create proxies for all objects within object
 			if bOb.dupli_group:
 				for o in bOb.dupli_group.objects:
-					bvp.utils.blender.grab_only(bOb)
+					butils.grab_only(bOb)
 					bpy.ops.object.proxy_make(object=o.name) #, object=bOb.name, type=o.name)
 				# Get rid of linked group now that dupli group objects are imported
 				bpy.context.scene.objects.unlink(bOb)
