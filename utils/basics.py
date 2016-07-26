@@ -8,8 +8,14 @@ Created by ML 2011.05
 Modified by ML 2013.09.18
 '''
 
-import os, random, subprocess, time, bvp
+import os
+import time
+import subprocess
+import pickle # replace with json? bson? 
 import numpy as np
+
+from .options import config
+blender_cmd = config.get('path','blender_cmd')
 
 try:
 	import bpy
@@ -45,11 +51,13 @@ def unique(seq, idfun=None):
 			seen[marker] = 1
 			result.append(item)			
 	return result, seen
+
 def linspace(a, b, n=100):
 	r = b-a # range
 	# create 0-1 for n values
 	qq = [x/float(n-1)*r+a for x in range (0, n)]
 	return qq
+
 def gridPos(n, xL=(-5, 5), yL=(-5, 5), zL=(0, 10)):
 	# Cam Position
 	p = []
@@ -99,31 +107,29 @@ def RunScriptForAllFiles(scriptF, fNm, Is_Cluster=False, Inpts=None):
 
 	ML 2012.01.30
 	'''
-	# Get Blender instance
-	Blender = bvp.Settings['Paths']['BlenderCmd'] 
 	
 	if not Is_Cluster:
 		for BlendFile in fNm:
 			#BlendFile = os.path.join(fDir, BlendFile)
-			BlenderCmd = [Blender, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?
+			full_cmd = [blender_cmd, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?
 			if not Inpts is None:
-				BlenderCmd+=Inpts
+				full_cmd+=Inpts
 			print('Calling:')
-			print(BlenderCmd)
-			subprocess.call(BlenderCmd)
+			print(full_cmd)
+			subprocess.call(full_cmd)
 			print('Done with %s'%BlendFile)
 	else:
 		nCPUs = '2'
 		ClusterGrp = 'blender' # For now, GLab Slurm computers enabled to run Blender
 		TempScriptDir = os.path.join(bvp.__path__[0], 'Temp')
 		for ii, BlendFile in enumerate(fNm):
-			BlenderCmd = [Blender, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?				
+			full_cmd = [blender_cmd, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?				
 			TempScriptName = os.path.join(TempScriptDir, 'RunScriptForAllFiles_%s_%04d.sh'%(time.strftime('%Y%m%d_%m%M'), ii+1))
 			with open(TempScriptName, 'wb') as fid:
 				fid.write('#!/bin/sh\n')
 				fid.write('#SBATCH\n')
-				BlenderCmd = Blender+' -b '+BlendFile+' -P '+BlenderPyFile
-				fid.write(BlenderCmd)
+				full_cmd = blender_cmd+' -b '+BlendFile+' -P '+BlenderPyFile
+				fid.write(full_cmd)
 				# Cleanup (move to .done file instead?)
 				#fid.write('rm '+BlenderPyFile) 
 				#fid.write('rm '+TempScriptName) 
@@ -150,7 +156,7 @@ def savePik(d, pikFile, protocol=2):
 	ML 2012.02
 	'''
 	with open(pikFile, 'wb') as fid:
-		bvp.pickle.dump(d, fid, protocol=2)
+		pickle.dump(d, fid, protocol=2)
 
 def load_template(template_type):
 	bvp_path = os.path.split(os.path.abspath(bvp.__file__))[0]
@@ -203,7 +209,7 @@ class fixedKeyDict(dict):
 			for k in DictIn.keys():
 				self[k] = DictIn[k]
 
-if not bvp.Is_Blender:
+if not is_blender:
 	def pySlurm(PyStr, LogDir='/auto/k1/mark/SlurmLog/', SlurmOut=None, SlurmErr=None, 
 					nCPUs='2', partition='all', memory=6000, dep=None):
 		'''

@@ -9,7 +9,7 @@
 *.DS_Store
 
 ## -- Do not copy actual settings, only example for distribution -- ##
-Settings/*ettings*.json
+options.cfg
 
 ## -- TEMPORARY: No demos yet. Not ready for prime-time. -- ##
 Demos_Tests/

@@ -5,7 +5,7 @@ import os
 import math as bnp
 from ..utils.blender import add_group
 from .Constraint import ObConstraint, CamConstraint
-from .Object import Object as O
+from .Object import Object
 
 try:
     import bpy
@@ -90,10 +90,10 @@ class Background(object):
         Sky = bvp.Sky('*'+self.sky_semantic_category[0], Lib) # Choose a sky according to semantic category of BG ## RELIES ON ONLY ONE ENTRY FOR SKY SEMANTIC CAT! Should be most specific specifier...
         scn = bvp.Scene(0, BG=self, Cam=Cam, Sky=Sky, FrameRange=frames)
         if not ObL and not nObj:
-            ObL = [O('*animal', Lib, size3D=None), O('*vehicle', Lib, size3D=None), O('*appliance', Lib, size3D=None)]
+            ObL = [Object('*animal', Lib, size3D=None), Object('*vehicle', Lib, size3D=None), Object('*appliance', Lib, size3D=None)]
             nObj = 0
         elif not ObL and nObj:
-            ObL = [O(None, None, size3D=None) for x in range(nObj)]
+            ObL = [Object(None, None, size3D=None) for x in range(nObj)]
         scn.populate_scene(ObList=ObL, ResetCam=True, RaiseError=True, nIter=100, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
         if bvp.Is_Blender:
             RO = bvp.RenderOptions()

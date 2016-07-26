@@ -129,8 +129,7 @@ class Action(MappedClass):
 			duh.
 		"""
 		# Idiot-proofing
-		if not is_blender:
-			raise Exception("from_blender() only works within an active blender session.")
+		assert is_blender, "from_blender() only works within an active blender session."
 		# Get relevant blender objects 
 		wm = context.window_manager
 		ob = context.object
@@ -195,7 +194,7 @@ class Action(MappedClass):
 
 	def __repr__(self):
 		"""Display string"""
-		S = '\n ~A~ Action "%s" ~A~\n'%(self.name)
+		rstr = '\n ~A~ Action "%s" ~A~\n'%(self.name)
 		for k, v in self.docdict:
-			S += '%s : %s\n'%(k, repr(v))
-		return S
+			rstr += '%s : %s\n'%(k, repr(v))
+		return rstr
