@@ -1,4 +1,4 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Gets properties for all objects (groups) in a .blend files. Stores properties in a list 
@@ -26,7 +26,7 @@ dictionaries are of the form:
 Object constraints are not working yet (2012.02.29)!
 
 ML 2012.02
-'''
+"""
 
 # Imports
 import bpy,bvp,os,re,copy

@@ -1,9 +1,9 @@
-'''
+"""
 .B.lender .V.ision .P.roject utils for computing shape-related quantities in Blender
 
 TO DO: generalize so that these can be used outside of Blender? Or do we care, because 
 Blender is our storage for all mesh geometry...?
-'''
+"""
 import bvp
 import numpy as np
 #from scipy import sparse
@@ -776,7 +776,7 @@ class Shape(object):
         return self.graph
 
     def extract_chunk(self, nfaces=100, seed=None, auxpts=None):
-        '''Extract a chunk of the surface using breadth first search, for testing purposes'''
+        """Extract a chunk of the surface using breadth first search, for testing purposes"""
         node = seed
         if seed is None:
             node = np.random.randint(len(self.pts))
@@ -811,7 +811,7 @@ class Shape(object):
         return np.array(pts), np.array(polys)
 
     def polyhedra(self, wm):
-        '''Iterates through the polyhedra that make up the closest volume to a certain vertex'''
+        """Iterates through the polyhedra that make up the closest volume to a certain vertex"""
         for p, facerow in enumerate(self.connected):
             faces = facerow.indices
             pts, polys = _ptset(), _quadset()
@@ -925,12 +925,12 @@ class _quadset(object):
 
 
 def tetra_vol(pts):
-    '''Volume of a tetrahedron'''
+    """Volume of a tetrahedron"""
     tetra = pts[1:] - pts[0]
     return np.abs(np.dot(tetra[0], np.cross(tetra[1], tetra[2]))) / 6
 
 def brick_vol(pts):
-    '''Volume of a triangular prism'''
+    """Volume of a triangular prism"""
     return tetra_vol(pts[[0, 1, 2, 4]]) + tetra_vol(pts[[0, 2, 3, 4]]) + tetra_vol(pts[[2, 3, 4, 5]])
 
 def sort_polys(polys):
@@ -939,17 +939,17 @@ def sort_polys(polys):
     return np.array([polys[xind, amin], polys[xind, (amin+1)%3], polys[xind, (amin+2)%3]]).T
 
 def face_area(pts):
-    '''Area of triangles
+    """Area of triangles
 
     Parameters
     ----------
     pts : array_like
         n x 3 x 3 array with n triangles, 3 pts, and (x, y, z) coordinates
-    '''
+    """
     return 0.5 * np.sqrt((np.cross(pts[:, 1]-pts[:, 0], pts[:, 2]-pts[:, 0])**2).sum(1))
 
 def face_volume(pts1, pts2, polys):
-    '''Volume of each face in a polyhedron sheet'''
+    """Volume of each face in a polyhedron sheet"""
     vols = np.zeros((len(polys), ))
     for i, face in enumerate(polys):
         vols[i] = brick_vol(np.append(pts1[face], pts2[face], axis=0))
@@ -986,7 +986,7 @@ def make_cube(center=(.5, .5, .5), size=1):
     return pts * size + center, polys
 
 def boundary_edges(polys):
-    '''Returns the edges that are on the boundary of a mesh, as defined by belonging to only 1 face'''
+    """Returns the edges that are on the boundary of a mesh, as defined by belonging to only 1 face"""
     # AKA non-manifold edges? 
     edges = dict()
     for i, poly in enumerate(np.sort(polys)):
@@ -1004,7 +1004,7 @@ def boundary_edges(polys):
     return np.array(epts)
 
 def trace_poly(edges):
-    '''Given a disjoint set of edges, yield complete linked polygons'''
+    """Given a disjoint set of edges, yield complete linked polygons"""
     idx = dict((i, set([])) for i in np.unique(edges))
     for i, (x, y) in enumerate(edges):
         idx[x].add(i)

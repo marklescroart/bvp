@@ -55,26 +55,23 @@ except ImportError:
     is_blender = False
 
 from . import utils 
+from .options import config
 
 # Classes
 from .Classes.Action import Action
 #from .Classes.Background import Background
 from .Classes.Camera import Camera
 from .Classes.Constraint import  ObConstraint, CamConstraint
-from .Classes.DBInterface import DBInterface
+#from .Classes.DBInterface import DBInterface
 from .Classes.Object import Object
 #from .Classes.RenderOptions import RenderOptions
-#from .Classes.Scene import Scene
+from .Classes.Scene import Scene
 #from .Classes.SceneList import SceneList
 from .Classes.Shadow import Shadow
 #from .Classes.Shape import Shape # Move to Object...?
 #from .Classes.Sky import Sky
 
-
-# REPLACE ME WITH A MORE STANDARD CONFIG FILE
-## -- Default Settings -- ##
-_settings_file = os.path.join(os.path.dirname(__file__), 'Settings', 'Settings.json')
-Settings = json.load(open(_settings_file, 'r'))
+# UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
 
 ## -- Useful functions -- ##
 def _getuuid():
@@ -138,7 +135,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     else:
         del_tmp_script = False
     # Run 
-    blender = Settings['Paths']['BlenderCmd']
+    blender = config.get('path', 'blender_cmd') #Settings['Paths']['BlenderCmd']
     blender_cmd = [blender, '-b', blend_file, '-P', script]
     if is_local:
         # To do (?) 
@@ -151,25 +148,19 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         stdout, stderr = proc.communicate()
         if del_tmp_script and not stderr:
             os.unlink(tmpf)
+        # Raise exception if stderr? 
+        # Or leave that to calling function? 
+        # Optional?
         return stdout, stderr
-        # Raise exception if stderr? Or leave that to calling function? Optional?
+        
     else:
         # Call via cluster
-        if Verbosity_Level>3:
+        if verbosity_level>3:
             print('Calling via cluster: %s'%(' '.join(blender_cmd)))
         jobid, stderr = _cluster(blender_cmd, **kwargs)
-        # To do (?)
-        # - Check standard error for boo-boos??
+        # Check stderr for presence of errors? 
+        # Raise them if they exist?
         return jobid
 
-def save_settings(S=None, settings_file=_settings_file):
-    '''
-    Save any modification to bvp.Settings. This is PERMANENT across sessions - use with caution!
-    '''
-    if S is None:
-        S = Settings
-    json.dump(S, open(settings_file, 'w'), indent=2)
-
-
 __all__ = ['Action', 'Camera', 'ObConstraint', 'CamConstraint', 
-           'DBInterface', 'Object', 'Shadow', 'Settings'] # Lose Settings, make config.
+           'DBInterface', 'Object', 'Shadow', 'utils','config'] # Lose Settings, make config.

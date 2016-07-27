@@ -1,4 +1,4 @@
-''' 
+""" 
 
 #######################################################
 
@@ -18,7 +18,7 @@ requires environment variable "BVPDIR" to be set to base directory (dir containi
 
 ML 2011.06.24
 
-'''
+"""
 import off_export,bvp,bpy,os,re
 import pfSkel as sk
 Div = '~'*40

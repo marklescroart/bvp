@@ -19,11 +19,11 @@ if bvp.Is_Blender:
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
 class bvpLibrary(object):
-	'''
+	"""
 	Class to store pointers to / meta info about objects in stored in archival .blend files.
-	'''
+	"""
 	def __init__(self, LibDir=bvp.Settings['Paths']['LibDir']):
-		'''
+		"""
 		Usage: Lib = bvpLibrary(LibDir='/auto/k6/mark/BlenderFiles/')
 		
 		A class to store meta-info (file locations, names, *(Some properties) of objects, backgrounds, shadows, and skies) about objects 
@@ -47,7 +47,7 @@ class bvpLibrary(object):
 					   Shadows/ <Category_*.blend and Category_*.pik>
 		
 		2011.11.30 ML
-		'''		
+		"""		
 		self.LibDir = LibDir
 		# Build in check for existence of .pik files??
 
@@ -71,7 +71,7 @@ class bvpLibrary(object):
 				setattr(self, sc.lower(), None)
 		#del SceneComponents, sc, fDir, fNm, d, f
 	def getSceneComponentList(self, filterFn, ComponentType='objects'):
-		'''
+		"""
 		Get list of objects, backgrounds, scenes, or shadows from the library that 
 		meet a particular filter criterion.
 		Filter should be either a string (of some semantic category), a list of 
@@ -85,7 +85,7 @@ class bvpLibrary(object):
 		or: (lambda function usage)
 		fn = lambda x: x['realWorldSize'] < 1.0
 		SmallStuff = Lib.getComponentList(fn)
-		'''
+		"""
 		L = getattr(self, ComponentType)
 		if type(filterFn)==type('string'):
 			# If filterFn is a string, it is a semantic category
@@ -99,7 +99,7 @@ class bvpLibrary(object):
 			Out = [x for x in L if filterFn(x)]
 		return Out
 	def getSceneComponent(self, filterFn, ComponentType='objects'):
-		'''
+		"""
 		Get a specific object, background, scene, or shadow from the library that 
 		meets a particular filter criterion. If multiple objects meet the filter
 		criterion, one is chosen at random**.
@@ -123,7 +123,7 @@ class bvpLibrary(object):
 		smBG = Lib.getComponent(fn, 'backgrounds')
 
 		ML 2012.02.24
-		'''
+		"""
 		# This BS is due to python2/python3 differences
 		try:
 			IsStr = isinstance(filterFn, (str, unicode))
@@ -161,7 +161,7 @@ class bvpLibrary(object):
 		return TmpOb
 
 	def getGrpNames(self, filterFn=None, ComponentType='objects'):
-		'''
+		"""
 		Gets grp Names (unique ids for each object / background / etc). By default, gets ALL names, but can be filtered
 		(as in getSceneComponentList)
 
@@ -169,7 +169,7 @@ class bvpLibrary(object):
 
 		If "filterFn" is None, returns all group names within a particular ComponentType
 
-		'''
+		"""
 		if not filterFn:
 			filterFn = lambda x: isinstance(x, dict)
 		L = self.getSCL(filterFn, ComponentType)
@@ -178,7 +178,7 @@ class bvpLibrary(object):
 		return Nm
 		
 	def UpdatePropFiles(self, ClassToUpdate=('object', 'background', 'sky', 'shadow')):
-		'''
+		"""
 		.blend files -> *Props.txt files
 
 		Update text files (objectProps.txt, backgroundProps.txt, etc) that 
@@ -191,7 +191,7 @@ class bvpLibrary(object):
 		
 		** USE WITH CAUTION - this makes changes to your archival file info! ** 
 		(as a precaution, this renames old *Props.txt' files to *Props_<date+time>.txt)
-		'''
+		"""
 		if bvp.Verbosity_Level > 1:
 			print('Updating *Props.txt files!')
 		for cls in ClassToUpdate:
@@ -208,7 +208,7 @@ class bvpLibrary(object):
 			RunScriptForAllFiles(scriptF, fList, Inpts=[self.LibDir])
 			
 	def UpdateBlendFiles(self, ClassToUpdate=('object', 'background', 'sky', 'shadow')):
-		'''
+		"""
 		*Props.txt files -> .blend files
 
 		Update .blend files based on information in *Props.txt files 
@@ -222,7 +222,7 @@ class bvpLibrary(object):
 		** USE WITH CAUTION - this makes changes to your archival files! ** 
 		** THESE CHANGES ARE NOT REVERSIBLE without considerable effort! **
 		** (depending on the size of your library, of course) **
-		'''
+		"""
 		if bvp.Verbosity_Level > 1:
 			print('Updating .blend files!')
 		for cls in ClassToUpdate:
@@ -237,7 +237,7 @@ class bvpLibrary(object):
 
 
 	def UpdateLibrary(self, ClassToUpdate=('object', 'background', 'sky', 'shadow')):
-		'''
+		"""
 		.blend files -> .pik files
 
 		Update all .pik files that store properties for all object, background, 
@@ -247,7 +247,7 @@ class bvpLibrary(object):
 		default is to update all classes ('object', 'background', 'sky', 'shadow')
 		
 		** USE WITH CAUTION - this makes changes to your archival file info! ** 		
-		'''
+		"""
 		if bvp.Verbosity_Level > 1:
 			print('Updating library .pik files!')
 		for cls in ClassToUpdate:
@@ -259,14 +259,14 @@ class bvpLibrary(object):
 			scriptF = os.path.join(bvp.__path__[0], 'Scripts', 'Get'+cls.capitalize()+'Props.py')
 			RunScriptForAllFiles(scriptF, fList)
 	def UpdateAll(self, ClassToUpdate=('object', 'background', 'sky', 'shadow')):
-		'''
+		"""
 		Updates (1) Blend files from Prop files
 				(2) Prop files from Blend files (to remove any instructions to change semantic categories / names, e.g.)
 				(3) .py (lib) files from Blend files
 
 		NOTE: if you add objects to the archival .blend files, you should first call "UpdatePropFiles" (if there is nothing
 				else to update), and THEN call UpdateAll()
-		'''
+		"""
 		# First: Apply any changes in Prop files to Blend files 
 		# (This will ignore any new objects in Blend files)
 		self.UpdateBlendFiles(ClassToUpdate)
@@ -277,9 +277,9 @@ class bvpLibrary(object):
 		self.UpdateLibrary(ClassToUpdate)
 		
 	def PosedObList(self):
-		'''
+		"""
 		Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
-		'''
+		"""
 		ObList = []
 		for o in self.objects:
 			if o['nPoses']:
@@ -290,12 +290,12 @@ class bvpLibrary(object):
 		return ObList
 
 	def RenderObjects(self, Type=('Image', ), subCat=None, rotList=(0, ), render_Pose=True, renderGroupSize=1, Is_Overwrite=False, scaleObj=None):
-		'''
+		"""
 		Render (all) objects in bvpLibrary
 
 		TODO: longer help!
 		ScaleObj = optional scale object to render along with this object (NOT FINISHED!)
-		'''
+		"""
 		
 		RO = bvp.RenderOptions()
 		RO.BVPopts['BasePath'] = os.path.join(self.LibDir, 'Images', 'Objects', 'Scenes', '%s')
@@ -338,10 +338,10 @@ class bvpLibrary(object):
 					pNum = Obj.pose+1
 				else:
 					pNum = 1
-				fPath = '%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0], Obj.name, pNum, Obj.rot3D[2])
+				fpath = '%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0], Obj.name, pNum, Obj.rot3D[2])
 				ScnL.append(bvp.Scene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
 									Shadow=None, Cam=Cam, FrameRange=(1, 1), 
-									fPath=fPath, FrameRate=15))
+									fpath=fpath, FrameRate=15))
 		# Convert list of scenes to SceneList	
 		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=renderGroupSize, RenderType=Type)
@@ -349,12 +349,12 @@ class bvpLibrary(object):
 
 	def RenderObjectVox(self, nGrid=10, xL=(-5, 5), yL=(-5, 5), zL=(0, 10), maxFilesPerDir=5000, 
 						subCat=None, render_Pose=True, Is_Overwrite=False):
-		'''
+		"""
 		Render (all) objects in bvpLibrary in voxelized 3D form
 
 		TODO: longer help!
 		ScaleObj = optional scale object to render along with this object (NOT FINISHED!)
-		'''
+		"""
 		if bvp.Is_Blender:
 			print('Sorry, this won''t run inside Blender; it requires access to slurm!')
 			return
@@ -405,10 +405,10 @@ class bvpLibrary(object):
 					# Frame range
 					FR = (d*maxFilesPerDir+1, min(nGrid**3, maxFilesPerDir*(d+1)))
 					Cam = bvp.Camera(location=cPos[FR[0]-1:FR[1]], fixPos=fPos[FR[0]-1:FR[1]], frames=fr[FR[0]-1:FR[1]])
-					fPath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semantic_category[0], Obj.name, pNum, nGrid, d*maxFilesPerDir, '#'*len(str(nGrid**3)))
+					fpath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semantic_category[0], Obj.name, pNum, nGrid, d*maxFilesPerDir, '#'*len(str(nGrid**3)))
 					ScnL.append(bvp.Scene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
 										Shadow=None, Cam=Cam, FrameRange=FR, 
-										fPath=fPath))
+										fpath=fpath))
 			# Convert list of scenes to SceneList	
 			SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 			#return SL
@@ -424,7 +424,7 @@ os.rmdir(fD)
 			cjIDs = []
 			for jID, S in zip(jIDs, ScnL):
 				DepStr = 'afterok:%s'%jID # Dependencies for job
-				fD, xx = S.fPath.split('/') # last part of filepath from scene
+				fD, xx = S.fpath.split('/') # last part of filepath from scene
 				fD = RO.BVPopts['BasePath']%fD
 				cjID = bvp.utils.basics.pySlurm(ConcatCmd.format(fD=fD), dep=DepStr, memory=2000, )
 				cjIDs.append(cjID)
@@ -438,7 +438,7 @@ fD = "{fD}"
 fNm = sorted([os.path.join(fD, f) for f in os.listdir(fD) if 'pik' in f and "{key}" in f])
 for f in fNm:
 	I+=np.array(bvp.utils.basics.loadPik(f))
-I = bvp.utils.basics.MakeBlenderSafe(I, 'float')
+I = bvp.utils.basics.make_blender_safe(I, 'float')
 sName = os.path.join(fD, "{key}"+".pik")
 bvp.utils.basics.savePik(I, sName)
 for f in fNm:
@@ -452,12 +452,12 @@ for f in fNm:
 		# Set up secondary slurm job to concatenate all voxelization images to t/f voxels.
 
 	def RenderBGs(self, subCat=None, dummyObjects=(), nCamLoc=5, Is_Overwrite=False):
-		'''
+		"""
 		Render (all) backgrounds in bvpLibrary to folder <LibDir>/Images/Backgrounds/<category>_<name>.png
 
 		subCat = None #lambda x: x['name']=='BG_201_mHouse_1fl_1' #None #'outdoor'		
 		dummyObjects = ['*human', '*artifact', '*vehicle']
-		'''
+		"""
 		RO = bvp.RenderOptions()
 		RO.BVPopts['BasePath'] = os.path.join(self.LibDir, 'Images', 'Backgrounds', '%s')
 		RO.resolution_x = RO.resolution_y = 256 # smaller images
@@ -481,8 +481,8 @@ for f in fNm:
 
 			for p in range(nCamLoc):
 				cNum = p+1
-				fPath = '%s_%s_cp%02d_fr##'%(BG.semantic_category[0], BG.name, cNum)
-				fChk = RO.BVPopts['BasePath']%fPath.replace('##', '01.'+RO.image_settings['file_format'].lower())
+				fpath = '%s_%s_cp%02d_fr##'%(BG.semantic_category[0], BG.name, cNum)
+				fChk = RO.BVPopts['BasePath']%fpath.replace('##', '01.'+RO.image_settings['file_format'].lower())
 				print('Checking for file: %s'%(fChk))
 				if os.path.exists(fChk) and not Is_Overwrite:
 					print('Found it!')
@@ -507,23 +507,23 @@ for f in fNm:
 
 				S = bvp.Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
 									Shadow=Shad, Cam=Cam, FrameRange=frames, 
-									fPath=fPath, 
+									fpath=fpath, 
 									FrameRate=15)
 				try:
 					# Allow re-set of camera position with each attempt to populate scene
 					S.populate_scene(ObL, ResetCam=True)
 				except:
-					print('Unable to populate scene %s!'%S.fPath)
+					print('Unable to populate scene %s!'%S.fpath)
 				ScnL.append(S)
 		# Convert list of scenes to SceneList	
 		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=nCamLoc)
 	def RenderSkies(self, subCat=None, Is_Overwrite=False):
-		'''
+		"""
 		Render (all) skies in bvpLibrary to folder <LibDir>/LibBackgrounds/<category>_<name>.png
 
 		subCat = None # lambda x: 'dome' in x['semantic_category']
-		'''
+		"""
 		raise Exception('Not done yet!')
 		RO = bvp.RenderOptions()
 		RO.BVPopts['BasePath'] = os.path.join(self.LibDir, 'Images', 'Skies', '%s')
@@ -549,8 +549,8 @@ for f in fNm:
 			BG = bvp.Background(bgID=bg['name'], Lib=self)
 			for p in range(nCamLoc):
 				cNum = p+1
-				fPath = '%s_%s_cp%d_fr##'%(BG.semantic_category[0], BG.name, cNum)
-				fChk = RO.BVPopts['BasePath']%fPath.replace('##', '01.'+RO.file_format.lower())
+				fpath = '%s_%s_cp%d_fr##'%(BG.semantic_category[0], BG.name, cNum)
+				fChk = RO.BVPopts['BasePath']%fpath.replace('##', '01.'+RO.file_format.lower())
 				print('Checking for file: %s'%(fChk))
 				if os.path.exists(fChk) and not Is_Overwrite:
 					print('Found it!')
@@ -559,19 +559,19 @@ for f in fNm:
 				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
 				S = bvp.Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
 									Shadow=None, Cam=Cam, FrameRange=(1, 1), 
-									fPath=fPath, 
+									fpath=fpath, 
 									FrameRate=15)
 				#try:
 					# Allow re-set of camera position with each attempt to populate scene
 				S.populate_scene(ObL, ResetCam=True)
 				#except:
-				#	print('Unable to populate scene %s!'%S.fPath)
+				#	print('Unable to populate scene %s!'%S.fpath)
 				ScnL.append(S)
 		# Convert list of scenes to SceneList	
 		SL = bvp.SceneList(ScnList=ScnL, RenderOptions=RO)
 		SL.RenderSlurm(RenderGroupSize=nCamLoc)
 	def CreateSolidVol(self, obj=None, vRes=96, buf=4):
-		'''
+		"""
 		Searches for extant .voxverts files in <LibDir>/Objects/VOL_Files/, and from them creates 
 		3D, filled object mask matrices
 		Saves this voxelized verison of an object as a .vol file in the <LibDir>/Objects/VOL_Files/ directory.
@@ -589,7 +589,7 @@ for f in fNm:
 		isn't directly used by any models (yet); thus it has been saved in a separate place, as 
 		the data about real-world size, number of mesh vertices, etc.
 
-		'''
+		"""
 		# Imports
 		import re, os
 		from scipy.ndimage.morphology import binary_fill_holes as imfill # Fills holes in multi-dim images

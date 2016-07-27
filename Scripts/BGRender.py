@@ -37,13 +37,13 @@ for bg in ToRender:
 		Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames),fixPos=BG.CamConstraint.sampleFixPos(frames),frames=frames)
 		S = bvp.Scene(Num=BGCt,BG=BG,Sky=Sky,Obj=None,
 							Shadow=None,Cam=Cam,FrameRange=(1,1),
-							fPath='%s_%s_cp%d_fr##'%(BG.semantic_category[0],BG.name,cNum),
+							fpath='%s_%s_cp%d_fr##'%(BG.semantic_category[0],BG.name,cNum),
 							FrameRate=15)
 		try:
 			# Allow re-set of camera position with each attempt to populate scene
 			S.populate_scene(ObL,ResetCam=True)
 		except:
-			print('Unable to populate scene %s!'%S.fPath)
+			print('Unable to populate scene %s!'%S.fpath)
 		ScnL.append(S)
 # Convert list of scenes to SceneList	
 SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)

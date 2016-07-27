@@ -45,7 +45,7 @@ for o in ToRender:
 			pNum = 1
 		ScnL.append(bvp.Scene(Num=ObCt,Obj=(Obj,),BG=BG,Sky=Sky,
 							Shadow=None,Cam=Cam,FrameRange=(1,1),
-							fPath='%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0],Obj.name,pNum,Obj.rot3D[2]),FrameRate=15))
+							fpath='%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0],Obj.name,pNum,Obj.rot3D[2]),FrameRate=15))
 # Convert list of scenes to SceneList	
 SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)
 SL.RenderSlurm(RenderGroupSize=1)

@@ -79,10 +79,10 @@ for o in ToRender:
 			#Cam = bvp.Camera() # w/ some parameters...
 			# Create Scene
 			ScCt+=1
-			fPath = 'Sc%04d_##'%(ScCt)
+			fpath = 'Sc%04d_##'%(ScCt)
 			ScnL.append(bvp.Scene(Num=ScCt,Obj=(Obj,),BG=BG,Sky=Sky,
 								Shadow=None,Cam=c,FrameRange=(1,nFrames),
-								fPath=fPath,FrameRate=15))
+								fpath=fpath,FrameRate=15))
 # Convert list of scenes to SceneList	
 SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)
 # Save

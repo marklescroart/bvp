@@ -129,14 +129,14 @@ class RenderOptions(bpy.types.PropertyGroup):
 	do_normals = bpy.props.BoolProperty(default=False)
 
 
-'''
+"""
 # UI list option for displaying databases (more flexible, more space)
 class DBprop(bpy.types.PropertyGroup):
 	"""Grouped database properties"""
 	id = bpy.props.IntProperty()
 	port = bpy.props.IntProperty(name='port',default=bvp.Settings['db']['port'])
 	path = bpy.props.StringProperty(name='path',default=bvp.Settings['Paths']['LibDir'])
-'''
+"""
 
 ## -- For dynamic EnumProperties -- ##
 def enum_groups(self,context):
@@ -170,7 +170,7 @@ def enum_dbs(self,context):
 
 ## -- General property declarations -- ##
 def declare_properties():
-	'''Declarations of extra object properties
+	"""Declarations of extra object properties
 
 	These properties contain (most of) the meta-data stored about 
 	each scene element in the BVP database.
@@ -182,7 +182,7 @@ def declare_properties():
 
 	DEPRECATED. All objects in DB will need to be updated to put these
 	properties onto GROUPS rather than objects. 
-	'''
+	"""
 	### --- DEPRECATED --- ###
 
 	# ## -- For both object and background elements -- ##
@@ -324,7 +324,7 @@ class RescaleGroup(bpy.types.Operator):
 		return {"FINISHED"}
 
 	def get_group_bounding_box(self,ob_list):
-		'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
+		"""Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
 
 		Parameters
 		----------
@@ -336,7 +336,7 @@ class RescaleGroup(bpy.types.Operator):
 		minxyz,maxxyz : lists
 			min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
 			more standard format for a bounding box. 
-		'''
+		"""
 		BBx = list()
 		BBy = list()
 		BBz = list()
@@ -469,10 +469,9 @@ class DBSaveAction(bpy.types.Operator):
 		return {'FINISHED'}
 	def invoke(self,context,event):
 		global bvpact
-		bvpact = Action.from_blender(context)
+		bvpact = Action.from_blender(context, dbi)
 		# (get docdict)
 		chk = dbi.query(**bvpact.docdict)
-
 
 		## OLD
 		# Create database instance
@@ -635,7 +634,7 @@ class ClipFrames(bpy.types.Operator):
 		scn.frame_end = np.ceil(act.frame_range[1])
 		return {'FINISHED'}
 ### --- Misc. supporting classes --- ###
-'''
+"""
 # UI list option for displaying databases (more flexible, more space)
 # Need database creation option (?)
 class BVP_DB_LIST(bpy.types.UIList):
@@ -644,7 +643,7 @@ class BVP_DB_LIST(bpy.types.UIList):
 		split = layout.split(0.2)
 		split.label(str(item.id)) # item.name
 		split.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
-'''
+"""
 
 ### --- Panels --- ###
 

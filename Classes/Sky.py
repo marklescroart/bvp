@@ -1,17 +1,18 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import os, bvp
-from bvp.utils.basics import fixedKeyDict
-from bvp.utils.blender import add_group, AddLamp, set_layers, grab_only
+import os
+from ..utils.basics import fixedKeyDict
+from ..utils.blender import add_group, add_lamp, set_layers, grab_only
 import math as bnp
-# Numpy imports
-# Blender imports
-if bvp.Is_Blender:
-	import bpy
+try:
+    import bpy
+    is_blender = True
+except ImportError: 
+    is_blender = False
 
 class Sky(object):
-	'''Class for skies and lighting (sun, lamps, world) for scenes
+	"""Class for skies and lighting (sun, lamps, world) for scenes
 
 	Fields in skyParams are:
 	  .fname - parent .blend file housing this sky
@@ -35,11 +36,11 @@ class Sky(object):
 	To over-ride whatever has been imported from sky files with above values, set this to True:
 	  .OverrideWorldProps = False 
 	
-	'''
+	"""
 	def __init__(self, skyID=None, Lib=None):
-		'''
+		"""
 		Initialization.
-		'''
+		"""
 		# Defaults ?? Create Lib from default BG file instead ??
 		self.fname=None
 		self.name=None
@@ -171,9 +172,9 @@ class Sky(object):
 						})
 
 	def Place(self, num=0, Scn=None, Scale=None):
-		'''
+		"""
 		Adds sky to Blender scene
-		'''
+		"""
 		LampOb = []
 		if not Scn:
 			Scn = bpy.context.scene # Get current scene if input not supplied
@@ -238,19 +239,17 @@ class Sky(object):
 		# END (temp?) over-ride of AO
 		
 	def AddWorld(self, Scn=None):
-		'''
-		Usage: AddWorld(self, bvpScn, Scn=None):
-		
+		"""		
 		Adds a specified world from a specified file, as in add_group()
 
 		NOTE! Currently (2012.02) worlds and sky groups must have the same (unique) name!
-		'''
+		"""
 		if not Scn:
 			Scn = bpy.context.scene
-		fPath, fName = os.path.split(self.fname)
+		fpath, fName = os.path.split(self.fname)
 		WorldName = self.name
 		bpy.ops.wm.link_append(
-			directory=os.path.join(fPath, fName)+"\\World\\", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
+			directory=os.path.join(fpath, fName)+"\\World\\", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
 			filepath="//"+fName+"\\World\\"+WorldName, # local filepath within .blend file to the world to be imported
 			filename=WorldName, # "filename" being the name of the data block, i.e. the name of the world.
 			link=False, 

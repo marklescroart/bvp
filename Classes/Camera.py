@@ -1,13 +1,8 @@
-## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
-
 # Imports
 import math as bnp
 from .Constraint import CamConstraint
-from ..utils.basics import fixedKeyDict
-from ..utils import blender as bvpbu
-from ..utils.bvpMath import vec2eulerXYZ
+from .. import utils as bvpu
 
-# Blender imports
 try:
     import bpy
     import mathutils as bmu
@@ -75,7 +70,7 @@ class Camera(object):
         return S
         
     def place(self, name='000', draw_size=0.33, scn=None):
-        '''Places camera into Blender scene (only works within Blender)
+        """Places camera into Blender scene (only works within Blender)
 
         Parameters
         ----------
@@ -83,7 +78,7 @@ class Camera(object):
             Name for Blender object. "cam_" is automatically prepended to the name.
         scn : bpy.data.scene instance
             Scene to which to add the camera.
-        '''
+        """
         if not is_blender:
             raise Exception("Cannot call place() while operating outside Blender!") # !!! TODO: general exception class for trying to call blender (bpy) functions while operating outside of blender
         if scn is None:
@@ -122,16 +117,16 @@ class Camera(object):
         cam.data.clip_start, cam.data.clip_end = self.clip
 
         # Set camera motion (multiple camera positions for diff. frames)
-        ## !!! TODO fix CreateAnim_Loc awful function and variable names
-        a = bvpbu.CreateAnim_Loc(self.location, self.frames, aName='CamMotion', hType='VECTOR')
+        ## !!! TODO fix make_location_animation awful function and variable names
+        a = bvpu.blender.make_location_animation(self.location, self.frames, aName='CamMotion', hType='VECTOR')
         cam.animation_data_create()
         cam.animation_data.action = a
-        f = bvpbu.CreateAnim_Loc(self.fix_location, self.frames, aName='FixMotion', hType='VECTOR')
+        f = bvpu.blender.make_location_animation(self.fix_location, self.frames, aName='FixMotion', hType='VECTOR')
         fix.animation_data_create()
         fix.animation_data.action = f
 
     def place_stereo(self, disparity, layers=None, scn=None):
-        '''Add two cameras for stereo rendering.
+        """Add two cameras for stereo rendering.
 
         Returns two Blender Camera objects, separated by "disparity" (in Blender units). 
         That is, left camera is at -disparity/2, right camera is at +disparity/2 from main camera 
@@ -150,7 +145,7 @@ class Camera(object):
         -----
         There must be a single main camera in the scene first for this to work; left and right
         cameras will be parented to current camera. 
-        '''
+        """
         if not is_blender:
             raise Exception("Cannot call place_stereo() while operating outside Blender!") # !!! TODO: general exception class for trying to call blender (bpy) functions while operating outside of blender        
         if scn is None:
@@ -164,9 +159,7 @@ class Camera(object):
             raise Exception('More than 1 base camera in scene!')
         else:
             base_camera = base_camera[0]
-        # Get camera rotation from vector from camera->fixation target (@first frame)
-        rotation = vec2eulerXYZ(bmu.Vector(self.fix_location[0])-bmu.Vector(self.location[0]))
-        rotation = [bnp.radians(x) for x in rotation]
+        # Get camera rotation fro) for x in rotation]
 
         # Parent two new cameras to the extant camera in the scene
         # Left camera 
@@ -177,7 +170,7 @@ class Camera(object):
         left_cam.data = base_camera.data # Keep same camera props as main camera
         # Instead of the next lines, it would seem better to use `left_cam.parent = base_camera`, 
         # but that doesn't work for some reason. It messes up the transformation of left_cam. (Blender 2.77, July 2016)
-        bvpbu.grab_only(base_camera)
+        bvpu.blender.grab_only(base_camera)
         left_cam.select = True
         bpy.ops.object.parent_set()
 
@@ -188,7 +181,7 @@ class Camera(object):
         #bpy.ops.transform.translate(value=(disparity/2., 0, 0), constraint_axis=(True, False, False), constraint_orientation='LOCAL')
         right_cam = bpy.context.object
         right_cam.data = base_camera.data
-        bvpbu.grab_only(base_camera)
+        bvpu.blender.grab_only(base_camera)
         right_cam.select = True
         bpy.ops.object.parent_set()
         return left_cam, right_cam

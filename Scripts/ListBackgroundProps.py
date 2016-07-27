@@ -1,4 +1,4 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Lists properties for all backgrounds (groups) in a .blend file, and prints them
@@ -27,7 +27,7 @@ GetBGProps.py - creates a list of property dicts for each group in a file,
 	stored in a .pik file (Category_Blah.blend -> Category_Blah.pik)
 
 ML 2012.02.15
-'''
+"""
 
 # Imports
 import bpy,re,os,sys

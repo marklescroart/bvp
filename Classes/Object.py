@@ -1,6 +1,10 @@
-'''
+"""
 .B.lender .V.ision .Project class for storage of abstraction of a Blender object
-'''
+
+To do: Move Shape to this file? 
+Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
+
+"""
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
@@ -11,9 +15,7 @@ import warnings
 from ..utils.basics import fixedKeyDict 
 from ..utils.blender import add_group, add_action, grab_only, set_cursor
 from ..utils.bvpMath import PerspectiveProj
-# Blender imports # GET RID OF this too! find a better way to set a global variable...
 #from . import Verbosity_Level, Is_Blender
-#from . import bvpDB # Why is this causing me problems?
 try:
 	import bpy
 	import mathutils as bmu
@@ -22,10 +24,11 @@ except ImportError:
 	is_blender = False
 
 class Object(object):
-	'''Layer of abstraction for objects (imported from other files) in Blender scenes.
-	'''
+	"""Layer of abstraction for objects (imported from other files) in Blender scenes.
+	"""
 	def __init__(self, name=None, fname=None, dbi=None, action=None, pose=None, 
-		pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), **kwargs):
+		pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), n_faces=None, n_vertices=None,
+		semantic_category=None, wordnet_label=None,):
 		"""	Class to store an abstraction of an object in a BVP scene. 
 
 		Stores all necessary information to define an object in a scene: identifying information for
@@ -56,7 +59,7 @@ class Object(object):
 		name : string
 			ID for object (unique name for an object in the database, which is also (as of 2014.09, but
 			this may change) the name for the Blender group in the archival .blend file)
-		semantic_cat : string | list
+		semantic_category : string | list
 			semantic category of object
 		real_world_size : float
 			Size of object in meters
@@ -75,10 +78,8 @@ class Object(object):
 		"""
 		# Allow dbi to be a list of parameters to create a bvpDB. This helps with rendering on cluster 
 		# computers; dictionaries are easier to store/pass as arguments than objects. 
-		if isinstance(dbi, dict):
-			dbi = bvp.DBInterface(**dbi)
 		# Default attribute fields
-		dbob = dict(real_world_size=5.0, name='default_sphere', parent_file=None, semantic_cat=None, wordnet_label=None)
+		dbob = dict(real_world_size=5.0, name='default_sphere', fname=None, semantic_category=None, wordnet_label=None)
 		if dbi is None:
 			dbob.update(kwargs)
 		else:
@@ -89,8 +90,8 @@ class Object(object):
 			dbob.update(result)
 		# Set attributes based on database object fields. (Too flexible??)
 		for k, v in dbob.items():
-			# Should set at least: name, parent_file, semantic_cat, wordnet_label, real_world_size, 
-			# nVertices, nFaces, 
+			# Should set at least: name, fname, semantic_category, wordnet_label, real_world_size, 
+			# n_Vertices, nFaces, 
 			setattr(self, k, v)
 		# Set input attributes
 		self.action = action
@@ -107,11 +108,11 @@ class Object(object):
 	def __repr__(self):
 		"""Display string"""
 		S = '\n ~O~ Object "%s" ~O~\n'%(self.name)
-		if self.parent_file:
-			S+='Parent File: %s\n'%self.parent_file
-		if self.semantic_cat:
-			S+=self.semantic_cat[0]
-			for s in self.semantic_cat[1:]: S+=', %s'%s
+		if self.fname:
+			S+='Parent File: %s\n'%self.fname
+		if self.semantic_category:
+			S+=self.semantic_category[0]
+			for s in self.semantic_category[1:]: S+=', %s'%s
 			S+='\n'
 		if self.pos3D:
 			S+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
@@ -121,12 +122,12 @@ class Object(object):
 			S+='Pose: #%d'%self.pose
 		if self.pos3D or self.size3D or self.pose:
 			S+='\n'
-		if self.nvertices:
-			S+='%d Verts; %d Faces'%(self.nvertices, self.nFaces)
+		if self.n_vertices:
+			S+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
 		return(S)
 
 	def place(self, scn=None, proxy=True):
-		'''Places object into Blender scene, with pose & animation information
+		"""Places object into Blender scene, with pose & animation information
 
 		Parameters
 		----------
@@ -134,7 +135,7 @@ class Object(object):
 			If provided, the object will be linked to the named scene. If a scene
 			named `scn` does not exist, it will be created.
 		
-		'''
+		"""
 		# Optionally link to a specific scene
 		scn = bvp.utils.blender.set_scene(scn)
 
@@ -146,27 +147,27 @@ class Object(object):
 			bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
 			bpy.ops.transform.translate(value=(0, 0, default_diameter/2.))
 			set_cursor((0, 0, 0))
-			G = bpy.context.object
+			grp = bpy.context.object
 		else:
-			fdir = os.path.join(bvp.Settings['Paths']['LibDir'], 'Objects/')
-			G = add_group(self.name, self.parent_file, fdir, proxy=proxy)
+			fdir = os.path.join(config.get('path',''), 'object/')
+			grp = add_group(self.name, self.fname, fdir, proxy=proxy)
 		# Eliminate any other currently-selected objects
-		grab_only(G) 
+		grab_only(grp) 
 
 		# Objects are stored at max dim. 10 for easier viewability /manipulation
 		# Allow for asymmetrical scaling for weirdo-looking objects? (currently no)
 		Sz = float(self.size3D)/10. 
 
-		setattr(G, 'scale', bmu.Vector((Sz, Sz, Sz))) # uniform x, y, z scale
+		setattr(grp, 'scale', bmu.Vector((Sz, Sz, Sz))) # uniform x, y, z scale
 		if not self.pos3D is None:
-			setattr(G, 'location', self.pos3D)
+			setattr(grp, 'location', self.pos3D)
 		if not self.rot3D is None:
 			# Use bpy.ops.transform here instead? Some objects may not have position set to zero properly!
-			setattr(G, 'rotation_euler', self.rot3D)
+			setattr(grp, 'rotation_euler', self.rot3D)
 
 		# Get armature, if an armature exists for this object
-		if not G.dupli_group is None:
-			Arm = [x for x in G.dupli_group.objects if x.type=='ARMATURE']
+		if not grp.dupli_group is None:
+			Arm = [x for x in grp.dupli_group.objects if x.type=='ARMATURE']
 			if len(Arm)>0:
 				# Some armature object detected. Proceed with pose / action.
 				if len(Arm)>1:
@@ -203,8 +204,8 @@ class Object(object):
 			self.ApplyAction(ArmProxy, self.action)
 		# Deal with particle systems. Use of particle systems in general is not advised, since
 		# they complicate sizing and drastically slow renders.
-		if not G.dupli_group is None:
-			for o in G.dupli_group.objects:
+		if not grp.dupli_group is None:
+			for o in grp.dupli_group.objects:
 				# Get the MODIFIER object that contains the particle system
 				PartSystModf = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
 				for psm in PartSystModf:
@@ -249,22 +250,22 @@ class Object(object):
 			set_cursor((0, 0, 0))
 		else:
 			fdir = os.path.join(bvp.Settings['Paths']['LibDir'], 'Objects/')
-			add_group(self.name, self.parent_file, fdir)
+			add_group(self.name, self.fname, fdir)
 			# 
-		G = bpy.context.object
+		grp = bpy.context.object
 		Sz = float(self.size3D)/10. # Objects are stored at max dim. 10 for easier viewability /manipulation
-		setattr(G, 'scale', bmu.Vector((Sz, Sz, Sz))) # uniform x, y, z scale
+		setattr(grp, 'scale', bmu.Vector((Sz, Sz, Sz))) # uniform x, y, z scale
 		if self.pos3D:
-			setattr(G, 'location', self.pos3D)
+			setattr(grp, 'location', self.pos3D)
 		if self.rot3D:
 			# Use bpy.ops.transform here instead? Some objects may not have position set to zero properly!
-			setattr(G, 'rotation_euler', self.rot3D)
+			setattr(grp, 'rotation_euler', self.rot3D)
 		if self.pose or self.pose==0: # allow for pose index to equal zero, but not None
-			Arm, Pose = self.GetPoses(G)
+			Arm, Pose = self.GetPoses(grp)
 			self.apply_pose(Arm, self.pose)
 		# Deal with particle systems:
 		if not self.name is None:
-			for o in G.dupli_group.objects:
+			for o in grp.dupli_group.objects:
 				# Get the MODIFIER object that contains the particle system
 				PartSystModf = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
 				for psm in PartSystModf:
@@ -283,7 +284,7 @@ class Object(object):
 		scn.update()
 
 	def ApplyAction(self, arm, action):
-		'''Apply an action to an armature.
+		"""Apply an action to an armature.
 
 		Kept separate from Object __init__ function so to be able to interactively apply actions 
 		in an open Blender session.
@@ -296,16 +297,16 @@ class Object(object):
 			Armature object to which the action is applied.
 		action : Action
 			Action to be applied. Must have file_name and path attributes
-		'''
+		"""
 		# 
 		fdir = os.path.join(bvp.Settings['Paths']['LibDir'], 'Actions/')
-		act = add_action(action.name, action.parent_file, fdir)
+		act = add_action(action.name, action.fname, fdir)
 		if arm.animation_data is None:
 			arm.animation_data_create()
 		arm.animation_data.action = act
 
 	def apply_pose(self, Arm, PoseIdx):
-		'''Apply a pose to an armature.
+		"""Apply a pose to an armature.
 
 		Parameters
 		----------
@@ -319,7 +320,7 @@ class Object(object):
 		This function only applies WHOLE-ARMATURE poses (for now). Later it may be useful to update
 		this function to pose individual bones of an armature.
 		
-		'''
+		"""
 		# Set mode to pose mode
 		grab_only(Arm)
 		bpy.ops.object.posemode_toggle()

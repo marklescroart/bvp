@@ -1,7 +1,7 @@
-'''
+"""
 Creating scenes for BVP (Blender Vision Project) pilot experiments
 
-'''
+"""
 try:
 	import cPickle as pickle
 except ImportError:
@@ -21,12 +21,12 @@ skyLibDir = '/auto/k6/mark/BlenderFiles/Scenes/'
 ScnList_fName = '/auto/k6/mark/BVPpilot2_Stimuli/SceneList_Temp1.pik'
 
 def TestSkies():
-	'''
+	"""
 	Create Test images of all skies with scenes of random objects
-	'''
-	''' 
+	"""
+	""" 
 	Creation of stimuli for BVP pilot experiment 2
-	'''
+	"""
 	# Specify scene parameters
 	# Load library lists
 	fNm = '/auto/k6/mark/BVPpilot2_Stimuli/SkyTest.pik'
@@ -102,9 +102,9 @@ def TestSkies():
 	
 	
 def ObjectBGSkyImages():
-	'''
+	"""
 	Create individual images of all objects, backgrounds, and skies in library
-	'''
+	"""
 	# Background: Get objects, backgrounds, skies from library:
 	ObF,ObGrpList = bvpC.GetGroups(obLibDir,'Object')
 	BGF,BGGrpList = bvpC.GetGroups(obLibDir,'BG')
@@ -136,9 +136,9 @@ def ObjectBGSkyImages():
 	
 	
 def BVPpilot2():
-	''' 
+	""" 
 	Creation of stimuli for BVP pilot experiment 2
-	'''
+	"""
 	# Specify scene parameters
 	# Load library lists
 	fNm = '/Users/Work/Desktop/TempLibFiles.pik'

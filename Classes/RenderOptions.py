@@ -52,11 +52,11 @@ MathNode = 'CompositorNodeMath'
 bvp_basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 
 class RenderOptions(object):
-	'''Class for storing render options for a scene. 
+	"""Class for storing render options for a scene. 
 		
-	'''
+	"""
 	def __init__(self, blender_params=None, bvp_params=None):
-		'''Initialize rendering options for scenes in BVP framework.
+		"""Initialize rendering options for scenes in BVP framework.
 
 		Parameters
 		----------
@@ -90,7 +90,7 @@ class RenderOptions(object):
 		RenderOptions does not directly modify a scene's file path; it only provides the base file (parent directory) for all rendering.
 		Scene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
 
-		'''
+		"""
 		
 		self.use_freestyle = False # May need some clever if statement here - checking on version of blender
 		if self.use_freestyle:
@@ -269,15 +269,15 @@ class RenderOptions(object):
 			# Turn off raytracing??
 
 		scn.update()
-	'''
+	"""
 	Notes on nodes: The following functions add various types of compositor nodes to a scene in Blender.
 	These allow output of other image files that represent other "meta-information" (e.g. Z depth, 
 	normals, etc) that is separate from the pixel-by-pixel color / luminance information in standard images. 
 	To add nodes: NewNode = NT.nodes.new(type=NodeType) 
 	See top of code for list of node types used.
-	'''
+	"""
 	def add_object_masks(self, scn=None, single_output=False):
-		'''Adds compositor nodes to render out object masks.
+		"""Adds compositor nodes to render out object masks.
 
 		Parameters
 		----------
@@ -295,7 +295,7 @@ class RenderOptions(object):
 		If scenes are created with many objects off-camera, this code will create a mask for EVERY off-scene object. 
 		These masks will not be in the scene, but blender will render an image (an all-black image) for each and 
 		every one of them.
- 		'''
+ 		"""
 		if not scn:
 			scn = bpy.context.scene
 		scn.use_nodes = True
@@ -399,8 +399,8 @@ class RenderOptions(object):
 			NewIDOut.location = Loc - bmu.Vector((-150., 100))
 
 	def add_depth(self, scn=None, single_output=False):
-		'''Adds compositor nodes to render out Z buffer
-		'''
+		"""Adds compositor nodes to render out Z buffer
+		"""
 		if not scn:
 			scn = bpy.context.scene
 		scn.use_nodes = True
@@ -481,13 +481,13 @@ class RenderOptions(object):
 		NT.links.new(NodeAdd1000.outputs[0], DepthOut.inputs[0])
 			
 	def add_normals(self, scn=None, single_output=False):
-		'''
+		"""
 		Usage: add_normals(scn=None, single_output=False)
 
 		Adds compositor nodes to render out Normals
 
 		ML 2012.01
-		'''
+		"""
 		if not scn:
 			scn = bpy.context.scene
 		scn.use_nodes = True
@@ -580,7 +580,7 @@ class RenderOptions(object):
 		NT.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
 		
 	def add_motion(self, scn=None, single_output=False):
-		'''Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
+		"""Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
 
 		Parameters
 		----------
@@ -588,7 +588,7 @@ class RenderOptions(object):
 			Leave as default (None) for now. For potential future code upgrades
 		single_output : bool
 			Set True if optical flow is the only desired output of the render
-		'''
+		"""
 		if not scn:
 			scn = bpy.context.scene
 		scn.use_nodes = True
@@ -697,11 +697,11 @@ class RenderOptions(object):
 		Cam.data.cycles.panorama_type='FISHEYE_EQUISOLID'
 
 		# Get all-white cycles emission material 
-		fPath = os.path.join(bvp_basedir, 'BlendFiles')
+		fpath = os.path.join(bvp_basedir, 'BlendFiles')
 		fName = 'Cycles_Render.blend'
 		MatNm = 'CycWhite'
 		bpy.ops.wm.link_append(
-			directory=os.path.join(fPath, fName)+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Materials)
+			directory=os.path.join(fpath, fName)+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Materials)
 			filepath="//"+fName+"\\Material\\"+'CycWhite', # local filepath within .blend file to the material to be imported
 			filename='CycWhite', # "filename" being the name of the data block, i.e. the name of the material.
 			link=False, 

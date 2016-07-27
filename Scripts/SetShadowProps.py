@@ -1,11 +1,11 @@
-'''
+"""
 Sets properties for all shadows (groups) in a .blend file, based on the 
 text file "shadowProps.txt" in the main bvp directory.
 
 See ListShadowProps.py for file format conventions for the text file.
 
 ML 2012.02.12
-'''
+"""
 import bpy,sys,os
 from bvp.utils.blender import DeclareProperties
 # Get groups in this file

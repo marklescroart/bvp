@@ -1,4 +1,4 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Gets properties for all backgrounds in a .blend file. Stores properties in a list 
@@ -27,7 +27,7 @@ dictionaries are of the form:
 
 
 ML 2012.02
-'''
+"""
 
 # Imports
 import bpy,bvp,os,re
