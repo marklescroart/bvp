@@ -14,8 +14,8 @@ except ImportError:
 class Action(MappedClass):
     """Layer of abstraction for armature-based actions (imported from other files) in Blender scenes.
     """
-    def __init__(self, name='DummyAction', fname=None, armature='mixamo_human', bvptype='action',
-        wordnet_label=None, wordnet_frames=None, 
+    def __init__(self, name='DummyAction', fname=None, armature='mixamo_human', type='Action',
+        wordnet_label=None, wordnet_frames=None, is_armature=True, _id=None, _rev=None, n_frames=None,
         is_cyclic=False, is_translating=False, is_broken=False, bg_interaction=False, obj_interaction=False, 
         is_interactive=False, is_animal=False, fps=24, min_xyz=None, max_xyz=None, dbi=None):
         """Class to store an armature-based action for an object in a BVP scene. 
@@ -25,7 +25,7 @@ class Action(MappedClass):
         name : string
             ID for object (unique name for an object in the database, which is also (as of 2014.09, but
             this may change) the name for the Blender group in the archival .blend file)
-        file_name : string
+        fname : string
             Name of file in which action resides
         armature : string
             Class of armature to which this action can be applied, e.g. "mixamo_human"
@@ -79,12 +79,14 @@ class Action(MappedClass):
 
         # Quick setting of attributes
         inpt = locals()
-        self.bvptype = 'action'
-        for k, v in inpt: 
-            if not k in ('self', 'bvptype'):
+        self.type = 'Action'
+        for k, v in inpt.items(): 
+            if not k in ('self', 'type'):
                 setattr(self, k, v)
         # Set _temp_params, etc.
-        # 
+        self._temp_fields = []
+        self._data_fields = []
+
     def save(self, context):
         """Save Action to database; must be called inside an active Blender session"""
         if not is_blender:
@@ -113,7 +115,7 @@ class Action(MappedClass):
         ## Frames
         n_frames = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
         ## WordNet labels
-        wordnet_labels = [s.name for s in act.Action.wordnet_label]
+        wordnet_label = [s.name for s in act.Action.wordnet_label]
         wordnet_frames = [s.frame for s in act.Action.wordnet_label]
         ## Bounding box
         if isinstance(ob.data, bpy.types.Armature):
@@ -137,16 +139,16 @@ class Action(MappedClass):
         # The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
         # of the current file (group/action/whatever) and save them (append them) to another specfied file
         # in the database. Currently NOT IMPLEMENTED.
-        thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
+        thisfile = os.path.dirname(bpy.data.filepath) #if len(bpy.data.filepath)>0 else pfile
         if thisfile=="":
             # Require saving in db-appropriate location 
             raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath, 'Action/')))
         # Construct bvp Action
         bvpact = cls.__new__(cls)
         bvpact.__init__(name=act.name, 
-            file_name=thisfile, 
+            fname=thisfile, 
             # Labels / info
-            wordnet_labels=wordnet_labels, 
+            wordnet_label=wordnet_label, 
             wordnet_frames=wordnet_frames, 
             # Flags
             is_cyclic=act.Action.is_cyclic, 
@@ -168,6 +170,6 @@ class Action(MappedClass):
     def __repr__(self):
         """Display string"""
         rstr = '\n ~A~ Action "%s" ~A~\n'%(self.name)
-        for k, v in self.docdict:
+        for k, v in self.docdict.items():
             rstr += '%s : %s\n'%(k, repr(v))
         return rstr

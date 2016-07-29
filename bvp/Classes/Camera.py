@@ -36,10 +36,10 @@ class Camera(object):
         """
         # Default camera parameters
         inpt = locals()
-        for i in inpt:
-            if not i=='self':
-                if inpt[i]:
-                    setattr(self, i, inpt[i])
+        self.type = 'Camera'
+        for k, v in inpt.items():
+            if not i in ('self', 'type'):
+                setattr(self, k, v)
         constr = CamConstraint() # Initialize w/ default parameters 
         if all([x==1 for x in self.frames]):
             self.frames = (1, )

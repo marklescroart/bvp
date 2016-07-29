@@ -32,51 +32,47 @@ pymongo # MOVE to optional dependency...
 
 """
 ## -- Startup stuff -- ##
+from __future__ import absolute_import
 __version__ = '0.2a' 
 
 ## -- Imports -- ##
-import re
-import os
-import sys
-import json
-import math
+import re as _re
+import os as _os
 import subprocess
-import numpy as np
-import pickle
-
-# Blender imports
-try:
-    # Working inside of Blender
-    import bpy
-    import mathutils as bmu
-    is_blender = True
-except ImportError: 
-    # Working outside of Blender
-    is_blender = False
-
 from . import utils 
 from .options import config
 
 # Classes
+# Annoyingly, this makes python 2 sad.
 from .Classes.Action import Action
-#from .Classes.Background import Background
+from .Classes.Background import Background
 from .Classes.Camera import Camera
 from .Classes.Constraint import  ObConstraint, CamConstraint
-#from .Classes.DBInterface import DBInterface
+
 from .Classes.Object import Object
-#from .Classes.RenderOptions import RenderOptions
+from .Classes.RenderOptions import RenderOptions
 from .Classes.Scene import Scene
-#from .Classes.SceneList import SceneList
+#from .Classes.SceneList import SceneList # STILL WIP
 from .Classes.Shadow import Shadow
-#from .Classes.Shape import Shape # Move to Object...?
-#from .Classes.Sky import Sky
+#from .Classes.Shape import Shape # STILL WIP Move to Object...?
+from .Classes.Sky import Sky
+
+from . import DB
+from .DB import DBInterface
 
 # UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
+
+def set_scn():
+    """Quickie default setup of camera + lighting for an object
+    """    
+    scn = Scene(cam=Camera(), sky=Sky())
+    scn.create()
+    scn.apply_opts(render_options=RenderOptions())
 
 ## -- Useful functions -- ##
 def _getuuid():
     """Overkill for unique file names"""
-    import uuid # Overkill for unique file name
+    import uuid
     uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
     return uu
     
@@ -92,7 +88,7 @@ def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     stdout, stderr = clust.communicate(cmd)
-    jobid = re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
+    jobid = _re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
     return jobid, stderr
 
 def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
@@ -101,7 +97,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     Parameters
     ----------
     script : string file name or script
-        if `script` is a file that exists (os.path.exists), this function will open
+        if `script` is a file that exists (_os.path.exists), this function will open
         an instance of Blender and run that file in Blender. If it is a string, it 
         will create a dummy temp file, write the string to it, and delete the dummy 
         file once it has run (or failed). 
@@ -123,12 +119,12 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     """
     # Inputs
     if blend_file is None:
-        blend_file = os.path.join(__path__[0], 'BlendFiles', 'Blank.blend')
+        blend_file = _os.path.join(__path__[0], 'BlendFiles', 'Blank.blend')
     # Check for existence of script
-    if not os.path.exists(script):
+    if not _os.path.exists(script):
         # TO DO: look into doing this with pipes??
         del_tmp_script = True
-        tmpf = os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
+        tmpf = _os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
         with open(tmpf, 'w') as fid:
             fid.writelines(script)
         script = tmpf
@@ -147,7 +143,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
             stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
         if del_tmp_script and not stderr:
-            os.unlink(tmpf)
+            _os.unlink(tmpf)
         # Raise exception if stderr? 
         # Or leave that to calling function? 
         # Optional?
@@ -162,5 +158,6 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         # Raise them if they exist?
         return jobid
 
-__all__ = ['Action', 'Camera', 'ObConstraint', 'CamConstraint', 
-           'DBInterface', 'Object', 'Shadow', 'utils','config'] # Lose Settings, make config.
+__all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 
+           'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
+           'utils','config'] 

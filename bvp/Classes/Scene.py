@@ -379,12 +379,12 @@ class Scene(object):
         # Initialize scene:
         S = cls.__new__(blah)
         # Scroll through scene component types:
-        bvptype = ['objects', 'backgrounds', 'skies', 'shadows']
+        type = ['objects', 'backgrounds', 'skies', 'shadows']
         # Get scene components:
         #vL = copy.copy(verbosity_level)
         #verbosity_level=1 # Turn off warnings for not-found library objects
         for o in scn.objects:
-            for ct in bvptype:
+            for ct in type:
                 # Search for object name in database... HMM.
                 ob_add = Lib.getSC(o.name, ct)
                 if ob_add and ct=='objects':

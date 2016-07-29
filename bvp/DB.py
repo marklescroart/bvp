@@ -1,14 +1,8 @@
 """
-FOR THIS CLASS: 
-
-Voxelize, e.g., should be a method of the object. 
-As should Point Cloud, 
-as should desaturate, 
-as should (noisify), 
-as should ... ? 
 
 each class should have: from_docdict(doc), from_blender(blender_object), 
 docdict [property], to_blender [sets blend props?] 
+
 
 - Actions - 
     Action - must be linked to specific class of armatures (which will be a property of bvpObjects)
@@ -22,7 +16,12 @@ docdict [property], to_blender [sets blend props?]
 -> Positioning (for START of action) will still be handled by pos3D, rot3D, size3D. 
 -> Actions will need bounding boxes, which will have to be multiplied by the bounding boxes for objects.
 
+TODO: 
+- 
+
 """
+
+from __future__ import absolute_import
 
 # Imports
 import numpy as np
@@ -30,13 +29,14 @@ import subprocess
 import sys
 import os
 import time
+import json
 from .options import config
+from . import dbqueries
 
 from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 #from .Classes.Constraint import  ObConstraint, CamConstraint
-#from .Classes.DBInterface import DBInterface
 from .Classes.Object import Object
 #from .Classes.RenderOptions import RenderOptions
 #from .Classes.Scene import Scene
@@ -61,47 +61,45 @@ try:
         Sky=Sky,
         )
     # add db queries for bvp stuff
-
+    setattr(docdb.dbqueries, 'bvp', dbqueries)
 except ImportError:
     print("No docdb_lite present! WTF!") # Make me a better error message
+
+# Defaults
+dbhost = config.get('db','dbhost')
+dbname = config.get('db','dbname')
+is_verbose = config.get('db','is_verbose').lower() in ('t','true','yes','1')
+return_objects = config.get('db','return_objects').lower() in ('t','true','yes','1')
 
 verbosity_level = 3
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
-class DBInterface(object):
+class DBInterface(docdb.couchclient.CouchDocDBClient):
     """Class to interface with bvp elements stored in couch db
-        
-        Separate collections for objects, bgs, skies, actions, shadows, scenelists, more?
-        
-        Files in the library directory must be stored according to bvp directory structure: 
-        
-        BaseDirectory/ Objects/ <Category_*.blend and Category_*.pik>
-                       Backgrounds/ <Category_*.blend and Category_*.pik>
-                       Skies/ <Category_*.blend and Category_*.pik>
-                       Shadows/ <Category_*.blend and Category_*.pik>
-        Parameters
-        ----------
-        dbhost : string
-            Name for host server. Read from config file. Config default is intialized to be 'localhost'
-        dbname : string
-            Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
-        port : scalar
-            Port number for database. 
-        Notes
-        -----
-        """     
-
-    def __init__(self, dbname=config.get('db', 'dbname'), dbhost=config.get('db','dbhost'), 
-                dbpath=config.get('path','db_dir')):
-        """Class to interact with (mongo) database"""
-        
-        self.dbpath = dbpath
-        self.temp_instance = False
-        try:
-            # First look for already-running (possibly global) server
-            self.dbi = 0 # TRY TO CONNECT
-        except: # Catch error
-            raise Exception("FIX ME!") # Informative error message as to how to start db server
+    
+    Files in the library directory must be stored according to bvp directory structure: 
+    
+    BaseDirectory/ object/*.blend
+                   background/*.blend
+                   sky/*.blend
+                   shadow/*.blend
+    Parameters
+    ----------
+    dbhost : string
+        Name for host server. Read from config file. Config default is intialized to be 'localhost'
+    dbname : string
+        Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
+    port : scalar
+        Port number for database. 
+    Notes
+    -----
+    """
+    def __init__(self, dbhost=dbhost, dbname=dbname, queries=('basic', 'bvp'), 
+        is_verbose=is_verbose, return_objects=return_objects):
+        super(DBInterface, self).__init__(dbhost, dbname, queries=queries, 
+            is_verbose=is_verbose, return_objects=return_objects)
+        # Set database root dir
+        #self.query(_id='db_config')
 
     def _cleanup(self):
         """Remove all .blend1 and .blend2 backup files from database"""
@@ -110,62 +108,25 @@ class DBInterface(object):
             for f in ff:
                 os.unlink(os.path.join(root, f))
 
-    def _update(self, ClassToUpdate=('object', 'background', 'sky', 'shadow'), direction='blend->db'):
-        """Update library to be consistent with extant groups in files 
-
-        Removes missing files, (adds files?), (Updates changed properties for db objects in archival blend files)
-
-        Need direction argument, because database could be updated either way - blend->db or db->blend
-
-        This will probably be expensive
-        """
-        raise NotImplementedError('Still WIP')
-        for cls in ClassToUpdate:
-            fDir = os.path.join(self.LibDir, cls.capitalize().replace('y', 'ie')+'s')
-            fList = [os.path.join(fDir, f) for f in os.listdir(fDir) if f[-3:]=='end' and 'Category_' in f]
-            if verbosity_level > 1:
-                print('%s files to update:'%cls.capitalize())
-                print(fList)
-            # Check on files...
-            # RunScriptForAllFiles(scriptF, fList)
-
-    def print_list(self, fname, params, sctype=('objects', ), qdict=None):
-        """Prints a semicolon-separated list of all groups (and parameters??) to a text file
-        
-        Gets grp Names (unique ids for each object / background / etc). By default, gets ALL names, but can be filtered
-        (as in getSceneComponentList)
-
-        Parameters
-        ----------
-        fname : string file name
-            File name for file to which to write. Extant files will be overwritten.
-        params : list|tuple
-            List of parameters to print. 
-        sctype : list|tuple
-            List of scene component types for which to print items.
-        
-        Returns
-        -------
-        (nothing - writes to file)
-        """
+    def export_json(self, fname, qdict=None):
         if qdict is None:
-            # Return all objects
-            qdict = {}
-        fid = open(fname, 'w')
-        for sct in sctype:
-            ob = self.dbi[sct].find(qdict)
-            for o in ob:
-                ss = o['name'] + ("; %s"*len(params))%tuple([repr(o[p]) for p in params])
-                fid.write(ss+'\n')
-        fid.close()
-
-    def read_list(self, fname):
-        """Reads in a list in the same format as print_list, uses it to update many database fields
-
-        Optionally print list of stuff to be updated before running update? 
-        """
-        pass
+            ddict = [dict(doc) for doc in self.get_all_documents() if not '_design' in doc.id]
+        elif isinstance(qdict, (list, tuple)):
+            ddict = []
+            for q in qdict:
+                ddict += self.query_documents(**q) # no fancy queries...
+        elif isinstance(qdict, dict):
+            ddict = self.query_documents(**qdict)
+        else:
+            raise Exception("Bad type for qdict argument!")
+        json.dump(ddict, open(fname, mode='w'))
         
+    def import_json(self, fname):
+        # Import all library header files from a json document.
+        # Maybe separate this into two functions, 
+        # one for making a new database and one for updating an extant database
+        pass
+
     def posed_object_list(self):
         """Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
         """
@@ -307,6 +268,7 @@ class DBInterface(object):
         # Convert list of scenes to SceneList   
         SL = SceneList(ScnList=ScnL, RenderOptions=RO)
         SL.RenderSlurm(RenderGroupSize=nCamLoc)
+
     def RenderSkies(self, subCat=None, Is_Overwrite=False):
         """
         Render (all) skies in bvpLibrary to folder <LibDir>/LibBackgrounds/<category>_<name>.png
@@ -359,6 +321,7 @@ class DBInterface(object):
         # Convert list of scenes to SceneList   
         SL = SceneList(ScnList=ScnL, RenderOptions=RO)
         SL.RenderSlurm(RenderGroupSize=nCamLoc)
+
     def CreateSolidVol(self, obj=None, vRes=96, buf=4):
         """
         Searches for extant .voxverts files in <LibDir>/Objects/VOL_Files/, and from them creates 

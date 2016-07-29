@@ -4,12 +4,11 @@ Class for general constraints on random distributions.
 # Imports
 import random
 import copy
-import sys
-import math as bnp
+import sys # perhaps not necessary... see below
 from .Object import Object # Should this be here...? Unclear. 
 from .. import utils as bvpu
 
-# Remove. Rely on numpy. 
+# TODO: Remove. Rely on numpy. 
 randn = random.gauss # Takes inputs Mean, Std
 rand = random.random
 

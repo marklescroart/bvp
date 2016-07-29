@@ -16,13 +16,6 @@ import numpy as np
 
 from ..options import config
 blender_cmd = config.get('path','blender_cmd')
-
-try:
-	import bpy
-	import mathutils as bmu # "B lender M ath U tilities"
-	is_blender = True
-except:
-	is_blender = False
 	
 # Utility functions
 def unique(seq, idfun=None): 
@@ -209,55 +202,54 @@ class fixedKeyDict(dict):
 			for k in DictIn.keys():
 				self[k] = DictIn[k]
 
-if not is_blender:
-	def pySlurm(PyStr, LogDir='/auto/k1/mark/SlurmLog/', SlurmOut=None, SlurmErr=None, 
-					nCPUs='2', partition='all', memory=6000, dep=None):
-		"""
-		Call a python script (formatted as one long string of commands) via slurm. Writes the string
-		to a python (.py) file, and writes a (temporary) shell script (.sh) file to call the 
-		newly-created PyFile via slurm queue.
+def pySlurm(PyStr, LogDir='/auto/k1/mark/SlurmLog/', SlurmOut=None, SlurmErr=None, 
+				nCPUs='2', partition='all', memory=6000, dep=None):
+	"""
+	Call a python script (formatted as one long string of commands) via slurm. Writes the string
+	to a python (.py) file, and writes a (temporary) shell script (.sh) file to call the 
+	newly-created PyFile via slurm queue.
 
-		Inputs: 
-			PyStr - a string that will be written in its entirety to PyFile
-			LogDir - directory to create (temporary) script files and slurm log outputs. Defaults
-				to '/tmp/' (make sure you have write permission for that directory on your machine!)
-			SlurmOut - file to which to write log
-			SlurmErr - file name to which to write error
-			nCPUs = string number of CPUs required for job
-			partition - best to leave at "all"
-			memory = numerical value, in MB, the amount of memory required for the job
-			dep = string of slurm dependenc(y/ies) for job
-		Returns: 
-			jobID = string job ID
-		"""
-		import uuid, subprocess, re
-		# Get unique id string
-		u = str(uuid.uuid4()).replace('-', '')
-		PyFile = 'TempSlurm_%s.py'%u # Add datestr? 
-		PyFile = os.path.join(LogDir, PyFile)
-		with open(PyFile, 'w') as fid:
-			fid.writelines(PyStr)
-		BashFile = 'TempSlurm_%s.sh'%u
-		BashFile = os.path.join(LogDir, BashFile)
-		with open(BashFile, 'w') as fid:
-			fid.write('#!/bin/sh\n')
-			fid.write('#SBATCH\n')
-			fid.write('python '+PyFile)
-			# Cleanup (move to .done file instead?)
-			#fid.write('rm '+PyFile) 
-			#fid.write('rm '+BashFile) 
-		#SlurmOut = os.path.join(LogDir, 'Log', '%s_chunk%03d_SlurmLog_hID=%%N'%(rName, x+1))
-		if SlurmOut is None:
-			SlurmOut = os.path.join(LogDir, 'SlurmOutput_%j_hID%N.out') # Add process id -> this isn't correct syntax!
-		else:
-			SlurmOut = os.path.join(LogDir, SlurmOut)
-		#SlurmJob = "BVPrender_Chunk%03d" # Add to dict / input somehow?
-		SlurmCmd = ['sbatch', '-c', nCPUs, '-p', partition, '-o', SlurmOut, '--mem', str(memory)]
-		if dep:
-			SlurmCmd += ['-d', dep]
-		SlurmCmd += [BashFile]
-		#SlurmCmd = ['sbatch', '-c', nCPUs, '-w', 'ibogaine', BashFile, '-o', SlurmOut]
-		stdOut = subprocess.check_output(SlurmCmd)
-		jobID = re.search('(?<=Submitted batch job )[0-9]*', stdOut).group()
-		# Delete temp files??
-		return jobID
+	Inputs: 
+		PyStr - a string that will be written in its entirety to PyFile
+		LogDir - directory to create (temporary) script files and slurm log outputs. Defaults
+			to '/tmp/' (make sure you have write permission for that directory on your machine!)
+		SlurmOut - file to which to write log
+		SlurmErr - file name to which to write error
+		nCPUs = string number of CPUs required for job
+		partition - best to leave at "all"
+		memory = numerical value, in MB, the amount of memory required for the job
+		dep = string of slurm dependenc(y/ies) for job
+	Returns: 
+		jobID = string job ID
+	"""
+	import uuid, subprocess, re
+	# Get unique id string
+	u = str(uuid.uuid4()).replace('-', '')
+	PyFile = 'TempSlurm_%s.py'%u # Add datestr? 
+	PyFile = os.path.join(LogDir, PyFile)
+	with open(PyFile, 'w') as fid:
+		fid.writelines(PyStr)
+	BashFile = 'TempSlurm_%s.sh'%u
+	BashFile = os.path.join(LogDir, BashFile)
+	with open(BashFile, 'w') as fid:
+		fid.write('#!/bin/sh\n')
+		fid.write('#SBATCH\n')
+		fid.write('python '+PyFile)
+		# Cleanup (move to .done file instead?)
+		#fid.write('rm '+PyFile) 
+		#fid.write('rm '+BashFile) 
+	#SlurmOut = os.path.join(LogDir, 'Log', '%s_chunk%03d_SlurmLog_hID=%%N'%(rName, x+1))
+	if SlurmOut is None:
+		SlurmOut = os.path.join(LogDir, 'SlurmOutput_%j_hID%N.out') # Add process id -> this isn't correct syntax!
+	else:
+		SlurmOut = os.path.join(LogDir, SlurmOut)
+	#SlurmJob = "BVPrender_Chunk%03d" # Add to dict / input somehow?
+	SlurmCmd = ['sbatch', '-c', nCPUs, '-p', partition, '-o', SlurmOut, '--mem', str(memory)]
+	if dep:
+		SlurmCmd += ['-d', dep]
+	SlurmCmd += [BashFile]
+	#SlurmCmd = ['sbatch', '-c', nCPUs, '-w', 'ibogaine', BashFile, '-o', SlurmOut]
+	stdOut = subprocess.check_output(SlurmCmd)
+	jobID = re.search('(?<=Submitted batch job )[0-9]*', stdOut).group()
+	# Delete temp files??
+	return jobID

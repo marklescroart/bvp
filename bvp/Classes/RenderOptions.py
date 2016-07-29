@@ -1,17 +1,24 @@
 """
-Class to control BVP Render options 
+TODO: 
+
+Might be nice to store specific presets of RenderOptions, for specific final choices for rendering stimuli
+for a given experiment. 
+
+FOR NOW, this is not going to be a mapped class...
+
 """
+
 # Imports
 import bvp, os, sys
 import math as bnp
-from .utils import blender as butils
+from ..utils import blender as butils
 #from .utils.blender import butils.set_layers
-from .utils.basics import fixedKeyDict
 try:
 	import bpy
-	#import mathutils as bmu # "B lender M ath U tilities"
+	is_blender = True
 except ImportError:
-	pass
+	is_blender = False
+
 # The "type" input for compositor node creation has been arbitrarily changed 
 # numerous times throughout Blender API development. This is EXTREMELY 
 # IRRITATING. Nonetheless, the format may change again, so I've collected

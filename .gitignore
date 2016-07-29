@@ -7,6 +7,7 @@
 *.blend2
 *__pycache__*
 *.DS_Store
+*bvp.egg*
 
 ## -- Do not copy actual settings, only example for distribution -- ##
 Settings/*ettings*.json

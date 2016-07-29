@@ -793,6 +793,8 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'obje
             instance_groups=proxy)
         G = bpy.context.object
     return G
+
+# Belongs in Object or Shape
 def meshify(ob):
     """
     Create a single (water-tight?) mesh from a multi-mesh group
