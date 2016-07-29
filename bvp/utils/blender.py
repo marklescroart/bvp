@@ -204,9 +204,27 @@ def grab_only(ob):
     ob : bpy class object
         Object to be selected
     """
+    if bpy.context.active_object is not None:
+        if bpy.context.active_object.mode != 'OBJECT':
+            bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     bpy.ops.object.select_all(action='DESELECT')
+    if isinstance(ob, bpy.types.Group):
+        ob = find_group_parent(ob)
     ob.select = True
-    bpy.context.scene.objects.active = ob
+    bpy.context.scene.objects.active = ob    
+
+def find_group_parent(group):
+    """Find parent object among group objects"""
+    no_parent = [o for o in group.objects if o.parent is None]
+    if len(no_parent)>1:
+        # OK, try for an armature:
+        armatures = [o for o in group.objects if o.type=='ARMATURE']
+        if len(armatures) == 1:
+            return armatures[0]
+        else:
+            raise Exception("Can't find parent, can't find single armature")
+        #raise Exception("WTF! More than one no-parent object in group!")
+    return no_parent[0]
 
 def get_mesh_objects(scn=None, select=True):
     """Returns a list of - and optionally, selects - all mesh objects in a scene
@@ -440,7 +458,6 @@ def set_scene(scene_name=None):
         # Set all screens to this scene
         for scr in bpy.data.screens:
             scr.scene = scn
-            
     return scn
 
 def apply_action(target_object, action_file, action_name):

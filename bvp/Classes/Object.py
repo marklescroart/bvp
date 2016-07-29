@@ -133,58 +133,69 @@ class Object(MappedClass):
             grp = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
         # Select only this object as active object
         bvpu.blender.grab_only(grp) 
+        if isinstance(grp, bpy.types.Object):
+            g_ob = grp
+        else:
+            g_ob = bvpu.blender.find_group_parent(grp)
         # Objects are stored at max dim. 10 for easier viewability /manipulation
         # Allow for asymmetrical scaling for weirdo-looking objects? (currently no)
-        sz = float(self.size3D)/10. 
-        setattr(grp, 'scale', bmu.Vector((sz, sz, sz))) # uniform x, y, z scale
+        sz = float(self.size3D)/10. # TODO 10 is default size for objects in files. Should be a variable, perhaps
+        g_ob.scale *= sz #setattr(grp, 'scale', bmu.Vector((sz, sz, sz))) # uniform x, y, z scale
         if self.pos3D is not None:
-            setattr(grp, 'location', self.pos3D)
+            setattr(g_ob, 'location', self.pos3D)
         if self.rot3D is not None:
-            setattr(grp, 'rotation_euler', self.rot3D)
+            setattr(g_ob, 'rotation_euler', self.rot3D)
         # Get armature, if an armature exists for this object
-        if not grp.dupli_group is None:
-            Arm = [x for x in grp.dupli_group.objects if x.type=='ARMATURE']
-            if len(Arm)>0:
-                # Some armature object detected. Proceed with pose / action.
-                if len(Arm)>1:
-                    warnings.warn('Multiple armatures detected, this is probably an irregularity in the file...')
-                    # Try to deal with it by selecting the armature with a pose library attached:
-                    pose_test = [a for a in Arm if not a.pose_library is None]
-                    if len(pose_test)==0:
-                        Arm = Arm[0]
-                    elif len(pose_test)==1:
-                        Arm = pose_test[0]
-                    else:
-                        raise Exception("Aborting - all armatures have pose libraries, I don't know what to do")
-                elif len(Arm)==1:
-                    Arm = Arm[0]
-                bpy.ops.object.proxy_make(object=Arm.name) #object=pOb.name, type=Arm.name)
-                ArmProxy = bpy.context.object
-                ArmProxy.pose_library = Arm.pose_library
-                # Update self w/ list of poses??
-                if not ArmProxy.pose_library is None:
-                    self.poses = [x.name for x in ArmProxy.pose_library.pose_markers]
-            else:
-                Arm = None
+        if is_proxy:
+            armatures = [x for x in G.dupli_group.objects if x.type=='ARMATURE']
+        elif isinstance(G, bpy.types.Group):
+            armatures = [x for x in G.objects if x.type=='ARMATURE']
         else:
-            # For clarity
-            Arm = None
+            # This should raise an exception...
+            armatures = []
+        # Select one armature for poses
+        if len(armatures)>0:
+            # Some armature object detected. Proceed with pose / action.
+            if len(armatures)>1:
+                # Mayhaps this should raise an error...
+                warnings.warn('Multiple armatures detected, this is probably an irregularity in the file...')
+                # Try to deal with it by selecting the armature with a pose library attached:
+                pose_test = [a for a in armatures if not a.pose_library is None]
+                if len(pose_test)==0:
+                    armature = armatures[0]
+                elif len(pose_test)==1:
+                    armature = pose_test[0]
+                else:
+                    raise Exception("Aborting - all armatures have pose libraries, I don't know what to do")
+            elif len(armatures)==1:
+                armature = armatures[0]
+        else:
+            armature = None
+        if is_proxy:
+            bpy.ops.object.proxy_make(object=armature.name) #object=pOb.name,type=armatures.name)
+            pose_armature = bpy.context.object
+            pose_armature.pose_library = armature.pose_library
+        else:
+            pose_armature = armature
+        # Update self w/ list of poses??
+        if pose_armature is not None and pose_armature.pose_library is not None:
+            self.poses = [x.name for x in pose_armature.pose_library.pose_markers]
 
         # Set pose, action
         if not self.pose is None:
-            self.apply_pose(ArmProxy, self.pose)
+            self.ApplyPose(pose_armature, self.pose)
         if not self.action is None:
-            # Get Action if not already a Action object
-            if isinstance(self.action, dict):
-                self.action = Action(**self.action)
-            self.ApplyAction(ArmProxy, self.action)
+            # Get bvpAction if not already a bvpAction object
+            if isinstance(self.action,dict):
+                self.action = bvp.bvpAction(**self.action)
+            self.ApplyAction(pose_armature, self.action)
         # Deal with particle systems. Use of particle systems in general is not advised, since
         # they complicate sizing and drastically slow renders.
-        if not grp.dupli_group is None:
-            for o in grp.dupli_group.objects:
+        if is_proxy:
+            for o in G.dupli_group.objects:
                 # Get the MODIFIER object that contains the particle system
-                PartSystModf = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
-                for psm in PartSystModf:
+                particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
+                for psm in particle_modifier:
                     # Option 1: Turn off the whole modifier (this seems to work)
                     if self.size3D  < 3.:
                         psm.show_render = False
@@ -194,8 +205,8 @@ class Object(MappedClass):
                     # after creation (e.g., hair is commonly styled). Again, avoid if 
                     # possible...
         scn.update()
-        # Shift frame and update scene, because some poses / effects don't seem to take 
-        # effect until the frame changes:
+        # Switch frame & update again, because some poses / effects 
+        # don't seem to take effect until the frame changes
         scn.frame_current+=1
         scn.update()
         scn.frame_current-=1
@@ -243,8 +254,8 @@ class Object(MappedClass):
         if not self.name is None:
             for o in grp.dupli_group.objects:
                 # Get the MODIFIER object that contains the particle system
-                PartSystModf = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
-                for psm in PartSystModf:
+                particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
+                for psm in particle_modifier:
                     #print('Object %s has particle system %s'%(o.name, ps.name))
                     # Option 1: Turn off the whole modifier (this seems to work)
                     if self.size3D  < 3.:
