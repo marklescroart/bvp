@@ -99,7 +99,11 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         super(DBInterface, self).__init__(dbhost, dbname, queries=queries, 
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir
-        #self.query(_id='db_config')
+        try:
+            self.db_dir = self.db['config']['db_dir']
+        except:
+            # TODO: Make this an error
+            self.db_dir = None
 
     def _cleanup(self):
         """Remove all .blend1 and .blend2 backup files from database"""
@@ -109,6 +113,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                 os.unlink(os.path.join(root, f))
 
     def export_json(self, fname, qdict=None):
+        """Exports some or all documents in this database """
         if qdict is None:
             ddict = [dict(doc) for doc in self.get_all_documents() if not '_design' in doc.id]
         elif isinstance(qdict, (list, tuple)):
@@ -122,14 +127,17 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         json.dump(ddict, open(fname, mode='w'))
         
     def import_json(self, fname):
-        # Import all library header files from a json document.
-        # Maybe separate this into two functions, 
-        # one for making a new database and one for updating an extant database
-        pass
+        """Import all library header files from a json document.
+
+        This function is for updating an extant database; see classmethod 
+
+        """
+        raise NotImplementedError("Not yet!") 
 
     def posed_object_list(self):
         """Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
         """
+        raise NotImplementedError("Not yet!")
         ObList = []
         for o in self.objects:
             if o['nPoses']:
@@ -150,7 +158,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
 
         ScaleObj = optional scale object to render along with this object (NOT FINISHED!)
         """
-        
+        raise NotImplementedError("Not yet!")
         RO = RenderOptions() # Should be an input, as should scene
         RO.BVPopts['BasePath'] = os.path.join(self.LibDir, 'Images', 'Objects', 'Scenes', '%s')
         RO.resolution_x = RO.resolution_y = 256 # smaller images
@@ -208,6 +216,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         subCat = None #lambda x: x['name']=='BG_201_mHouse_1fl_1' #None #'outdoor'      
         dummyObjects = ['*human', '*artifact', '*vehicle']
         """
+        raise NotImplementedError("Not yet!")
         RO = RenderOptions()
         RO.BVPopts['BasePath'] = os.path.join(self.LibDir, 'Images', 'Backgrounds', '%s')
         RO.resolution_x = RO.resolution_y = 256 # smaller images
@@ -393,19 +402,33 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                 hh.T.tofile(fid) # Transpose to put it in column-major form...
             # Done with this object!
     @classmethod
+    def create_db_from_json(cls, fname, dbname, dbhost, db_dir):
+        import couchdb
+        server = couchdb.Server(dbhost)
+        print("Creating database {} on {}".format(dbname, dbhost))
+        server.create(dbname)
+        server[dbname].save(dict(_id='config', db_dir=db_dir))
+        dbi = cls.__new__(cls)
+        dbi.__init__(dbname=dbname, dbhost=dbhost)
+        print("Setting up queries...")
+        dbi.set_up_db()
+        docs = json.load(open(fname))
+        print("Uploading documents...")
+        dbi.put_documents(docs)
+        print("Done!")
+
+
+    @classmethod
     def start_db_server(cls, cmd=None): # set cmd from config file
         # Options for cmd from particular os
-
+        raise NotImplementedError("Not yet!")
         subprocess.call(cmd) # Or whatever to run this in the backgroud.
-    # # shortcut names
-    # getSCL = getSceneComponentList
-    # getSC = getSceneComponent
 
     # @property
-    # def nObjects(self):
+    # def n_object(self):
     #   return len(self.objects)
     # @property
-    # def nObjectsCountPoses(self):
+    # def n_object_count_poses(self):
     #   nOb = 0
     #   for o in self.objects:
     #       if o['nPoses']:
@@ -414,11 +437,11 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
     #           nOb+=1
     #   return nOb
     # @property
-    # def nBGs(self):
+    # def n_background(self):
     #   return len(self.backgrounds)
     # @property
-    # def nSkies(self):
+    # def n_sky(self):
     #   return len(self.skies)
     # @property
-    # def nShadows(self):
+    # def n_shadow(self):
     #   return len(self.shadows)
