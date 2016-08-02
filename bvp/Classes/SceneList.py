@@ -329,7 +329,7 @@ class SceneList(object):
                 try:
                     N = bvp.Object(O.name, Lib)
                     self.ScnList[iS].Obj[iO].semantic_category = N.semantic_category
-                    self.ScnList[iS].Obj[iO].realWorldSize = N.realWorldSize
+                    self.ScnList[iS].Obj[iO].real_world_size = N.real_world_size
                 except:
                     Fail=True
                     print('Update failed because name has been changed for scene %d object %s!\nNeeds to be manually updated!'%(iS, O.name))
@@ -337,7 +337,7 @@ class SceneList(object):
             try:
                 N = bvp.Background(S.BG.name, Lib)
                 self.ScnList[iS].BG.semantic_category = N.semantic_category
-                self.ScnList[iS].BG.realWorldSize = N.realWorldSize
+                self.ScnList[iS].BG.real_world_size = N.real_world_size
             except:
                 Fail=True
                 print('Update failed because name has been changed for scene %d background %s! Needs to be manually updated!'%(iS, S.BG.name))
@@ -345,7 +345,7 @@ class SceneList(object):
             try:
                 N = bvp.Sky(S.Sky.name, Lib)
                 self.ScnList[iS].Sky.semantic_category = N.semantic_category
-                self.ScnList[iS].Sky.realWorldSize = N.realWorldSize
+                self.ScnList[iS].Sky.real_world_size = N.real_world_size
             except:
                 if S.Sky.name is not None:
                     Fail=True

@@ -3,66 +3,54 @@
 # Imports.
 import os
 from ..utils.blender import add_group
+from .MappedClass import MappedClass
+
 try:
-	import bpy
-	is_blender = True
+    import bpy
+    is_blender = True
 except ImportError:
-	is_blender = False
+    is_blender = False
 
 # Class def
-class Shadow(object):
-	"""
-	Class for abstract blender scene backgrounds
-	"""
-	def __init__(self, shID=None, Lib=None): 
-		"""
-		Usage: shadow = Background(shID=None, Lib=None)
+class Shadow(MappedClass):
+    """
+    Class for abstract blender scene backgrounds
+    """
+    def __init__(self, name=None, fname=None, semantic_category=None, real_world_size=None,
+        n_vertices=None, n_faces=None, type='Shadow', dbi=None, _id=None, _rev=None): 
+        """Class to store shadows 
+                
+        Notes
+        -----
+        As of 2011.10.19, there is only one shadow category (noise). May add more...
+        Buildings
+        Natural
+        Inside
+        etc.
+        """
+        # Map inputs to properties
+        inpt = locals()
+        self.type = 'Shadow'
+        for k, v in inpt.items(): 
+            if not k in ('self', 'type'):
+                setattr(self, k, v)
+        # Set _temp_params, etc.
+        self._temp_fields = []
+        self._data_fields = []
+        self._db_fields = []
 
-		Class to store shadows 
-				
-		As of 2011.10.19, there is only one shadow category (noise). May add more...
-		Buildings
-		Natural
-		Inside
-		etc.
-		
-		ML 2012.01.23
-		"""
-		# Defaults ?? Create Lib from default BG file instead ??
-		self.fname=None
-		self.name=None
-		self.semantic_category=None
-		self.realWorldSize=100.0 # size of whole space in meters
-		self.nVertices=0
-		self.nFaces=0
-
-		if Lib:
-			TmpSky = Lib.getSC(shID, 'shadows')
-			# Replace default values with values from library
-			self.__dict__.update(TmpSky)
-	def __repr__(self):
-		S = '\n ~S~ Shadow "%s" ~S~\n'%self.name
-		return S
-		
-	def PlaceShadow(self, Scn=None, Scale=None):
-		"""
-		Usage: PlaceShadow(Scn=None)
-
-		Adds shadow object to Blender scene
-
-		"""
-		if not Scn:
-			Scn = bpy.context.scene # Get current scene if input not supplied
-		if self.name:
-			# Add group of mesh object(s)
-			fDir, fNm = os.path.split(self.fname)
-			ShOb = add_group(self.name, fNm, fDir)
-		if not Scale is None:
-			if verbosity_level >3:
-				print('Resizing shadow...')
-			sz = Scale/self.realWorldSize[0] # most skies are 100x100 in area
-			bpy.ops.transform.resize(value=(sz, sz, sz))
-		else:
-			if verbosity_level > 3:
-				print("Shadow is empty!")
-			
+    def __repr__(self):
+        S = '\n ~S~ Shadow "%s" ~S~\n'%self.name
+        return S
+        
+    def place(self, scn=None, scale=None):
+        """Adds shadow object to Blender scene
+        """
+        if not scn:
+            scn = bpy.context.scene # Get current scene if input not supplied
+        if self.name:
+            # Add group of mesh object(s)
+            shadow_ob = add_group(self.name, self.fname, self.path)
+        if scale is not None:
+            sz = scale / self.real_world_size[0] # most skies are 100x100 in area
+            bpy.ops.transform.resize(value=(sz, sz, sz))            

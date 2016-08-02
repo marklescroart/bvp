@@ -14,7 +14,7 @@ dictionaries are of the form:
 'fname':'/path/to/Category_Blah.blend',
 'name':'Sky_001_Whatever',
 'semantic_category':['cloudy','day']
-'realWorldSize':100.000, # size of whole space in meters
+'real_world_size':100.000, # size of whole space in meters
 'nVertices':1000,
 'nFaces':900,
 }
@@ -58,7 +58,7 @@ for G in bpy.data.groups:
 			fname=bpy.data.filepath,
 			name=G.name,
 			semantic_category=semCat,
-			realWorldSize=rws,
+			real_world_size=rws,
 			lightLoc=LightLoc,
 			lightRot=LightRot,
 			lightType=LightType,

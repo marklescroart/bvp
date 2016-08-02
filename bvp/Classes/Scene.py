@@ -1,8 +1,17 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
 # Imports
-import bvp
 import copy
+from .MappedClass import MappedClass
+from .Action import Action
+from .Camera import Camera
+from .Background import Background
+from .Object import Object
+from .Sky import Sky
+from .Shadow import Shadow
+
+# TODO: Get rid of all these imports, call e.g. bvpu.basics.fixedKeyDict
+from .. import utils as bvpu
 from ..utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent version of linspace
 from ..utils.blender import set_cursor
 from ..utils.bvpMath import ImPosCount
@@ -13,7 +22,9 @@ try:
 except ImportError: 
     is_blender = False
 
-class Scene(object):
+DEFAULT_FRAME_RATE = int(config.get('render','frame_rate'))
+
+class Scene(MappedClass):
     """Class for storing an abstraction of a Blender scene. 
 
     Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
@@ -22,7 +33,7 @@ class Scene(object):
     
     Parameters
     ----------
-    num : scalar
+    number : scalar
         Scene number (one-based by convention) within a list of scenes. Determines default scene name.
     objects : list of bvpObjects | None
         Objects with which to populate the scene. Defaults to none (no objects)
@@ -35,7 +46,7 @@ class Scene(object):
         (all alpha with no image/sky texture)
     shadow : Shadow instance | None
         Controls added shadows, if any. Defaults to none (no added shadows)
-    cam : bvpCam instance | None
+    camera : Camera instance | None
         Camera for the scene. Defaults to slight up-right camera with no camera motion.
     frame_range : 2-tuple
         Frame span to render of this scene. NOTE that this is 1-based (the first frame of a scene is 1, 
@@ -54,54 +65,70 @@ class Scene(object):
     Scene.populate_scene() method to set positions for the objects, given the background constraints.
     """
     #def __init__(self, scnParams={}):
-    def __init__(self, num=0, objects=None, bg=None, sky=None, shadow=None, cam=None, frame_range=(1, 1), fpath=None, frame_rate=int(config.get('render','frame_rate'))): 
+    def __init__(self, 
+                 number=0, 
+                 objects=None, 
+                 background=None, 
+                 sky=None, 
+                 shadow=None, 
+                 camera=None, 
+                 frame_range=(1, 1), 
+                 fname=None, 
+                 frame_rate=DEFAULT_FRAME_RATE): 
         """Class to store scene information in Blender.
         """     
         # Add all inputs as class properties (Shady?)
-        Input = locals()
-        for i in Input:
-            if not i in ['self']:
-                setattr(self, i, Input[i])
-        
+        inpt = locals()
+        for k, v in inpt.items():
+            if not k in ['self', 'type']:
+                setattr(self, k, v)
+        self._temp_fields = ['camera'] # hmm... 
+        self._data_fields = []
+        self._db_fields = ['objects', 'background', 'sky', 'shadow']
+
         if self.objects is None:
             # Make "objects" field into a list
             self.objects = []
         # Set default sky parameters
         if self.sky is None: 
-            self.sky = bvp.Sky()
+            self.sky = Sky()
         # Set default background parameters
-        if self.bg is None:
-            self.bg = bvp.Background()
+        if self.background is None:
+            self.background = Background()
         # Default camera: Fixed position!
-        if self.cam is None:
-            self.cam = bvp.Camera(lens=self.bg.lens) # TO DO: Set cam default to file "Settings"! 
+        if self.camera is None:
+            self.camera = Camera(lens=self.background.lens) # TO DO: Set camera default to file "Settings"! 
+        #if self.render_options is None:
+        #    self.render_options = RenderOptions()
         # Final elements, shadows, are not necessary
         # Set file path for renders:
-        if self.fpath is None:
-            self.fpath = 'Sc%04d_##'%self.num
+        if self.fname is None:
+            self.fname = 'Sc%04d_##'%self.number
         self.frame_rate = frame_rate
 
     @property
-    def nObjects(self):
+    def n_objects(self):
         return len(self.objects)
+
     @property
-    def ScnParams(self):
+    def scn_params(self):
         d = fixedKeyDict({
             'frame_start':self.frame_range[0], 
             'frame_end':self.frame_range[1] # Default is 3 seconds
             # MORE??
             })
         return d
+
     def __repr__(self):
-        S = 'Class "Scene" (num=%d, %.2f s, Frames=(%d-%d)):\n'%(self.num, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
-        S+='BACKGROUND%s\n\n'%self.bg
-        S+='SKY%s\n\n'%self.sky
-        S+='SHADOW%s\n\n'%self.shadow
-        S+='CAMERA%s\n\n'%self.cam
-        S+='OBJECTS\n'
+        rstr = 'Class "Scene" (number=%d, %.2f s, Frames=(%d-%d)):\n'%(self.number, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
+        rstr+='BACKGROUND %s\n\n'%self.background
+        rstr+='SKY %s\n\n'%self.sky
+        rstr+='SHADOW %s\n\n'%self.shadow
+        rstr+='CAMERA %s\n\n'%self.camera
+        rstr+='OBJECTS\n'
         for o in self.objects:
-            S+='%s\n'%o
-        return S
+            rstr+='%s\n'%o
+        return rstr
     
     def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=.50, MinSz2D=0, RaiseError=False, nIter=50):
         """Choose positions for all objects in "ObList" input within the scene, 
@@ -111,8 +138,10 @@ class Scene(object):
         has had an object in it. Can be omitted for single scenes (defaults
         to randomly sampling whole image)
 
-        ML 2012.03
         """
+        raise Exception("WIP! FiX ME!") # TODO
+        # (This just might work, but doubtful)
+
         from random import shuffle
         if not ImPosCt:
             ImPosCt = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
@@ -124,10 +153,10 @@ class Scene(object):
             #if verbosity_level > 3:
             #    print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
             if ResetCam:
-                # Start w/ random cam, fixation position
-                cPos = self.bg.CamConstraint.sampleCamPos(self.frame_range)
-                fPos = self.bg.CamConstraint.sampleFixPos(self.frame_range)
-                self.cam = bvp.Camera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.bg.lens)
+                # Start w/ random camera, fixation position
+                cPos = self.background.CamConstraint.sampleCamPos(self.frame_range)
+                fPos = self.background.CamConstraint.sampleFixPos(self.frame_range)
+                self.camera = Camera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.background.lens)
             # Multiple object constraints for moving objects
             OC = []
             for o in ObList:
@@ -140,8 +169,8 @@ class Scene(object):
                     shuffle(OC)
                 oc = OC.pop()
                 NewOb = copy.copy(o) # resets size each iteration as well as position
-                if self.bg.obstacles:
-                    Obst = self.bg.obstacles+ObToAdd
+                if self.background.obstacles:
+                    Obst = self.background.obstacles+ObToAdd
                 else:
                     Obst = ObToAdd
                 if not o.semantic_category:
@@ -154,10 +183,10 @@ class Scene(object):
                     NewOb.size3D = oc.sampleSize()
                 if not o.rot3D:
                     # NOTE: This is fixing rotation of objects to be within 90 deg of facing camera
-                    NewOb.rot3D = oc.sampleRot(self.cam)
+                    NewOb.rot3D = oc.sampleRot(self.camera)
                 if not o.pos3D:
-                    # Sample position last (depends on cam position, It may end up depending on pose, rotation, (or action??)
-                    NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb.size3D, self.cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
+                    # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
+                    NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb.size3D, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
                     if NewOb.pos3D is None:
                         Fail=True
                         break
@@ -168,31 +197,13 @@ class Scene(object):
                 Attempt+=1
         # Check for failure
         if Attempt>nIter and RaiseError:
-            raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.bg.name, nIter))
+            raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.background.name, nIter))
         elif Attempt>nIter and not RaiseError:
             print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
         self.objects = ObToAdd
         # Make sure last fixation hasn't "wandered" away from objects: 
-        fPosFin = self.bg.CamConstraint.sampleFixPos((1, ), obj=ObToAdd)
-        self.cam.fixPos = self.cam.fixPos[:-1]+[fPosFin[0], ]
-
-    def apply_opts(self, scn=None, render_options=None):
-        """Apply general options to scene (environment lighting, world, start/end frames, etc), 
-        including (optionally) render options (of class 'RenderOptions'))
-        
-        ML 2011
-        """
-        scn = bvp.utils.blender.set_scene(scn) 
-        # Set frames (and other scene props?)
-        for s in self.ScnParams.keys():
-            setattr(scn, s, self.ScnParams[s])
-        if render_options:
-            # Set filepath
-            if render_options.BVPopts['BasePath'][-2:]!='%s':
-                print('Warning! base path did not have room to add scene-specific file name. MODIFYING...')
-                render_options.BVPopts['BasePath']+='%s'
-            scn.render.filepath = render_options.BVPopts['BasePath']%self.fpath
-            render_options.apply_opts()
+        fPosFin = self.background.CamConstraint.sampleFixPos((1, ), obj=ObToAdd)
+        self.camera.fixPos = self.camera.fixPos[:-1]+[fPosFin[0], ]
 
     def get_occlusion(self):
         """
@@ -202,64 +213,60 @@ class Scene(object):
         pass
 
 
-    def create(self, render_options=None, scn=None):
+    def create(self, render_options=None, scn=None, is_working=False):
         """Creates the stored scene (imports bg, sky, lights, objects, shadows) in Blender
 
         Optionally, applies rendering options 
 
         Parameters
         ----------
-        render_options : bvp.RenderOptions instance
+        render_options : RenderOptions instance
             Class to store rendering options (e.g. size, base path, extra meta-information renders, etc.)
         scn : string scene name
             Scene to render within .blend file. Defaults to current scene.
         """
-        scn = bvp.utils.blender.set_scene(scn)
+        scn = bvpu.blender.set_scene(scn)
         # set layers to correct setting
         scn.layers = [True]+[False]*19
         # set cursort to center
         set_cursor((0, 0, 0))
-        # place bg
-        self.bg.Place()
-        if self.bg.realWorldSize<50. and 'indoor' in self.bg.semantic_category:
+        # Background
+        self.background.place()
+        if self.background.semantic_category is not None and 'indoor' in self.background.semantic_category and self.background.real_world_size < 50.:
             # Due to a problem with skies coming inside the corners of rooms
-            Scale = self.bg.realWorldSize*1.5
+            scale = self.background.real_world_size*1.5
         else:
-            Scale = self.bg.realWorldSize
-        self.sky.Place(num=self.num, Scale=Scale)
-        self.cam.Place(IDname='cam%03d'%self.num)
+            scale = self.background.real_world_size
+        # Sky
+        self.sky.place(number=self.number, scale=scale)
+        # Camera
+        self.camera.place(name='camera%03d'%self.number)
+        # Shadow
         if self.shadow:
-            self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
-        for o in self.objects:
-            o.Place()
-        scn.name = self.fpath
-        self.apply_opts(render_options=render_options)
-        scn.layers = [True]*20
-    
-    def create_working(self, render_options=None, scn=None):
-        """Creates the stored scene, but allows for objects without set positions.
-
-        See Scene.create() help.
-        """
-        if not scn:
-            scn = bpy.context.scene
-        # set layers to correct setting
-        scn.layers = [True]+[False]*19
-        # set cursort to center
-        set_cursor((0, 0, 0))
-        # place bg
-        self.bg.Place()
-        self.sky.Place(num=self.num, Scale=self.bg.realWorldSize)
-        self.cam.Place(IDname='cam%03d'%self.num)
-        if self.shadow:
-            self.shadow.PlaceShadow(Scale=self.bg.realWorldSize)
+            self.shadow.place(scale=self.background.real_world_size)
+        # Objects
         for o in self.objects:
             try:
-                o.Place()
-            except:
-                pass
-        scn.name = self.fpath
-        self.apply_opts(render_options=render_options)
+                o.place()
+            except Exception as e:
+                if is_working:
+                    pass
+                else:
+                    raise e
+        scn.name = self.fname
+        # Details
+        for s in self.scn_params.keys():
+            setattr(scn, s, self.scn_params[s])
+        if render_options is not None:
+            # Set filepath
+            filepath = copy.copy(render_options.BVPopts['BasePath'])
+            if not '{scene_name}' in filepath:
+                print('Warning! base path did not have room to add scene name. MODIFYING...')
+                filepath = ''.join([filepath, '{scene_name}'])
+                print('New path is:',filepath.format(scene_name=self.fname))
+            scn.render.filepath = filepath.format(scene_name=self.fname)
+            # Apply other options
+            render_options.apply_opts()
         scn.layers = [True]*20
 
     def render(self, render_options, scn=None):
@@ -272,14 +279,21 @@ class Scene(object):
         scn : string scene name
             Scene to render. Defaults to current scene.
         """
-        scn = bvp.utils.blender.set_scene(scn)
+        scn = bvpu.blender.set_scene(scn)
         # Reset scene nodes (?)
         
+        # TODO: This is brittle and shitty. Need to revisit how to set final file names. 
+        if scn.render.filepath is None:
+            scn.render.filepath = render_options.BVPopts['BasePath']
+        if '{scene_name}' in scn.render.filepath:
+            scn.render.filepath = render_options.BVPopts['BasePath'].format(self.fname)
+        elif '%s' in scn.render.filepath:
+            scn.render.filepath = scn.render.filepath%self.fname
         # Apply rendering options
-        scn.render.filepath = render_options.BVPopts['BasePath']%self.fpath
         render_options.apply_opts()
         # Render all layers!
-        scn.layers = [True]*20
+        scn.layers = [True]*20 # TODO: Revisit locations where layers are set in this class's methods / in RenderOptions methods
+        # TODO: Why isn't this in RenderOptions.apply_opts? Seems as if it should be...
         if render_options.BVPopts['Type'].lower()=='firstframe':
             scn.frame_step = scn.frame_end+1 # so only one frame will render
         elif render_options.BVPopts['Type'].lower()=='firstandlastframe':
@@ -309,7 +323,7 @@ class Scene(object):
             Scene to clear of all elements.
         """
         ### --- Removing objects for next scene: --- ### 
-        scn = bvp.utils.blender.set_scene(scn)
+        scn = bvpu.blender.set_scene(scn)
         # Remove all mesh objects       
         Me = list()
         for o in bpy.data.objects:
@@ -357,7 +371,7 @@ class Scene(object):
         scn.layers = [True]+[False]*19
     
     @classmethod
-    def from_blender(cls, num, scn=None, dbi=None):
+    def from_blender(cls, number, scn=None, dbi=None):
         """Gathers all elements present in a blender scene into a Scene.
         
         FORMERLY bvp.utils.blender.get_scene
@@ -369,15 +383,16 @@ class Scene(object):
         
         Parameters
         ----------
-        num : int
+        number : int
             0-first index for scene in scene list. (Sets render path for scene to be 'Sc%04d_##'%(Num+1))
 
         """
+        raise Exception('HUGELY WIP. NOT READY YET.') ## TODO: FIX ME!
         assert is_blender, "Hey bozo! from_blender() can't be run outside blender!"
         if scn is None:
             scn = bpy.context.scene
         # Initialize scene:
-        S = cls.__new__(blah)
+        new_scn = cls.__new__(blah)
         # Scroll through scene component types:
         type = ['objects', 'backgrounds', 'skies', 'shadows']
         # Get scene components:
@@ -386,7 +401,7 @@ class Scene(object):
         for o in scn.objects:
             for ct in type:
                 # Search for object name in database... HMM.
-                ob_add = Lib.getSC(o.name, ct)
+                ob_add = 0 ## SEARCH DATABASE FOR ME, OR DERIVE FROM OBJECT PROPS IN FILE. ##Lib.getSC(o.name, ct)
                 if ob_add and ct=='objects':
                     if 'ARMATURE' in [x.type for x in o.dupli_group.objects]:
                         Pob = [x for x in scn.objects if o.name in x.name and 'proxy' in x.name]
@@ -395,8 +410,8 @@ class Scene(object):
                         elif len(Pob)==0:
                             print('No pose has been set for poseable object %s'%o.name)
                         elif len(Pob)==1:
-                            print('Please manually enter the pose for object %s scn.Obj[%d]'%(o.name, len(S.Obj)+1))
-                    S.Obj.append(bvp.Object(o.name, Lib, 
+                            print('Please manually enter the pose for object %s scn.Obj[%d]'%(o.name, len(new_scn.Obj)+1))
+                    new_scn.Obj.append(Object(o.name, Lib, 
                         size3D=o.scale[0]*10., 
                         rot3D=list(o.rotation_euler), 
                         pos3D=list(o.location), 
@@ -404,12 +419,12 @@ class Scene(object):
                         ))
 
                 elif ob_add and ct=='backgrounds':
-                    S.BG = bvp.Background(o.name, Lib)
+                    new_scn.BG = Background(o.name, Lib)
                 elif ob_add and ct=='skies':
                     # Note: This will take care of lights, too
-                    S.Sky = bvp.Sky(o.name, Lib)
+                    new_scn.Sky = Sky(o.name, Lib)
                 elif ob_add and ct=='shadows':
-                    S.Shadow = bvp.Shadow(o.name, Lib)
+                    new_scn.Shadow = Shadow(o.name, Lib)
         #verbosity_level=vL
         # Get camera:
         C = [c for c in bpy.context.scene.objects if c.type=='CAMERA']
@@ -418,9 +433,9 @@ class Scene(object):
         C = C[0]
         CamAct = C.animation_data.action
         # lens
-        S.Cam.lens = C.data.lens
+        new_scn.Cam.lens = C.data.lens
         # frames
-        S.Cam.frames = tuple(CamAct.frame_range)
+        new_scn.Cam.frames = tuple(CamAct.frame_range)
         # location
         xC = [k for k in CamAct.fcurves if 'location'==k.data_path and k.array_index==0][0]
         yC = [k for k in CamAct.fcurves if 'location'==k.data_path and k.array_index==1][0]
@@ -428,7 +443,7 @@ class Scene(object):
         def cLoc(fr):
             # Get x, y, z location given time
             return (xC.evaluate(fr), yC.evaluate(fr), zC.evaluate(fr))
-        S.Cam.location = [cLoc(fr) for fr in CamAct.frame_range]
+        new_scn.Cam.location = [cLoc(fr) for fr in CamAct.frame_range]
         # Fixation position
         Fix = [c for c in bpy.context.scene.objects if "CamTar" in c.name][0]
         # (Possible danger - check for multiple fixation points??)
@@ -439,11 +454,11 @@ class Scene(object):
         def fLoc(fr):
             # Get x, y, z location given time
             return (xF.evaluate(fr), yF.evaluate(fr), zF.evaluate(fr))
-        S.Cam.fixPos = [fLoc(fr) for fr in FixAct.frame_range]
+        new_scn.Cam.fixPos = [fLoc(fr) for fr in FixAct.frame_range]
         # Last scene props: 
-        S.FrameRange = tuple(CamAct.frame_range)
-        S.ScnParams['frame_end'] = S.FrameRange[-1]
-        S.fpath = 'Sc%04d_##'%(Num+1)
-        S.Num = Num+1
+        new_scn.frame_range = tuple(CamAct.frame_range)
+        new_scn.scn_params['frame_end'] = new_scn.frame_range[-1]
+        new_scn.fname = 'Sc%04d_##'%(Num+1)
+        new_scn.Num = Num+1
         print('Don''t forget to set sky and poses!')
-        return S
+        return new_scn

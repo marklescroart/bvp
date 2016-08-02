@@ -745,7 +745,7 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
         L.select = True
     return LampOut
 
-def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'), 'action')):
+def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Action')):
     """Import an action into the current .blend file
 
     """
@@ -753,9 +753,14 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
         # Group already exists in file, for whatever reason
         print('Action already exists!')
     else:
-        bpy.ops.wm.link_append(
-            directory=os.path.join(fpath, fname)+"\\Action\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-            filepath="//"+fname+"\\Action\\"+action_name, # local filepath within .blend file to the scene to be imported
+        blendfile = os.path.join(fpath, fname)
+        section = "\\Action\\"
+        print('directory = '+ blendfile + section)
+        print('filepath = ' + blendfile + section + action_name)
+        print('filename = ' + action_name)
+        bpy.ops.wm.link(
+            directory=blendfile + section,
+            filepath=blendfile + section + action_name, # local filepath within .blend file to the scene to be imported
             filename=action_name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
             link=True, 
             relative_path=False, 
@@ -763,7 +768,7 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
     a = bpy.data.actions[action_name]
     return a
 
-def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'object'), proxy=True):
+def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Object'), proxy=True):
     """Add a proxy object for a Blender group to the current scene. 
 
     Add a group of Blender objects (all the parts of a single object, most likely) from another 

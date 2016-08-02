@@ -545,13 +545,13 @@ class CamConstraint(PosConstraint):
                 origin=(0., 0., 0.), X=None, Y=None, Z=None, fixX=(0., 1., -3., 3.), 
                 fixY=(0., 3., -3., 3.), fixZ=(2., .5, .0, 3.5), 
                 speed=(3., 1., 0., 6.), pan=True, zoom=True):
-        super(bvpCamConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
+        super(CamConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
         inpt = locals()
         for i in inpt.keys():
             if not i=='self':
                 setattr(self, i, inpt[i])
     def __repr__(self):
-        S = 'bvpCamConstraint:\n'+self.__dict__.__repr__()
+        S = 'CamConstraint:\n'+self.__dict__.__repr__()
         return(S)
     def sampleFixPos(self, frames=None, obj=None):
         """

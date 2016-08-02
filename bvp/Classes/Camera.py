@@ -38,7 +38,7 @@ class Camera(object):
         inpt = locals()
         self.type = 'Camera'
         for k, v in inpt.items():
-            if not i in ('self', 'type'):
+            if not k in ('self', 'type'):
                 setattr(self, k, v)
         constr = CamConstraint() # Initialize w/ default parameters 
         if all([x==1 for x in self.frames]):
@@ -95,7 +95,7 @@ class Camera(object):
 
         # Add camera
         cam_data = bpy.data.cameras.new('cam_{}'.format(name))
-        cam = bpy.ops.object.camera_add('cam_{}'.format(name), cam_data)
+        cam = bpy.data.objects.new('cam_{}'.format(name), cam_data)
         scn.objects.link(cam) # Make camera object present in scene
         scn.camera = cam # Set as active camera
         cam.location = self.location[0]
@@ -118,10 +118,10 @@ class Camera(object):
 
         # Set camera motion (multiple camera positions for diff. frames)
         ## !!! TODO fix make_location_animation awful function and variable names
-        a = bvpu.blender.make_location_animation(self.location, self.frames, aName='CamMotion', hType='VECTOR')
+        a = bvpu.blender.make_location_animation(self.location, self.frames, action_name='CamMotion', handle_type='VECTOR')
         cam.animation_data_create()
         cam.animation_data.action = a
-        f = bvpu.blender.make_location_animation(self.fix_location, self.frames, aName='FixMotion', hType='VECTOR')
+        f = bvpu.blender.make_location_animation(self.fix_location, self.frames, action_name='FixMotion', handle_type='VECTOR')
         fix.animation_data_create()
         fix.animation_data.action = f
 

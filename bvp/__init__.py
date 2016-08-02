@@ -60,14 +60,18 @@ from .Classes.Sky import Sky
 from . import DB
 from .DB import DBInterface
 
-# UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
+# NOTE: UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
 
-def set_scn():
+bvp_dir = _os.path.dirname(__file__)
+
+
+def set_scn(fname='bvp_test'):
     """Quickie default setup of camera + lighting for an object
     """    
-    scn = Scene(cam=Camera(), sky=Sky())
+    scn = Scene(camera=Camera(), sky=Sky(), fname=fname)
     scn.create()
     scn.apply_opts(render_options=RenderOptions())
+    return scn
 
 ## -- Useful functions -- ##
 def _getuuid():
@@ -119,7 +123,8 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     """
     # Inputs
     if blend_file is None:
-        blend_file = _os.path.join(__path__[0], 'BlendFiles', 'Blank.blend')
+        blend_file = _os.path.abspath(_os.path.join(bvp_dir, '../' 'BlendFiles', 'Blank.blend'))
+        print(blend_file)
     # Check for existence of script
     if not _os.path.exists(script):
         # TO DO: look into doing this with pipes??

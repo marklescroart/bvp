@@ -134,22 +134,22 @@ class Object(MappedClass):
         # Select only this object as active object
         bvpu.blender.grab_only(grp) 
         if isinstance(grp, bpy.types.Object):
-            g_ob = grp
+            grp_ob = grp
         else:
-            g_ob = bvpu.blender.find_group_parent(grp)
+            grp_ob = bvpu.blender.find_group_parent(grp)
         # Objects are stored at max dim. 10 for easier viewability /manipulation
         # Allow for asymmetrical scaling for weirdo-looking objects? (currently no)
         sz = float(self.size3D)/10. # TODO 10 is default size for objects in files. Should be a variable, perhaps
-        g_ob.scale *= sz #setattr(grp, 'scale', bmu.Vector((sz, sz, sz))) # uniform x, y, z scale
+        grp_ob.scale *= sz #setattr(grp, 'scale', bmu.Vector((sz, sz, sz))) # uniform x, y, z scale
         if self.pos3D is not None:
-            setattr(g_ob, 'location', self.pos3D)
+            setattr(grp_ob, 'location', self.pos3D)
         if self.rot3D is not None:
-            setattr(g_ob, 'rotation_euler', self.rot3D)
+            setattr(grp_ob, 'rotation_euler', self.rot3D)
         # Get armature, if an armature exists for this object
-        if is_proxy:
-            armatures = [x for x in G.dupli_group.objects if x.type=='ARMATURE']
-        elif isinstance(G, bpy.types.Group):
-            armatures = [x for x in G.objects if x.type=='ARMATURE']
+        if proxy:
+            armatures = [x for x in grp.dupli_group.objects if x.type=='ARMATURE']
+        elif isinstance(grp, bpy.types.Group):
+            armatures = [x for x in grp.objects if x.type=='ARMATURE']
         else:
             # This should raise an exception...
             armatures = []
@@ -171,7 +171,7 @@ class Object(MappedClass):
                 armature = armatures[0]
         else:
             armature = None
-        if is_proxy:
+        if proxy:
             bpy.ops.object.proxy_make(object=armature.name) #object=pOb.name,type=armatures.name)
             pose_armature = bpy.context.object
             pose_armature.pose_library = armature.pose_library
@@ -183,16 +183,17 @@ class Object(MappedClass):
 
         # Set pose, action
         if not self.pose is None:
-            self.ApplyPose(pose_armature, self.pose)
+            self.apply_pose(pose_armature, self.pose)
         if not self.action is None:
-            # Get bvpAction if not already a bvpAction object
-            if isinstance(self.action,dict):
-                self.action = bvp.bvpAction(**self.action)
-            self.ApplyAction(pose_armature, self.action)
+            # Get Action if not already an Action object
+            #if isinstance(self.action, dict):
+            #    self.action = bvp.bvpAction(**self.action)
+            # TODO: REPLACE ABOVE with 
+            self.apply_action(pose_armature, self.action)
         # Deal with particle systems. Use of particle systems in general is not advised, since
         # they complicate sizing and drastically slow renders.
-        if is_proxy:
-            for o in G.dupli_group.objects:
+        if proxy:
+            for o in grp.dupli_group.objects:
                 # Get the MODIFIER object that contains the particle system
                 particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
                 for psm in particle_modifier:
@@ -270,7 +271,7 @@ class Object(MappedClass):
         scn.frame_current-=1
         scn.update()
 
-    def ApplyAction(self, arm, action):
+    def apply_action(self, arm, action):
         """Apply an action to an armature.
 
         Kept separate from Object __init__ function so to be able to interactively apply actions 
@@ -286,8 +287,8 @@ class Object(MappedClass):
             Action to be applied. Must have file_name and path attributes
         """
         # 
-        fdir = os.path.join(bvp.Settings['Paths']['LibDir'], 'Actions/')
-        act = bvpu.blender.add_action(action.name, action.fname, fdir)
+        print(action.fpath, action.name)
+        act = bvpu.blender.add_action(action.name, action.fname, action.path)
         if arm.animation_data is None:
             arm.animation_data_create()
         arm.animation_data.action = act

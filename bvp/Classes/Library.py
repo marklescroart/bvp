@@ -83,7 +83,7 @@ class bvpLibrary(object):
 		semCat = ['animal', 'vehicle']
 		AnimalsAndVehicles = Lib.getComponentList(semCat)
 		or: (lambda function usage)
-		fn = lambda x: x['realWorldSize'] < 1.0
+		fn = lambda x: x['real_world_size'] < 1.0
 		SmallStuff = Lib.getComponentList(fn)
 		"""
 		L = getattr(self, ComponentType)
@@ -119,7 +119,7 @@ class bvpLibrary(object):
 		#For example: (string usage)
 		Ob = Lib.getComponent('*cat', 'objects')
 		#or: (lambda function usage)
-		fn = lambda x: x['realWorldSize'] < 50.0
+		fn = lambda x: x['real_world_size'] < 50.0
 		smBG = Lib.getComponent(fn, 'backgrounds')
 
 		ML 2012.02.24

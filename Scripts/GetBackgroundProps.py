@@ -12,7 +12,7 @@ dictionaries are of the form:
 'fname':'/path/to/Category_Blah.blend',
 'name':'BG_001_Whatever',
 'semantic_category':['outside','natural']
-'realWorldSize':100.000, # size of whole space in meters
+'real_world_size':100.000, # size of whole space in meters
 'lens':50., # focal length for scene camera, in mm
 'nVertices':1000,
 'nFaces':900,
@@ -78,7 +78,7 @@ for G in Grp:
 	else:
 		# Needs modification! defaults should depend on real world size / size of floor mesh / something...
 		# OR: simply raise error, and demand that all files have pos constraints.
-		camConstr = bvp.bvpCamConstraint() # Size=...
+		camConstr = bvp.CamConstraint() # Size=...
 		obConstr = bvp.bvpObConstraint() # Size=...
 	try:
 		rws = gOb['RealWorldSize'], # of the whole space
@@ -92,7 +92,7 @@ for G in Grp:
 			fname=bpy.data.filepath,
 			name=G.name,
 			semantic_category=semCat,
-			realWorldSize=rws,
+			real_world_size=rws,
 			lens=Lens,
 			nVertices=sum([len(oo.data.vertices) for oo in G.objects if oo.type=='MESH']),
 			nFaces=sum([len(oo.data.polygons) for oo in G.objects if oo.type=='MESH']),

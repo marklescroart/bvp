@@ -116,7 +116,7 @@ def import_psb(sdir,psd_dir,dbname='bvp_psb',port=9194):
 			name = 'psb%04d_%s'%(n, os.path.split(ob_dict['url'])[-1])
 			# TO DO : Construct database representation
 			dbob = dict(name=name,basicCat=None,semantic_category=None,
-				wordnet_label=None,realWorldSize=[ob_dict['scale']],
+				wordnet_label=None,real_world_size=[ob_dict['scale']],
 				nFaces=ob_dict['polygons'],nVertices=None,nPoses=None,
 				constraints=None,verified=False,fname=blend_file)
 			dbi.objects.insert([dbob])
@@ -254,7 +254,7 @@ if __name__=='__main__':
 # 			name = 'psb%04d_%s'%(n, os.path.split(ob_dict['url'])[-1])
 # 			# TO DO : Construct database representation
 # 			dbob = dict(name=name,basicCat=None,semantic_category=None,
-# 				wordnet_label=None,realWorldSize=[ob_dict['scale']],
+# 				wordnet_label=None,real_world_size=[ob_dict['scale']],
 # 				nFaces=ob_dict['polygons'],nVertices=None,nPoses=None,
 # 				constraints=None,verified=False,fname=blend_file)
 # 			dbi.objects.insert([dbob])

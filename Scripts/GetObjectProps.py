@@ -11,7 +11,7 @@ dictionaries are of the form:
 {
 'fname':'/path/to/Category_Blah.blend',
 'name':'001_Whoopee',
-'realWorldSize':0.2,
+'real_world_size':0.2,
 'basicCat':'whoopie cushion',
 'semantic_category':['artsm','tool','whoopie cushion']
 'nVertices':1000,
@@ -76,7 +76,7 @@ for G in bpy.data.groups:
 			name=G.name,
 			basicCat=basicCat,
 			semantic_category=semCat,
-			realWorldSize=rws,
+			real_world_size=rws,
 			nVertices=sum([len(oo.data.vertices) for oo in G.objects if oo.type=='MESH']),
 			nFaces=nFaces,
 			nPoses=nPoses,

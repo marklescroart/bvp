@@ -2,11 +2,12 @@
 import os
 from ..utils.blender import add_group
 from .Constraint import ObConstraint, CamConstraint
+from .MappedClass import MappedClass
 # Should be moved, along with test below
-from .Object import Object
-from .Camera import Camera
-from .Scene import Scene
-from .Sky import Sky
+#from .Object import Object
+#from .Camera import Camera
+#from .Scene import Scene
+#from .Sky import Sky
 
 try:
     import bpy
@@ -15,12 +16,13 @@ try:
 except ImportError:
     is_blender = False
 
-class Background(object):
+class Background(MappedClass):
     """Backgrounds for scenes"""
-    def __init__(self, name='DummyBackground', fname=None, n_vertices=None, n_faces=None, lens=50., 
+    def __init__(self, name='DummyBackground', fname=None, n_vertices=None, n_faces=None, 
+        type='Background', wordnet_label=None, real_world_size=None, lens=50., 
         semantic_category=None, object_semantic_category='all', sky_semantic_category='all',
-        camera_constraint=None, object_constraints=None, obstacles=None, 
-        type='Background', _id=None, _rev=None, dbi=None): 
+        camera_constraints=None, object_constraints=None, obstacles=None, 
+        _id=None, _rev=None, dbi=None): 
         """Class to store Backgrounds (floor, walls, maybe lights, + constraints on objects) 
 
         A Background consists of a floor, background objects (walls, maybe trees, etc), maybe 
@@ -43,7 +45,8 @@ class Background(object):
         for k, v in inpt.items(): 
             if not k in ('self', 'type'):
                 setattr(self, k, v)
-
+        if isinstance(self.real_world_size, (list, tuple)):
+            self.real_world_size = self.real_world_size[0]
         self._temp_fields = []
         self._data_fields = []
         self._db_fields = []
@@ -54,11 +57,12 @@ class Background(object):
         """
         if not scn:
             scn = bpy.context.scene # Get current scene if input not supplied
-        if self.name is not None:
+        if self.name is not 'DummyBackground':
             # Add group of mesh object(s)
-            #fDir, fNm = os.path.split(self.fname)
+            print('{}, {}'.format(self.path, self.name))
             add_group(self.name, self.fname, self.path)
         else:
+            # Potentially add default background (with ground plane, other render settings...)
             print("BG is empty!")
 
     @classmethod
@@ -145,23 +149,23 @@ class Background(object):
     #             uv(location=pos, size=ObSz)
 
     def __repr__(self):
-        rstr = ('\n bvp Background {name}\n'
-                '\t File: {fname}\n'
-                '\t [{sem_cat}]\n'
-                '\t [{wn_lab}]\n'
-                '\t Size: {sz}, Lens: {cam}\n'
-                '\t Vertices: {verts}, Faces: {face}\n'
-                '\t Skies allowed: {skies}\n'
-                '\t Objects allowed: {obj}\n'
+        rstr = ('\nbvp Background {name}\n'
+                '    File: {fname}\n'
+                '    [{sem_cat}]\n'
+                '    [{wn_lab}]\n'
+                '    Size: {sz}, Lens: {lens}\n'
+                '    Vertices: {verts}, Faces: {face}\n'
+                '    Skies allowed: {skies}\n'
+                '    Objects allowed: {obj}\n'
                 )
         sem_cat = [] if self.semantic_category is None else self.semantic_category
         wn_lab = [] if self.wordnet_label is None else self.wordnet_label
         skies = [] if self.sky_semantic_category is None else self.sky_semantic_category
         obj = [] if self.object_semantic_category is None else self.object_semantic_category
-        rstr.format(name=self.name, fname=self.fname, 
+        out = rstr.format(name=self.name, fname=self.fname, 
                     sem_cat=', '.join(sem_cat),
                     wn_lab =', '.join(wn_lab),
                     sz=self.real_world_size, lens=self.lens,
                     verts=self.n_vertices, face=self.n_faces,
                     skies=', '.join(skies), obj=', '.join(obj))
-        return(rstr)
+        return(out)
