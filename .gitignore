@@ -8,6 +8,7 @@
 *__pycache__*
 *.DS_Store
 *bvp.egg*
+build/*
 
 ## -- Do not copy actual settings, only example for distribution -- ##
 Settings/*ettings*.json

@@ -54,7 +54,7 @@ if __name__ == "__main__":
                        'Topic :: Scientific/Engineering',
                        'Operating System :: OSX'],
           platforms='any',
-          packages=['bvp'],
+          packages=['bvp', 'bvp.utils'],
           requires=['numpy', 'couchdb',],
           package_data={},
           scripts=[])
