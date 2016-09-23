@@ -7,6 +7,7 @@ import copy
 import sys # perhaps not necessary... see below
 from .Object import Object # Should this be here...? Unclear. 
 from .. import utils as bvpu
+from math import sqrt
 
 # TODO: Remove. Rely on numpy. 
 randn = random.gauss # Takes inputs Mean, Std
@@ -147,50 +148,53 @@ class ObConstraint(PosConstraint):
             if not i=='self':
                 setattr(self, i, Inputs[i])
     
-    # def checkXYZS_3D(self, XYZpos, Sz, Obst=None, CheckBounds=True):
-    #     """
-    #     Verify that a particular position and size is acceptable given "Obst" obstacles and 
-    #     the position constraints of this object (in 3-D). 
+    def checkXYZS_3D(self, minXYZpos, maxXYZpos, Sz, Obst=None, CheckBounds=True):
+        """
+        Verify that a particular position and size is acceptable given "Obst" obstacles and 
+        the position constraints of this object (in 3-D). 
         
-    #     Inputs:
-    #         XYZpos = (x, y, z) position (tuple or list)
-    #         Sz = scalar size
-    #         Obst = list of "Object" instances to specify positions of obstacles to avoid
-    #     Returns:
-    #         BGboundOK = boolean; True if XYZpos is within boundary constraints
-    #         ObDistOK = boolean; True if XYZpos does not overlap with other objects/obstacles 
-    #     """
-    #     # (1) Check distance from allowable object position boundaries (X, Y, and/or r)
-    #     BGboundOK_3D = [True, True, True]
-    #     if CheckBounds:
-    #         X_OK, Y_OK, r_OK = True, True, True # True by default
-    #         if self.X:
-    #             xA = True if self.X[2] is None else (XYZpos[0]-Sz/2.)>self.X[2]
-    #             xB = True if self.X[3] is None else (XYZpos[0]+Sz/2.)<self.X[3]
-    #             X_OK = xA and xB
-    #         if self.Y:
-    #             yA = True if self.Y[2] is None else (XYZpos[1]-Sz/2.)>self.Y[2]
-    #             yB = True if self.Y[3] is None else (XYZpos[1]+Sz/2.)<self.Y[3]
-    #             Y_OK = yA and yB
-    #         if self.r:
-    #             oX, oY, oZ = self.origin
-    #             R = ((XYZpos[0]-oX)**2+(XYZpos[1]-oY)**2)**.5
-    #             rA = True if self.r[2] is None else (R-Sz/2.)>self.r[2]
-    #             rB = True if self.r[3] is None else (R+Sz/2.)<self.r[3]
-    #             r_OK = rA and rB
-    #         BGboundOK_3D = [X_OK, Y_OK, r_OK] # all([...])
-    #     # (2) Check distance from other objects in 3D
-    #     if Obst is not None:
-    #         nObj = len(Obst)
-    #     else:
-    #         nObj = 0
-    #     TmpOb = Object(pos3D=XYZpos, size3D=Sz)
-    #     ObDstOK_3D = [True]*nObj
-    #     for c in range(nObj):
-    #         DstThresh3D = TmpOb.size3D/2. +  Obst[c].size3D /2. 
-    #         Dst3D = bvpu.bvpMath.vecDist(TmpOb.pos3D, Obst[c].pos3D)
-    #         ObDstOK_3D[c] = Dst3D>DstThresh3D
-    #     return BGboundOK_3D, ObDstOK_3D
+        Inputs:
+            XYZpos = (x, y, z) position (tuple or list)
+            Sz = scalar size
+            Obst = list of "Object" instances to specify positions of obstacles to avoid
+        Returns:
+            BGboundOK = boolean; True if XYZpos is within boundary constraints
+            ObDistOK = boolean; True if XYZpos does not overlap with other objects/obstacles 
+        """
+        # (1) Check distance from allowable object position boundaries (X, Y, and/or r)
+        BGboundOK_3D = [True, True, True]
+        if CheckBounds:
+            X_OK, Y_OK, r_OK = True, True, True # True by default
+            if self.X:
+                xA = True if self.X[2] is None else (minXYZpos[0]-Sz/2.)>self.X[2]
+                xB = True if self.X[3] is None else (maxXYZpos[0]+Sz/2.)<self.X[3]
+                X_OK = xA and xB
+            if self.Y:
+                yA = True if self.Y[2] is None else (minXYZpos[1]-Sz/2.)>self.Y[2]
+                yB = True if self.Y[3] is None else (maxXYZpos[1]+Sz/2.)<self.Y[3]
+                Y_OK = yA and yB
+            if self.r:
+                oX, oY, oZ = self.origin
+                maxR = ((maxXYZpos[0]-oX)**2+(maxXYZpos[1]-oY)**2)**.5
+                minR = ((minXYZpos[0]-oX)**2+(minXYZpos[1]-oY)**2)**.5
+                rA = True if self.r[2] is None else (minR-Sz/2.)>self.r[2]
+                rB = True if self.r[3] is None else (maxR+Sz/2.)<self.r[3]
+                r_OK = rA and rB
+            BGboundOK_3D = [X_OK, Y_OK, r_OK] # all([...])
+        # (2) Check distance from other objects in 3D
+        if Obst is not None:
+            nObj = len(Obst)
+        else:
+            nObj = 0
+        XYZpos = ((minXYZpos[0]+maxXYZpos[0])/2, (minXYZpos[1]+maxXYZpos[1])/2, (minXYZpos[2]+maxXYZpos[2])/2)
+        action_radius = sqrt((minXYZpos[0]-maxXYZpos[0])**2+(minXYZpos[1]-maxXYZpos[1])**2+(minXYZpos[2]-maxXYZpos[2])**2)/2
+        TmpOb = Object(pos3D=XYZpos, size3D=Sz)
+        ObDstOK_3D = [True]*nObj
+        for c in range(nObj):
+            DstThresh3D = TmpOb.size3D/2. + action_radius +  Obst[c].boundingSphereRadius 
+            Dst3D = bvpu.bvpMath.vecDist(TmpOb.pos3D, Obst[c].boundingSphereCenter)
+            ObDstOK_3D[c] = Dst3D>DstThresh3D
+        return BGboundOK_3D, ObDstOK_3D
 
     def checkXYZS_2D(self, XYZpos, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50.):
         """
@@ -259,7 +263,7 @@ class ObConstraint(PosConstraint):
         TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
         SzOK_2D = sum([TmpObSz_X, TmpObSz_Y])/2. > MinSz2D
         return SzOK_2D
-    def sampleXYZ(self, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0.):
+    def sampleXYZ(self, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0., minXYZdelta = (0.0,0.0,0.0), maxXYZdelta = (0.0,0.0,0.0)):
         """
         Usage: sampleXYZ(self, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0.)
 
@@ -342,7 +346,9 @@ class ObConstraint(PosConstraint):
                 print(pNm + '='+ str(value))
                 setattr(tmpC, pNm, value)
             TmpPos = tmpC.sampleXYZ()
-            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(TmpPos, Sz, Obst=Obst)
+            minTmpPos = (TmpPos[0]+minXYZdelta[0], TmpPos[1]+minXYZdelta[1], TmpPos[2]+minXYZdelta[2])
+            maxTmpPos = (TmpPos[0]+maxXYZdelta[0], TmpPos[1]+maxXYZdelta[1], TmpPos[2]+maxXYZdelta[2])
+            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(minTmpPos, maxTmpPos, Sz, Obst=Obst)
             EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpPos, Sz, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
             TmpOb = Object(pos3D=TmpPos, size3D=Sz)
             SzOK_2D = self.checkSize2D(TmpOb, Cam, MinSz2D)
@@ -377,7 +383,7 @@ class ObConstraint(PosConstraint):
                 raise Exception('Iterated %d x without finding good position!'%nIter)
             else: 
                 return None, None
-    def sampleXY(self, Sz, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.):
+    def sampleXY(self, Sz, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.,minXYZdelta=(0.0,0.0,0.0), maxXYZdelta = (0.0,0.0,0.0)):
         """
         Usage: sampleXY(Sz, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.)
 
@@ -439,7 +445,10 @@ class ObConstraint(PosConstraint):
             TmpPos = oPosUp
             TmpPos[2] -= Sz/2.
             # Check on 3D bounds
-            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(TmpPos, Sz, Obst=Obst)
+            print(TmpPos)
+            minTmpPos = (TmpPos[0]+minXYZdelta[0], TmpPos[1]+minXYZdelta[1], TmpPos[2]+minXYZdelta[2])
+            maxTmpPos = (TmpPos[0]+maxXYZdelta[0], TmpPos[1]+maxXYZdelta[1], TmpPos[2]+maxXYZdelta[2])
+            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(minTmpPos, maxTmpPos, Sz, Obst=Obst)
             # Check on 2D bounds
             EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpPos, Sz, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
             # Instantiate temp object and...

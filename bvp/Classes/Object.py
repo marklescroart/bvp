@@ -13,7 +13,8 @@ import random
 import warnings
 from .MappedClass import MappedClass
 from .. import utils as bvpu
-from ..options import config 
+from ..options import config
+from math import sqrt 
 
 try:
     import bpy
@@ -103,6 +104,33 @@ class Object(MappedClass):
         if self.n_vertices:
             S+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
         return(S)
+    @property
+    def max_xyz_pos(self):
+        return (self.action.max_xyz[0] + self.pos3D[0],self.action.max_xyz[1] + self.pos3D[1],self.action.max_xyz[2] + self.pos3D[2])
+
+    @property
+    def min_xyz_pos(self):
+        return (self.action.min_xyz[0] + self.pos3D[0],self.action.min_xyz[1] + self.pos3D[1],self.action.min_xyz[2] + self.pos3D[2])
+    
+
+
+    @property
+    def boundingSphereCenter(self):
+        if self.action is not None:
+            return self.pos3D
+        else:
+            max_pos =  self.max_xyz_pos
+            min_pos =  self.min_xyz_pos
+            return ((max_pos[0]+min_pos[0])/2,(max_pos[1]+min_pos[1])/2,(max_pos[2]+min_pos[2])/2)
+    @property
+    def boundingSphereRadius(self):
+        if self.action is not None:
+            return self.size3D/2
+        else:
+            max_pos =  self.max_xyz_pos
+            min_pos =  self.min_xyz_pos
+            return sqrt((max_pos[0]-min_pos[0])**2+(max_pos[1]-min_pos[1])**2+(max_pos[2]-min_pos[2])**2)/2
+    
 
     def place(self, scn=None, proxy=True):
         """Places object into Blender scene, with pose & animation information
