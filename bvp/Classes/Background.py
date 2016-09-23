@@ -32,7 +32,7 @@ class Background(MappedClass):
         bounds of space, what have you) should be in this group. 
         
         Parameters
-        ----------
+        ---------
         name: string 
             a unique identifier for the BG in question. Either a string 
                 (interpreted to be the name of the BG group) or a lambda function
@@ -53,6 +53,9 @@ class Background(MappedClass):
         self._temp_fields = []
         self._data_fields = []
         self._db_fields = []
+        #TODO Utkarsh: find better solution to this (and to camConstraint fix)
+        self.camConstraint = CamConstraint()
+        self.obConstraint = ObConstraint()
 
     def place(self, scn=None):
         """
