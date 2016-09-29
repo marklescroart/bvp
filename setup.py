@@ -69,7 +69,9 @@ if __name__ == "__main__":
                        'Topic :: Scientific/Engineering',
                        'Operating System :: OSX'],
           platforms='any',
-          packages=['bvp', 'bvp.utils'],
+          packages=['bvp', 
+                    'bvp.utils',
+                    'bvp.Classes'],
           requires=['numpy', 'couchdb',],
           package_data={'bvp':[ 
                             'defaults.cfg',
