@@ -44,7 +44,10 @@ class Background(MappedClass):
         self.type = 'Background'
         for k, v in inpt.items(): 
             if not k in ('self', 'type'):
-                setattr(self, k, v)
+                if v == 'None':
+                    setattr(self, k, None)
+                else:
+                    setattr(self, k, v)
         if isinstance(self.real_world_size, (list, tuple)):
             self.real_world_size = self.real_world_size[0]
         self._temp_fields = []

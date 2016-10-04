@@ -82,8 +82,10 @@ class Action(MappedClass):
         self.type = 'Action'
         for k, v in inpt.items(): 
             if not k in ('self', 'type'):
-                setattr(self, k, v)
-        # Set _temp_params, etc.
+                if v == 'None':
+                    setattr(self, k, None)
+                else:
+                    setattr(self, k, v)        # Set _temp_params, etc.
         self._temp_fields = []
         self._data_fields = []
 
