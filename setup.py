@@ -6,8 +6,25 @@
 # Adapted from MNE-Python
 
 import os
+import sys
 import setuptools
-from numpy.distutils.core import setup
+#from numpy.distutils.core import setup
+
+if len(set(('develop', 'bdist_egg', 'bdist_rpm', 'bdist', 'bdist_dumb',
+            'bdist_wininst', 'install_egg_info', 'egg_info', 'easy_install',
+            'test',
+            )).intersection(sys.argv)) > 0:
+    # This formulation is taken from nibabel.
+    # "setup_egg imports setuptools setup, thus monkeypatching distutils."
+    # Turns out, this patching needs to happen before disutils.core.Extension
+    # is imported in order to use cythonize()...
+    from setuptools import setup
+else:
+    # Use standard
+    from distutils.core import setup
+
+from distutils.command.install import install
+from distutils.core import Extension
 
 version = "0.1"
 with open(os.path.join('bvp', '__init__.py'), 'r') as fid:
@@ -30,14 +47,12 @@ LICENSE = 'Regents of the University of California'
 DOWNLOAD_URL = 'https://github.com/marklescroart/bvp'
 VERSION = version
 
-
 if __name__ == "__main__":
     if os.path.exists('MANIFEST'):
         os.remove('MANIFEST')
 
     setup(name=DISTNAME,
           maintainer=MAINTAINER,
-          include_package_data=False,
           maintainer_email=MAINTAINER_EMAIL,
           description=DESCRIPTION,
           license=LICENSE,
@@ -54,7 +69,13 @@ if __name__ == "__main__":
                        'Topic :: Scientific/Engineering',
                        'Operating System :: OSX'],
           platforms='any',
-          packages=['bvp', 'bvp.utils'],
+          packages=['bvp', 
+                    'bvp.utils',
+                    'bvp.Classes'],
           requires=['numpy', 'couchdb',],
-          package_data={},
+          package_data={'bvp':[ 
+                            'defaults.cfg',
+                            ],
+                        },
+          include_package_data=True,
           scripts=[])
