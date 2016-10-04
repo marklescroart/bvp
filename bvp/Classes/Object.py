@@ -72,7 +72,10 @@ class Object(MappedClass):
         self.type = 'Object'
         for k, v in inpt.items(): 
             if not k in ('self', 'type'):
-                setattr(self, k, v)
+                if v == 'None':
+                    setattr(self, k, None)
+                else:
+                    setattr(self, k, v)
 
         self._temp_fields = ['pos2D', 'pos3D','rot3D', 'size3D', 'action', 'pose']
         self._data_fields = []

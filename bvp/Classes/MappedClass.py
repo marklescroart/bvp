@@ -118,7 +118,7 @@ class MappedClass(object):
     @property
     def fpath(self):
         if hasattr(self, 'path') and hasattr(self, 'fname'):
-            if (self.path) is None or (self.fname is None):
+            if (self.path is None) or (self.fname is None) or (self.path=='None') or (self.fname=='None'):
                 return None
             else:
                 if isinstance(self.fname, (list, tuple)):
@@ -156,6 +156,12 @@ class MappedClass(object):
             d.update(ee)
         # Replace all classes in document with IDs
         d = _obj2id_doc(d)
+        for k in d.keys():
+            if d[k] is None:
+                d[k] = 'None'
+        if d['_rev'] == 'None':
+            # Can't have `_rev` be 'None'
+            _ = d.pop('_rev')
         # Convert to json and back to avoid unpredictable behavior due to conversion, e.g. tuple!=list
         d = json.loads(json.dumps(d))
         return d
@@ -179,7 +185,7 @@ class MappedClass(object):
                 v = _id2obj_strlist(v, self.dbi)
             elif isinstance(v, dict):
                 v = _id2obj_dict(v, self.dbi)
-            elif v is None:
+            elif v is None or v=='None':
                 pass
             elif isinstance(v, MappedClass):
                 pass
@@ -209,6 +215,10 @@ class MappedClass(object):
         assert self.dbi is not None, 'dbi field must be set to check on items in database!'
         # Search for extant db object
         doc = self.docdict
+        if doc['_id'] is None or doc['_id']=='None':
+            _ = doc.pop('_id')
+        if ('_rev' in doc) and (doc['_rev'] is None or doc['_rev']=='None'):
+            _ = doc.pop('_rev')
         dr = {}
         for sf in skip_fields:
             if sf in doc:
@@ -234,6 +244,26 @@ class MappedClass(object):
         else:
             return False, chk
 
+    def save(self, is_overwrite=False):
+        """Save the meta-data for this object to docdb database
+        
+        Does NOT do any checks on content (besides `_id` field). Needs update for saving fname, etc.
+        """
+        # Initial checks
+        if (self.dbi is None) or (self.dbi=='None'):
+            raise Exception('Must define dbi for this to work!')
+        # Search for extant db object
+        proceed,doc = self.db_check(is_overwrite=is_overwrite)
+        if not proceed:
+            if isinstance(doc,(list,tuple)) and len(doc)>1:
+                raise Exception("Multiple objects found in database that match this object!")
+            else:
+                raise Exception("Found extant doc in database, and is_overwrite is set to False!")
+
+        if (not '_id' in doc) or (doc['_id'] is None) or (doc['_id']=='None'):
+            doc['_id'] = self.dbi.get_uuid()
+        # Save header info to database
+        self.dbi.put_document(doc)
     # For bvp, for now, this seems like a bad idea. 
     # def delete(self):
     #     assert self.dbi is not None, 'dbi field must be set to delete a file!'

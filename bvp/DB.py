@@ -403,6 +403,9 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             # Done with this object!
     @classmethod
     def create_db_from_json(cls, fname, dbname, dbhost, db_dir):
+        """Creates database from a json file
+
+        If fname for json file is None, just creates an empty database"""
         import couchdb
         server = couchdb.Server(dbhost)
         print("Creating database {} on {}".format(dbname, dbhost))
@@ -412,9 +415,10 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         dbi.__init__(dbname=dbname, dbhost=dbhost)
         print("Setting up queries...")
         dbi.set_up_db()
-        docs = json.load(open(fname))
-        print("Uploading documents...")
-        dbi.put_documents(docs)
+        if fname is not None:
+            docs = json.load(open(fname))
+            print("Uploading documents...")
+            dbi.put_documents(docs)
         print("Done!")
 
 

@@ -160,7 +160,7 @@ def set_layers(ob, LayerList):
     ob = blender object data structure
     LayerList = list of numbers of layers you want the object to appear on, e.g. [0, 9] (ZERO-BASED)
     """
-    if not bvp.Is_Blender:
+    if not is_blender:
         print("Sorry, won't run outside of Blender!")
         return
     LL = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
@@ -502,7 +502,7 @@ def set_up_group(ObList=None, scn=None):
     np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
     if p:
         for o in np:
-            GrabOnly(o)
+            grab_only(o)
             bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
             if 'ChildOf' in o.constraints.keys():
                 o.constraints.remove(o.constraints['ChildOf'])
@@ -522,7 +522,7 @@ def set_up_group(ObList=None, scn=None):
         print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size, ScaleF, max(SzXYZ)))
     
     for o in ObList:
-        GrabOnly(o)
+        grab_only(o)
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         o.scale = o.scale * ScaleF
         o.location = ToSet_Loc
@@ -530,7 +530,7 @@ def set_up_group(ObList=None, scn=None):
     scn.update()
     # Re-parent everything
     for o in np:
-        GrabOnly(p)
+        grab_only(p)
         o.select = True
         bpy.ops.object.parent_set()
     # Create group (if necessary) and name group
@@ -560,7 +560,7 @@ def get_group_bounding_box(ob_list=None):
     BBy = list()
     BBz = list()
     for ob in ob_list: 
-        bvp.utils.blender.grab_only(ob)
+        grab_only(ob)
         if ob.type in bb_types:
             bpy.ops.object.transform_apply(rotation=True)
         for ii in range(8):
