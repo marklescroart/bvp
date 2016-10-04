@@ -37,6 +37,7 @@ from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 #from .Classes.Constraint import  ObConstraint, CamConstraint
+from .Classes.Material import Material
 from .Classes.Object import Object
 #from .Classes.RenderOptions import RenderOptions
 #from .Classes.Scene import Scene
@@ -52,6 +53,7 @@ try:
         Action=Action,
         Background=Background,
         Camera=Camera,
+        Material=Material,
         Object=Object,
         #RenderOptions=RenderOptions,
         #Scene=Scene,

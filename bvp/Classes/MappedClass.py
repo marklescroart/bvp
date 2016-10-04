@@ -121,12 +121,7 @@ class MappedClass(object):
             if (self.path is None) or (self.fname is None) or (self.path=='None') or (self.fname=='None'):
                 return None
             else:
-                if isinstance(self.fname, (list, tuple)):
-                    # Multi-file input. Get list of paths for all files.
-                    # For now (2015.09), these are assumed to be images.
-                    return [os.path.join(self.path, f) for f in self.fname]
-                else:
-                    return os.path.join(self.path, self.fname)
+                return os.path.join(self.path, self.fname)
         else:
             return None
 

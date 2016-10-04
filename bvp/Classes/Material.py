@@ -34,6 +34,6 @@ class Material(MappedClass):
         self._db_fields = []
 
     def __repr__(self):
-        S = '\n ~M~ Material "{name}" ~M~\n    ({fname})'.format(name=self.name,
+        S = '\n ~M~ Material "{name}" ~M~\n    ({fpath})'.format(name=self.name,
             fpath=self.fpath)
         return S
