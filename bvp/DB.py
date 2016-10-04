@@ -100,7 +100,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir
         try:
-            self.db_dir = self.db['config']['db_dir']
+            self.db_dir = os.path.expanduser(self.db['config']['db_dir'])
         except:
             # TODO: Make this an error
             self.db_dir = None
