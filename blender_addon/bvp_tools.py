@@ -45,9 +45,9 @@ bl_info = {
 
 ### --- Misc parameters --- ###
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
-dbport = bvp.Settings['db']['port']
-dbpath = bvp.Settings['Paths']['LibDir'] # only necessary for creating client instances...
-dbname = bvp.Settings['db']['name']
+#dbport = bvp.Settings['db']['port']
+dbpath = bvp.config.get('path', 'db_dir') # only necessary for creating client instances...
+dbname = bvp.config.get('db', 'name')
 to_save = {}
 db_results = []
 last_import = ""
@@ -129,14 +129,14 @@ class RenderOptions(bpy.types.PropertyGroup):
 	do_normals = bpy.props.BoolProperty(default=False)
 
 
-"""
+'''
 # UI list option for displaying databases (more flexible, more space)
 class DBprop(bpy.types.PropertyGroup):
 	"""Grouped database properties"""
 	id = bpy.props.IntProperty()
 	port = bpy.props.IntProperty(name='port',default=bvp.Settings['db']['port'])
 	path = bpy.props.StringProperty(name='path',default=bvp.Settings['Paths']['LibDir'])
-"""
+'''
 
 ## -- For dynamic EnumProperties -- ##
 def enum_groups(self,context):
@@ -159,10 +159,10 @@ def enum_wn_results(self,context):
 	return out
 
 def enum_dbs(self,context):
-	"""Enumerate all active databases for pymongo server (if running)"""
+	"""Enumerate all active databases for couchdb server (if running)"""
 	try:
 		# TO DO: Add ShapeNet / ModelNet to this list?
-		dbi = bvp.bvpDB(port=dbport)
+		dbi = bvp.DBInterface()
 		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
 	except:
 		dbnm = [('(none)','(none)','')]
@@ -396,28 +396,30 @@ class DBSaveObject(bpy.types.Operator):
 		wordnet = [s.lower() for s in wordnet if s]
 		#is_manifold = False # worth it? 
 		# Create database instance
-		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		dbi = bvp.DBInterface(dbname=wm.active_db)
 		# Construct object struct to save
 		to_save = dict(
 			# Edited through UI
 			name=wm.active_group, # also not great.
-			parent_file=pfile, # hacky. ugly. 
+			type='Object',
+			fname=pfile, # hacky. ugly. 
 			wordnet_label=wordnet,
-			semantic_cat=semcat,
-			basic_cat=grp.Object.basic_cat,
+			semantic_category=semcat,
+			basic_category=grp.Object.basic_cat,
 			real_world_size=grp.Object.real_world_size,
 			is_realistic=grp.Object.is_realistic,
 			is_cycles=grp.Object.is_cycles,
 			# Computed
-			nfaces=nfaces,
-			nvertices=nverts,
-			nposes=nposes,
+			n_faces=nfaces,
+			n_vertices=nverts,
+			n_poses=nposes,
 			constraints=None,
 			#is_manifold=is_manifold, # worth it? 
 			#_id='tempX12345', # dbi.db.id? generate_id? Look up ID? Check database for extant
 			)
-		dbi.objects.save(to_save)
-		save_path = os.path.join(dbpath,'Objects',pfile+'.blend')
+		# Create object instance instead, call save method? NEED ID...
+		dbi.put_document(to_save)
+		save_path = os.path.join(dbpath, 'Object', pfile+'.blend')
 		if save_path==thisfile:
 			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
@@ -444,12 +446,12 @@ class DBSaveAction(bpy.types.Operator):
 		global to_save
 		wm = context.window_manager
 		# Create database instance
-		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		dbi = bvp.DBInterface(dbname=wm.active_db)
 
 		if self.do_save:
 			print('Saving %s in database'%repr(to_save))
 			# Save in database
-			dbi.actions.save(to_save)
+			dbi.put_document(to_save)
 			# Save parent file
 			save_path = os.path.join(dbpath,'Actions',to_save['parent_file'])
 			print('saving %s'%save_path)
@@ -634,7 +636,7 @@ class ClipFrames(bpy.types.Operator):
 		scn.frame_end = np.ceil(act.frame_range[1])
 		return {'FINISHED'}
 ### --- Misc. supporting classes --- ###
-"""
+'''
 # UI list option for displaying databases (more flexible, more space)
 # Need database creation option (?)
 class BVP_DB_LIST(bpy.types.UIList):
@@ -643,7 +645,7 @@ class BVP_DB_LIST(bpy.types.UIList):
 		split = layout.split(0.2)
 		split.label(str(item.id)) # item.name
 		split.prop(item, "name", text="", emboss=False, translate=False) #, icon='BORDER_RECT'
-"""
+'''
 
 ### --- Panels --- ###
 
