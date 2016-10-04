@@ -48,7 +48,7 @@ from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 from .Classes.Constraint import  ObConstraint, CamConstraint
-
+from .Classes.Material import Material
 from .Classes.Object import Object
 from .Classes.RenderOptions import RenderOptions
 from .Classes.Scene import Scene
@@ -163,6 +163,6 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         # Raise them if they exist?
         return jobid
 
-__all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 
+__all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
            'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
            'utils','config'] 

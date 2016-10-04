@@ -37,6 +37,7 @@ from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 #from .Classes.Constraint import  ObConstraint, CamConstraint
+from .Classes.Material import Material
 from .Classes.Object import Object
 #from .Classes.RenderOptions import RenderOptions
 #from .Classes.Scene import Scene
@@ -52,6 +53,7 @@ try:
         Action=Action,
         Background=Background,
         Camera=Camera,
+        Material=Material,
         Object=Object,
         #RenderOptions=RenderOptions,
         #Scene=Scene,
@@ -100,7 +102,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir
         try:
-            self.db_dir = self.db['config']['db_dir']
+            self.db_dir = os.path.expanduser(self.db['config']['db_dir'])
         except:
             # TODO: Make this an error
             self.db_dir = None
