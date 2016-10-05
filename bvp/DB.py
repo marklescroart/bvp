@@ -77,27 +77,23 @@ verbosity_level = 3
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
 class DBInterface(docdb.couchclient.CouchDocDBClient):
-    """Class to interface with bvp elements stored in couch db
-    
-    Files in the library directory must be stored according to bvp directory structure: 
-    
-    BaseDirectory/ object/*.blend
-                   background/*.blend
-                   sky/*.blend
-                   shadow/*.blend
-    Parameters
-    ----------
-    dbhost : string
-        Name for host server. Read from config file. Config default is intialized to be 'localhost'
-    dbname : string
-        Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
-    port : scalar
-        Port number for database. 
-    Notes
-    -----
-    """
     def __init__(self, dbhost=dbhost, dbname=dbname, queries=('basic', 'bvp'), 
         is_verbose=is_verbose, return_objects=return_objects):
+        """Class to interface with bvp elements stored in couch db
+        
+        Files in the library directory must be stored according to bvp directory structure: 
+        
+        BaseDirectory/ object/*.blend
+                       background/*.blend
+                       sky/*.blend
+                       shadow/*.blend
+        Parameters
+        ----------
+        dbhost : string
+            Name for host server. Read from config file. Config default is intialized to be 'localhost'
+        dbname : string
+            Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
+        """
         super(DBInterface, self).__init__(dbhost, dbname, queries=queries, 
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir

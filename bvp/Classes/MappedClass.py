@@ -94,18 +94,11 @@ class MappedClass(object):
 
     @property
     def path(self):
-        # TODO: Revisit me. Also note that this is unique to bvp, not for higher-level fn.
-        # Alternative: get from database. This will be more flexible if one wants to use multiple 
-        # databases eventually.
-        # if self.dbi is None:
-        #     return None
-        # else:
-        #     db_dir = dbi.db['config']['db_dir'] # or whatever 
-        # For now: just use the config file and a single location.
-        db_dir = config.get('path','db_dir') # Get from dbi?? Make flexible for different databases??
-        if '~' in db_dir:
-            db_dir = os.path.expanduser(db_dir)
-        return os.path.join(db_dir, self.type)
+        if self.dbi is None:
+            return None
+        else:
+            db_dir = os.path.expanduser(self.dbi.db['config']['db_dir'])
+            return os.path.join(db_dir, self.type)
 
     @property
     def docdict(self):

@@ -215,10 +215,14 @@ def grab_only(ob):
 
 def find_group_parent(group):
     """Find parent object among group objects"""
-    no_parent = [o for o in group.objects if o.parent is None]
+    if isinstance(group, bpy.types.Group):
+        obs = group.objects
+    else:
+        obs = group
+    no_parent = [o for o in obs if o.parent is None]
     if len(no_parent)>1:
         # OK, try for an armature:
-        armatures = [o for o in group.objects if o.type=='ARMATURE']
+        armatures = [o for o in obs if o.type=='ARMATURE']
         if len(armatures) == 1:
             return armatures[0]
         else:
@@ -516,8 +520,7 @@ def set_up_group(ObList=None, scn=None):
     for Dim in range(3):
         SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
     
-    if not ToSet_Size==max(SzXYZ):
-        ScaleF = ToSet_Size/max(SzXYZ)
+    ScaleF = ToSet_Size/max(SzXYZ)
     if verbosity_level > 3: 
         print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size, ScaleF, max(SzXYZ)))
     
@@ -526,6 +529,7 @@ def set_up_group(ObList=None, scn=None):
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         o.scale = o.scale * ScaleF
         o.location = ToSet_Loc
+        bpy.ops.object.transform_apply(rotation=True, scale=True, location=True)
 
     scn.update()
     # Re-parent everything
@@ -805,6 +809,7 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         G.name = name
     else:
         print('Did not find group! adding...')
+        old_obs = list(bpy.context.scene.objects)
         bpy.ops.wm.append(
             directory=os.path.join(fpath, fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
             filepath="//"+fname+"\\Group\\"+name, # local filepath within .blend file to the scene to be imported
@@ -813,7 +818,9 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
             #relative_path=False, 
             autoselect=True, 
             instance_groups=proxy)
-        G = bpy.context.object
+        new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
+        G  = find_group_parent(new_obs)
+        grab_only(G)
     return G
 
 # Belongs in Object or Shape

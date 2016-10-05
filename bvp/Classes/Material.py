@@ -33,6 +33,19 @@ class Material(MappedClass):
         self._data_fields = []
         self._db_fields = []
 
+    def link(self):
+        """Link material to active Blender session
+        """ 
+
+        if self.name in bpy.data.materials:
+            pass # Don't import twice
+        else:
+            bpy.ops.wm.append(
+                filepath="//"+self.fname+"\\Material\\"+self.name, # local filepath within .blend file to the scene to be imported
+                directory=self.fpath+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+                filename=self.name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
+                link=True)
+
     def __repr__(self):
         S = '\n ~M~ Material "{name}" ~M~\n    ({fpath})'.format(name=self.name,
             fpath=self.fpath)
