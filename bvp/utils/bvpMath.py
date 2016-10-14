@@ -21,7 +21,7 @@ pi = np.pi
 # else:
 #   # Better be working within Blender...
 #   import mathutils as bmu
-#   from math import pi
+#   from math import pio
 #   MatrixFn = bmu.Matrix
 #   VectorFn = bmu.Vector
 #   GetInverse = lambda x: x.inverted()
@@ -223,11 +223,11 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)):
 
     objPos = bvpObj.pos3D
     camPos = bvpCam.location
-    fixPos = bvpCam.fixPos
+    fix_location = bvpCam.fix_location
     # Convert to vector
     cPos = VectorFn(camPos[0]) # Only do this wrt first frame for now!
     #cPos.shape = (3, 1) 
-    fPos = VectorFn(fixPos[0])
+    fPos = VectorFn(fix_location[0])
     #fPos.shape = (3, 1)
     oPos = VectorFn(objPos) #np.array(bvpObj.pos3D) 
     # Prep for shift in L, R directions (wrt camera)
@@ -356,8 +356,8 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
         # ensure that Z < 0
         Z = -Z
     cPos = VectorFn(bvpCam.location[0]) 
-    fixPos = VectorFn(bvpCam.fixPos[0])
-    cTheta = vec2eulerXYZ(lst(fixPos-cPos))
+    fix_location = VectorFn(bvpCam.fix_location[0])
+    cTheta = vec2eulerXYZ(lst(fix_location-cPos))
     cTheta = VectorFn(cTheta)
     # Complication?: zero rotation in blender is DOWN, zero rotation for this computation seems to be UP
     if Handedness == 'Left':

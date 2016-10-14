@@ -141,6 +141,7 @@ class ObConstraint(PosConstraint):
 
         ML 2012.10
         """
+        self.type = 'ObConstraint'
         super(ObConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
         # Set all inputs as class properties
         Inputs = locals()
@@ -148,62 +149,64 @@ class ObConstraint(PosConstraint):
             if not i=='self':
                 setattr(self, i, Inputs[i])
     
-    def checkXYZS_3D(self, minXYZpos, maxXYZpos, Sz, Obst=None, CheckBounds=True):
+    def checkXYZS_3D(self, Ob, Obst=None, CheckBounds=True):
         """
         Verify that a particular position and size is acceptable given "Obst" obstacles and 
         the position constraints of this object (in 3-D). 
         
         Inputs:
-            XYZpos = (x, y, z) position (tuple or list)
-            Sz = scalar size
+            Ob = the object being placed
             Obst = list of "Object" instances to specify positions of obstacles to avoid
         Returns:
             BGboundOK = boolean; True if XYZpos is within boundary constraints
             ObDistOK = boolean; True if XYZpos does not overlap with other objects/obstacles 
         """
         # (1) Check distance from allowable object position boundaries (X, Y, and/or r)
-        BGboundOK_3D = [True, True, True]
+        BGboundOK_3D = [True, True, True, True]
         if CheckBounds:
-            X_OK, Y_OK, r_OK = True, True, True # True by default
+            minXYZpos = Ob.min_xyz_pos
+            maxXYZpos = Ob.max_xyz_pos
+            Sz = Ob.size3D
+            X_OK, Y_OK, r_OK, Z_OK = True, True, True, True # True by default
+            #TODO: Doesn't take into account the objects size. may cause some weirdness, but taking object size into account will completely fail for some backgrounds like Oasis, where Z is constrained to a single value.
             if self.X:
-                xA = True if self.X[2] is None else (minXYZpos[0]-Sz/2.)>self.X[2]
-                xB = True if self.X[3] is None else (maxXYZpos[0]+Sz/2.)<self.X[3]
+                xA = True if self.X[2] is None else (minXYZpos[0])>=self.X[2]
+                xB = True if self.X[3] is None else (maxXYZpos[0])<=self.X[3]
                 X_OK = xA and xB
             if self.Y:
-                yA = True if self.Y[2] is None else (minXYZpos[1]-Sz/2.)>self.Y[2]
-                yB = True if self.Y[3] is None else (maxXYZpos[1]+Sz/2.)<self.Y[3]
+                yA = True if self.Y[2] is None else (minXYZpos[1])>=self.Y[2]
+                yB = True if self.Y[3] is None else (maxXYZpos[1])<=self.Y[3]
                 Y_OK = yA and yB
+            if self.Z:
+                zA = True if self.Z[2] is None else (minXYZpos[2])>=self.Z[2]
+                zB = True if self.Z[3] is None else (maxXYZpos[2])<=self.Z[3]
+                Z_OK = (zA and zB) or (Ob.action is not None and (self.Z[2] == self.Z[3])) # Alert: Special case for constrained Z
             if self.r:
                 oX, oY, oZ = self.origin
                 maxR = ((maxXYZpos[0]-oX)**2+(maxXYZpos[1]-oY)**2)**.5
                 minR = ((minXYZpos[0]-oX)**2+(minXYZpos[1]-oY)**2)**.5
-                rA = True if self.r[2] is None else (minR-Sz/2.)>self.r[2]
-                rB = True if self.r[3] is None else (maxR+Sz/2.)<self.r[3]
+                rA = True if self.r[2] is None else (minR-Sz/2.)>=self.r[2]
+                rB = True if self.r[3] is None else (maxR+Sz/2.)<=self.r[3]
                 r_OK = rA and rB
-            BGboundOK_3D = [X_OK, Y_OK, r_OK] # all([...])
+            BGboundOK_3D = [X_OK, Y_OK, Z_OK, r_OK] # all([...])
         # (2) Check distance from other objects in 3D
         if Obst is not None:
             nObj = len(Obst)
         else:
             nObj = 0
-        XYZpos = ((minXYZpos[0]+maxXYZpos[0])/2, (minXYZpos[1]+maxXYZpos[1])/2, (minXYZpos[2]+maxXYZpos[2])/2)
-        action_radius = sqrt((minXYZpos[0]-maxXYZpos[0])**2+(minXYZpos[1]-maxXYZpos[1])**2+(minXYZpos[2]-maxXYZpos[2])**2)/2
-        TmpOb = Object(pos3D=XYZpos, size3D=Sz)
         ObDstOK_3D = [True]*nObj
         for c in range(nObj):
-            DstThresh3D = TmpOb.size3D/2. + action_radius +  Obst[c].boundingSphereRadius 
-            Dst3D = bvpu.bvpMath.vecDist(TmpOb.pos3D, Obst[c].boundingSphereCenter)
-            ObDstOK_3D[c] = Dst3D>DstThresh3D
+            print(Obst[c])
+            ObDstOK_3D[c] = not Ob.collides_with(Obst[c])
         return BGboundOK_3D, ObDstOK_3D
 
-    def checkXYZS_2D(self, XYZpos, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50.):
+    def checkXYZS_2D(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50.):
         """
         Verify that a particular position and size is acceptable given "Obst" obstacles and 
         the position constraints of this object (in 2D images space). 
         
         Inputs:
-            XYZpos = (x, y, z) position (tuple or list)
-            Sz = scalar size
+            Ob = the object being placed
             Cam = Camera object (for computing perspective)
             Obst = list of "Object" instances to specify positions of obstacles to avoid
             EdgeDist = proportion of object that can go outside of the 2D image (0.-100.)
@@ -213,7 +216,9 @@ class ObConstraint(PosConstraint):
             ObDistOK = boolean; True if 2D projection of XYZpos overlaps less than (ObOverlap) with other objects/obstacles 
         """
         # (TODO: Make flexible for EdgeDist, ObOverlap being 0-1 or 0-100?)
-        TmpOb = Object(pos3D=XYZpos, size3D=Sz)
+        #TODO: Currently only looks at object distances in the first frame. It is computationally hard, and possibly unnecessary to check it for every frame.
+
+        TmpOb = Object(pos3D=Ob.pos3D, size3D=Ob.size3D)
         tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100))
         TmpObSz_X = abs(tmpIP_R[0]-tmpIP_L[0])
         TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
@@ -263,9 +268,9 @@ class ObConstraint(PosConstraint):
         TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
         SzOK_2D = sum([TmpObSz_X, TmpObSz_Y])/2. > MinSz2D
         return SzOK_2D
-    def sampleXYZ(self, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0., minXYZdelta = (0.0,0.0,0.0), maxXYZdelta = (0.0,0.0,0.0)):
+    def sampleXYZ(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0.):
         """
-        Usage: sampleXYZ(self, Sz, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0.)
+        Usage: sampleXYZ(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50., RaiseError=False, nIter=100, MinSz2D=0.)
 
         Randomly sample across the 3D space of a scene, given object 
         constraints (in 3D) on that scene and the position of a camera*.
@@ -276,7 +281,7 @@ class ObConstraint(PosConstraint):
         * Currently only for first frame! (2012.02.19)
 
         Inputs: 
-        Sz = object size
+        Ob = the object being placed
         Cam = Camera object
         Obst = list of Objects to be avoided 
         EdgeDist = Proportion of object by which objects must avoid the
@@ -319,8 +324,12 @@ class ObConstraint(PosConstraint):
         Random re-sampling seems to be a sub-optimal way to do this; better
         would be some sort of optimized sampling method with constraints. 
         (Lagrange multipliers?) But that sounds like a pain in the ass. 
+
+        #TODO: May be broken as of 2016/09/27 
         """
         #Compute
+        Sz = Ob.size3D
+        XYZpos = Ob.pos3D
         TooClose = True
         Iter = 1
         if Obst:
@@ -346,15 +355,12 @@ class ObConstraint(PosConstraint):
                 print(pNm + '='+ str(value))
                 setattr(tmpC, pNm, value)
             TmpPos = tmpC.sampleXYZ()
-            minTmpPos = (TmpPos[0]+minXYZdelta[0], TmpPos[1]+minXYZdelta[1], TmpPos[2]+minXYZdelta[2])
-            maxTmpPos = (TmpPos[0]+maxXYZdelta[0], TmpPos[1]+maxXYZdelta[1], TmpPos[2]+maxXYZdelta[2])
-            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(minTmpPos, maxTmpPos, Sz, Obst=Obst)
-            EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpPos, Sz, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
-            TmpOb = Object(pos3D=TmpPos, size3D=Sz)
-            SzOK_2D = self.checkSize2D(TmpOb, Cam, MinSz2D)
+            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(Ob, Obst=Obst)
+            EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(Ob, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
+            SzOK_2D = self.checkSize2D(Ob, Cam, MinSz2D)
             if all(ObDstOK_3D) and all(ObDstOK_2D) and all(BoundOK_3D) and EdgeOK_2D:
                 TooClose = False
-                TmpOb = Object(pos3D=TmpPos, size3D=Sz)
+                TmpOb = Ob
                 tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(1., 1.))
                 ImPos = [bvpu.bvpMath.listMean([tmpIP_R[0], tmpIP_L[0]]), bvpu.bvpMath.listMean([tmpIP_Bot[1], tmpIP_Top[1]])]
                 return TmpPos, ImPos
@@ -383,7 +389,7 @@ class ObConstraint(PosConstraint):
                 raise Exception('Iterated %d x without finding good position!'%nIter)
             else: 
                 return None, None
-    def sampleXY(self, Sz, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.,minXYZdelta=(0.0,0.0,0.0), maxXYZdelta = (0.0,0.0,0.0)):
+    def sampleXY(self, Ob, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.):
         """
         Usage: sampleXY(Sz, Cam, Obst=None, ImPosCt=None, EdgeDist=0., ObOverlap=.50, RaiseError=False, nIter=100, MinSz2D=0.)
 
@@ -396,7 +402,7 @@ class ObConstraint(PosConstraint):
         * Currently only for first frame! (2012.02.19)
 
         Inputs: 
-        Sz = object size
+        Ob = object being placed
         Cam = Camera object
         Obst = list of Objects to be avoided 
         ImPosCt = Class that keeps track of which image positions have been sampled 
@@ -422,8 +428,6 @@ class ObConstraint(PosConstraint):
         
         ML 2012.02
         """
-
-        """Check on 2D object size???"""
         #Compute
         if not ImPosCt:
             ImPosCt = bvpu.bvpMath.ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
@@ -436,24 +440,25 @@ class ObConstraint(PosConstraint):
         while TooClose and Iter<nIter:
             if verbosity_level > 9: 
                 print("--------- Iteration %d ---------"%Iter)
+            #TODO adjust uniform sampling to work with object trajectory position; currently only looks at initial state.
             #Zbase = self.sampleXYZ(Sz, Cam)[2]
             Zbase = self.origin[2]
+            Sz = Ob.size3D
             # Draw random (x, y) image position to start:
             ImPos = ImPosCt.sampleXY() 
             oPosZ = bvpu.bvpMath.PerspectiveProj_Inv(ImPos, Cam, Z=100)
             oPosUp = bvpu.bvpMath.linePlaneInt(Cam.location[0], oPosZ, P0=(0, 0, Zbase+Sz/2.))
             TmpPos = oPosUp
             TmpPos[2] -= Sz/2.
+            TmpOb = Object(pos3D=TmpPos, size3D=Sz, action = Ob.action)
             # Check on 3D bounds
-            print(TmpPos)
-            minTmpPos = (TmpPos[0]+minXYZdelta[0], TmpPos[1]+minXYZdelta[1], TmpPos[2]+minXYZdelta[2])
-            maxTmpPos = (TmpPos[0]+maxXYZdelta[0], TmpPos[1]+maxXYZdelta[1], TmpPos[2]+maxXYZdelta[2])
-            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(minTmpPos, maxTmpPos, Sz, Obst=Obst)
+            BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(TmpOb, Obst=Obst)
+            # BoundOK_3D = [True for i in BoundOK_3D] #Adding these for debugging purposes. Make sure to remove later
             # Check on 2D bounds
-            EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpPos, Sz, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
+            EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpOb, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
             # Instantiate temp object and...
-            TmpOb = Object(pos3D=TmpPos, size3D=Sz)
             # ... check on 2D size
+
             SzOK_2D = self.checkSize2D(TmpOb, Cam, MinSz2D)
             if all(ObDstOK_3D) and all(ObDstOK_2D) and EdgeOK_2D and all(BoundOK_3D) and SzOK_2D:
                 TooClose = False
@@ -465,7 +470,7 @@ class ObConstraint(PosConstraint):
                         print('ObSz = %.2f, ObstSz = %.2f, Dthresh = %.2f\n'%(ObjSz2D, ObstSz_List[ii], Dthresh_List[ii]))
                 return TmpPos, ImPos
             else:
-                if verbosity_level > 9:
+                if verbosity_level > 9000: #TODO: Temporarily disabled because it is outdated, and breaks things
                     Reason = ''
                     if not all(ObDstOK_3D):
                         Add = 'Bad 3D Dist!\n'
@@ -510,7 +515,7 @@ class ObConstraint(PosConstraint):
             import random
             VectorFn = bvpu.bvpMath.VectorFn
             # Get vector from fixation->camera
-            cVec = VectorFn(Cam.fixPos[0])-VectorFn(Cam.location[0])
+            cVec = VectorFn(Cam.fix_location[0])-VectorFn(Cam.location[0])
             # Convert to X, Y, Z Euler angles
             x, y, z = bvpu.bvpMath.vec2eulerXYZ(cVec)
             if round(random.random()):
@@ -562,7 +567,7 @@ class CamConstraint(PosConstraint):
     def __repr__(self):
         S = 'CamConstraint:\n'+self.__dict__.__repr__()
         return(S)
-    def sampleFixPos(self, frames=None, obj=None):
+    def sample_fix_location(self, frames=None, obj=None):
         """
         Sample fixation positions. Returns a list of (X, Y, Z) position tuples, nFrames long
 
@@ -571,21 +576,22 @@ class CamConstraint(PosConstraint):
 
         ML 2012.01.31
         """
-        fixPos = list()
+        #TODO : Why did this break?
+        fix_location = list()
         for ii in range(len(frames)):
             # So far: No computation of how far apart the frames are, so no computation of how fast the fixation point is moving. ADD??
-            if obj is None:
-                TmpFixPos = (self.sample_w_constr(self.fixX), self.sample_w_constr(self.fixY), self.sample_w_constr(self.fixZ))
+            if not obj:
+                Tmpfix_location = (self.sample_w_constr(self.fixX), self.sample_w_constr(self.fixY), self.sample_w_constr(self.fixZ))
             else:
                 ObPos = [o.pos3D for o in obj]
                 ObPosX = [None, None, min([x[0] for x in ObPos]), max([x[0] for x in ObPos])] # (Mean, Std, Min, Max) for sample_w_constr
                 ObPosY = [None, None, min([x[1] for x in ObPos]), max([x[1] for x in ObPos])]
                 #ObPosZ = [None, None, min([x[2] for x in ObPos]), max([x[2] for x in ObPos])] # use if we ever decide to do floating objects??
-                TmpFixPos = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(self.fixZ))
+                Tmpfix_location = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(self.fixZ))
             # Necessary??
-            #TmpFixPos = tuple([a+b for a, b in zip(TmpFixPos, self.origin)])
-            fixPos.append(TmpFixPos)
-        return fixPos
+            #Tmpfix_location = tuple([a+b for a, b in zip(Tmpfix_location, self.origin)])
+            fix_location.append(Tmpfix_location)
+        return fix_location
     def sampleCamPos(self, frames=None):
         """
         Sample nFrames positions (X, Y, Z) from position distribution given spherical / XYZ position constraints, 

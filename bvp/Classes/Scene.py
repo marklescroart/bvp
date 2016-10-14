@@ -157,18 +157,18 @@ class Scene(MappedClass):
             #    print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
             if ResetCam:
                 # Start w/ random camera, fixation position
-                cPos = self.background.camConstraint.sampleCamPos(self.frame_range)
-                fPos = self.background.camConstraint.sampleFixPos(self.frame_range)
-                self.camera = Camera(location=cPos, fixPos=fPos, frames=self.frame_range, lens=self.background.lens)
+                cPos = self.background.CamConstraint.sampleCamPos(self.frame_range)
+                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range)
+                self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
             # Multiple object constraints for moving objects
             OC = []
             for o in ObList:
-                # Randomly cycle through object constraints
+                # Randomly cycle through object constraints #TODO: WHY
                 if not OC:
-                    if type(self.background.obConstraint) is list:
-                        OC = copy.copy(self.background.obConstraint)
+                    if type(self.background.obConstraints) is list:
+                        OC = copy.copy(self.background.obConstraints)
                     else:
-                        OC = [copy.copy(self.background.obConstraint)]
+                        OC = [copy.copy(self.background.obConstraints)]
                     shuffle(OC)
                 oc = OC.pop()
                 NewOb = copy.copy(o) # resets size each iteration as well as position
@@ -189,10 +189,7 @@ class Scene(MappedClass):
                     NewOb.rot3D = oc.sampleRot(self.camera)
                 if not o.pos3D:
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
-                    if NewOb.action is not None:
-                        NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb.size3D, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D, minXYZdelta=NewOb.action.min_xyz, maxXYZdelta=NewOb.action.max_xyz)
-                    else:
-                        NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb.size3D, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
+                    NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
                     if NewOb.pos3D is None:
                         Fail=True
                         break
@@ -208,8 +205,8 @@ class Scene(MappedClass):
             print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
         self.objects = ObToAdd
         # Make sure last fixation hasn't "wandered" away from objects: 
-        fPosFin = self.background.camConstraint.sampleFixPos((1, ), obj=ObToAdd)
-        self.camera.fixPos = self.camera.fixPos[:-1]+[fPosFin[0], ]
+        fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=ObToAdd)
+        self.camera.fix_location = self.camera.fix_location[:-1]+[fPosFin[0], ]
 
     def get_occlusion(self):
         """
@@ -460,7 +457,7 @@ class Scene(MappedClass):
         def fLoc(fr):
             # Get x, y, z location given time
             return (xF.evaluate(fr), yF.evaluate(fr), zF.evaluate(fr))
-        new_scn.Cam.fixPos = [fLoc(fr) for fr in FixAct.frame_range]
+        new_scn.Cam.fix_location = [fLoc(fr) for fr in FixAct.frame_range]
         # Last scene props: 
         new_scn.frame_range = tuple(CamAct.frame_range)
         new_scn.scn_params['frame_end'] = new_scn.frame_range[-1]
