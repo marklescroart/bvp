@@ -39,7 +39,7 @@ __version__ = '0.2a'
 import re as _re
 import os as _os
 import subprocess
-from . import utils
+from . import utils 
 from .options import config
 
 # Classes

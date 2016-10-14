@@ -404,7 +404,7 @@ class bvpLibrary(object):
 						pNum = 1
 					# Frame range
 					FR = (d*maxFilesPerDir+1, min(nGrid**3, maxFilesPerDir*(d+1)))
-					Cam = bvp.Camera(location=cPos[FR[0]-1:FR[1]], fixPos=fPos[FR[0]-1:FR[1]], frames=fr[FR[0]-1:FR[1]])
+					Cam = bvp.Camera(location=cPos[FR[0]-1:FR[1]], fix_location=fPos[FR[0]-1:FR[1]], frames=fr[FR[0]-1:FR[1]])
 					fpath = '%s_%s_p%d_res%d_f%09d/vox%s'%(Obj.semantic_category[0], Obj.name, pNum, nGrid, d*maxFilesPerDir, '#'*len(str(nGrid**3)))
 					ScnL.append(bvp.Scene(Num=ObCt, Obj=(Obj, ), BG=BG, Sky=Sky, 
 										Shadow=None, Cam=Cam, FrameRange=FR, 
@@ -488,7 +488,7 @@ for f in fNm:
 					print('Found it!')
 					# Only append scenes to render that DO NOT have previews already rendered!
 					continue				
-				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fix_location=BG.CamConstraint.sampleFixPos(frames), frames=frames)
 				Sky = bvp.Sky('*'+BG.sky_semantic_category[0], Lib=self)
 				if Sky.semantic_category:
 					if 'dome' in Sky.semantic_category:
@@ -556,7 +556,7 @@ for f in fNm:
 					print('Found it!')
 					# Only append scenes to render that DO NOT have previews already rendered!
 					continue				
-				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+				Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames), fix_location=BG.CamConstraint.sampleFixPos(frames), frames=frames)
 				S = bvp.Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
 									Shadow=None, Cam=Cam, FrameRange=(1, 1), 
 									fpath=fpath, 

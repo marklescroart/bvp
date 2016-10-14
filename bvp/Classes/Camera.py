@@ -12,7 +12,7 @@ except ImportError:
 
 class Camera(object):
     """Class to handle placement of camera and camera fixation target for a scene."""
-    def __init__(self, location=((17.5, -17.5, 8), ), fixPos=((0, 0, 3.5), ), frames=(1, ), lens=50., clip=(.1, 500.)): 
+    def __init__(self, location=((17.5, -17.5, 8), ), fix_location=((0, 0, 3.5), ), frames=(1, ), lens=50., clip=(.1, 500.)): 
         """Class to handle placement of camera and camera fixation target for a scene.
 
         Parameters
@@ -20,7 +20,7 @@ class Camera(object):
         location : list of tuples
             a list of positions for each of n keyframes, each specifying camera 
             location as an (x, y, z) tuple
-        fixPos : list of tuples
+        fix_location : list of tuples
             as location, but for the fixation target for the camera
         frames : list
             a list of the keyframes at which to insert camera / fixation locations. 
@@ -30,7 +30,7 @@ class Camera(object):
         -----
         If location is specified to be "None", a random location for each keyframe 
             is drawn according to the defaults in CamConstraint. The same is true
-            for fixPos.
+            for fix_location.
         
         Tested up to 2 keyframes as of 2012.02.20 -- more may fail
         """
@@ -45,8 +45,8 @@ class Camera(object):
             self.frames = (1, )
         if location is None:
             self.location = constr.sampleCamPos(self.frames)
-        if fixPos is None:
-            self.fixPos = constr.sampleFixPos(self.frames)
+        if fix_location is None:
+            self.fix_location = constr.sample_fix_location(self.frames)
 
     @property
     def n_loc(self):
@@ -54,7 +54,7 @@ class Camera(object):
 
     @property
     def n_fix(self):
-        return len(self.fixPos)
+        return len(self.fix_location)
 
     @property
     def n_frames(self):
@@ -66,7 +66,7 @@ class Camera(object):
     def __repr__(self):
         S = '\n~C~ Camera ~C~\n'
         S += 'Camera lens: %s, clipping: %s, frames: %s\n cam location key points: %s\n fix location key points: %s'%(str(self.lens), 
-            str(self.clip), str(self.frames), str([["%.2f"%x for x in Pos] for Pos in self.location]), str([["%.2f"%x for x in Pos] for Pos in self.fixPos]))
+            str(self.clip), str(self.frames), str([["%.2f"%x for x in Pos] for Pos in self.location]), str([["%.2f"%x for x in Pos] for Pos in self.fix_location]))
         return S
         
     def place(self, name='000', draw_size=0.33, scn=None):
@@ -91,7 +91,7 @@ class Camera(object):
         #     self.clip = (.1, 500.)
         #     self.lens = 50.
         # AddCameraWithTarget(scn, name='cam_'+id_name, location=self.location[0], 
-        #                             fix_name='camtarget_'+id_name, fixPos=self.fixPos[0], clip=self.clip, lens=self.lens)
+        #                             fix_name='camtarget_'+id_name, fix_location=self.fix_location[0], clip=self.clip, lens=self.lens)
 
         # Add camera
         cam_data = bpy.data.cameras.new('cam_{}'.format(name))
@@ -101,7 +101,7 @@ class Camera(object):
         cam.location = self.location[0]
         # Add fixation target
         fix = bpy.data.objects.new('camtarget_{}'.format(name), None)
-        fix.location = self.fixPos[0]
+        fix.location = self.fix_location[0]
         fix.empty_draw_type = 'SPHERE'
         fix.empty_draw_size = draw_size
         # Add camera constraints to look at target (both necessary...? Unclear. Currently works, tho.)
@@ -121,7 +121,7 @@ class Camera(object):
         a = bvpu.blender.make_location_animation(self.location, self.frames, action_name='CamMotion', handle_type='VECTOR')
         cam.animation_data_create()
         cam.animation_data.action = a
-        f = bvpu.blender.make_location_animation(self.fixPos, self.frames, action_name='FixMotion', handle_type='VECTOR')
+        f = bvpu.blender.make_location_animation(self.fix_location, self.frames, action_name='FixMotion', handle_type='VECTOR')
         fix.animation_data_create()
         fix.animation_data.action = f
 
