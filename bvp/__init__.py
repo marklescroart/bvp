@@ -64,7 +64,6 @@ from .DB import DBInterface
 
 bvp_dir = _os.path.dirname(__file__)
 
-
 def set_scn(fname='bvp_test'):
     """Quickie default setup of camera + lighting for an object
     """    
@@ -123,8 +122,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     """
     # Inputs
     if blend_file is None:
-        blend_file = _os.path.abspath(_os.path.join(bvp_dir, '../' 'BlendFiles', 'Blank.blend'))
-        print(blend_file)
+        blend_file = _os.path.abspath(_os.path.join(bvp_dir, 'BlendFiles', 'Blank.blend'))
     # Check for existence of script
     if not _os.path.exists(script):
         # TO DO: look into doing this with pipes??

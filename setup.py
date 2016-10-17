@@ -7,6 +7,7 @@
 
 import os
 import sys
+import glob
 import setuptools
 #from numpy.distutils.core import setup
 
@@ -19,12 +20,14 @@ if len(set(('develop', 'bdist_egg', 'bdist_rpm', 'bdist', 'bdist_dumb',
     # Turns out, this patching needs to happen before disutils.core.Extension
     # is imported in order to use cythonize()...
     from setuptools import setup
+    print('using setuptools.setup...')
 else:
     # Use standard
     from distutils.core import setup
+    print('using distutils.core.setup...')
 
-from distutils.command.install import install
-from distutils.core import Extension
+#from distutils.command.install import install
+#from distutils.core import Extension
 
 version = "0.1"
 with open(os.path.join('bvp', '__init__.py'), 'r') as fid:
@@ -50,7 +53,7 @@ VERSION = version
 if __name__ == "__main__":
     if os.path.exists('MANIFEST'):
         os.remove('MANIFEST')
-
+    #blend_files = glob.glob('BlendFiles/*blend')
     setup(name=DISTNAME,
           maintainer=MAINTAINER,
           maintainer_email=MAINTAINER_EMAIL,
@@ -71,12 +74,15 @@ if __name__ == "__main__":
           platforms='any',
           packages=['bvp', 
                     'bvp.utils',
-                    'bvp.Classes'],
+                    'bvp.Classes',
+                    'bvp.BlendFiles'],
           requires=['numpy', 'couchdb',],
           package_data={'bvp':[ 
                             'options.cfg', # This may cause problems if it is not created yet.
                             'defaults.cfg',
                             ],
+                        'bvp.BlendFiles':['*blend'],
                         },
+          #data_files={},
           include_package_data=True,
           scripts=[])
