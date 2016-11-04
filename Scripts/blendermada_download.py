@@ -43,5 +43,13 @@ for cat_idx in range(len(scn.bmd_category_list)):
 for o in scn.objects:
     scn.objects.unlink(o)
 sfile = os.path.expanduser(bvp.config.get('path','db_dir'))
-sfile = os.path.join(sfile, 'Material', 'Blendermada_Materials.blend')
+fname = 'Blendermada_Materials.blend'
+sfile = os.path.join(sfile, 'Material', fname)
 bpy.ops.wm.save_mainfile(filepath=sfile)
+
+
+dbi = bvp.DBInterface()
+
+for mat in bpy.data.materials:
+    m = bvp.Material(name=mat.name, fname=fname, _id=dbi.get_uuid(), dbi=dbi)
+    m.save()
