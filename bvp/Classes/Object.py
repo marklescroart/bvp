@@ -336,7 +336,8 @@ class Object(MappedClass):
         """
         #
         if self.action:
-            return (self.action.max_xyz[0] + self.pos3D[0],self.action.max_xyz[1] + self.pos3D[1],self.action.max_xyz[2] + self.pos3D[2])
+            sf = self.size3D/10
+            return (sf*self.action.max_xyz[0] + self.pos3D[0],sf*self.action.max_xyz[1] + self.pos3D[1],sf*self.action.max_xyz[2] + self.pos3D[2])
         else:
             return self.pos3D
 
@@ -357,8 +358,9 @@ class Object(MappedClass):
         (x,y,z): 3-tuple of the object's minimum x,y, and z coordinates respectively.
         """
         #
+        sf = self.size3D/10
         if self.action:
-            return (self.action.min_xyz[0] + self.pos3D[0],self.action.min_xyz[1] + self.pos3D[1],self.action.min_xyz[2] + self.pos3D[2])
+            return (sf*self.action.min_xyz[0] + self.pos3D[0],sf*self.action.min_xyz[1] + self.pos3D[1],sf*self.action.min_xyz[2] + self.pos3D[2])
         else:
             return self.pos3D
 
