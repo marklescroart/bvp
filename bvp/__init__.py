@@ -149,6 +149,12 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         stdout, stderr = proc.communicate()
         if del_tmp_script and not stderr:
             _os.unlink(tmpf)
+        try:
+            # Change formatting of byte objects in python3
+            stdout = stdout.decode()
+            stderr = stderr.decode()
+        except:
+            pass
         # Raise exception if stderr? 
         # Or leave that to calling function? 
         # Optional?

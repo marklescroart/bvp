@@ -419,6 +419,16 @@ def add_img_material(name, imfile, imtype):
         full path to movie or image to add
     imtype : string
         one of : 'sequence', 'file', 'generated', 'movie'
+
+    ## NOTE: 
+    #name = 'ori_noise'
+    #imfile = '/Users/mark/Projects/Mixamo_Downloads/Demo/bg_camo.png'
+    #from bvp.utils.blender import add_img_material
+    import bvp
+    name = 'ori_motion'
+    imfile = '/Users/mark/Notebooks/ori_noise2.gif'
+    imtype = 'movie' # options: 'sequence','file','generated','movie'
+    im = bvp.utils.blender.add_img_material(name,imfile,imtype)        
     """
     # Load image
     from bpy_extras.image_utils import load_image
