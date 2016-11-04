@@ -132,6 +132,71 @@ class Scene(MappedClass):
         for o in self.objects:
             rstr+='%s\n'%o
         return rstr
+
+    def check_compatibility(self,bg, act, debug=True):
+        """Helper function for populate_scene
+
+        Does a preleminary check of whether or not it is possible to place a given action in a given background.
+        
+        Parameters
+        ----------
+        bg : Background to be checked
+        act : Action to check
+        debug : prints debug information about the background and the action
+
+        Notes
+        -----
+        Could possibly extend to objects with a certain size
+        """
+        act_contains_x_origin = act.max_xyz[0] > 0 > act.min_xyz[0]
+        act_contains_y_origin = act.max_xyz[1] > 0 > act.min_xyz[1]
+        act_contains_z_origin = act.max_xyz[2] > 0 > act.min_xyz[2]
+        tmp_ob = Object()
+        tmp_ob.action = act
+        const = bg.obConstraints
+        tmp_ob.size3D = min(bg.obConstraints.Sz[2],bg.obConstraints.Sz[3])
+        max_pos = tmp_ob.max_xyz_pos
+        min_pos = tmp_ob.min_xyz_pos
+        X_OK, Y_OK, Z_OK, r_OK = [True,True,True, True]
+        if const.X:
+            X_OK = (max_pos[0] - min_pos[0]) < (const.X[3] - const.X[2])
+        if const.Y:
+            Y_OK = (max_pos[1] - min_pos[1]) < (const.Y[3] - const.Y[2])
+        if const.Z:
+            if (const.Z[2] == const.Z[3]):
+                if debug:
+                    print('Constraint Z is constant for background %s. Ignoring Z constraint'%bg.name)
+                Z_OK = (max_pos[2] - min_pos[2]) < const.Sz[3] + 10*tmp_ob.size3D/100
+            else:
+                Z_OK = (max_pos[2] - min_pos[2]) < (const.Z[3] - const.Z[2])
+        if const.r:
+            minR = 0
+            maxR = ((max_pos[0]-min_pos[0])**2+(max_pos[1]-min_pos[1])**2+(max_pos[2]-min_pos[2])**2)**.5 #TODO: Enforce this better
+            rA = True if const.r[2] is None else (minR)>=const.r[2]
+            rB = True if const.r[3] is None else (maxR)<=const.r[3]
+            r_OK = rA and rB
+        if all([X_OK, Y_OK, Z_OK, r_OK, act_contains_x_origin, act_contains_y_origin, act_contains_z_origin]):
+            return True
+        else:
+            if debug:
+                print("Action", act.name,"incompatible with bg",bg.name)
+                print("max pos for action", act.max_xyz)
+                print("min pos for action", act.min_xyz)
+                print("ObConstraints:")
+                print("Origin:", const.origin)
+                print("X", const.X)
+                print("Y", const.Y)
+                print("Z", const.Z)
+                if const.r:
+                    print("R", const.r)
+                print("Size", const.Sz)
+                print("Temp Object Size", tmp_ob.size3D)
+                print("Temp Object action max", max_pos)
+                print("Temp Object action min", min_pos)
+                print("X,Y,Z ok:", [X_OK, Y_OK, Z_OK, r_OK])
+                print("origin containment:", [act_contains_x_origin, act_contains_y_origin, act_contains_z_origin])
+            return False
+
     
     def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=.50, MinSz2D=0, RaiseError=False, nIter=50):
         """Choose positions for all objects in "ObList" input within the scene, 
@@ -143,7 +208,7 @@ class Scene(MappedClass):
 
         """
         # raise Exception("WIP! FiX ME!") # TODO
-        # (This just might work, but doubtful)
+        # (This just might work doubtful)
 
         from random import shuffle
         if not ImPosCt:
@@ -158,12 +223,12 @@ class Scene(MappedClass):
             if ResetCam:
                 # Start w/ random camera, fixation position
                 cPos = self.background.CamConstraint.sampleCamPos(self.frame_range)
-                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range)
-                self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
             # Multiple object constraints for moving objects
             OC = []
             for o in ObList:
-                # Randomly cycle through object constraints #TODO: WHY
+                # Randomly cycle through object constraints (in case there are multiple exclusive possible locations for an object)
+                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=ObToAdd)
+                self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
                 if not OC:
                     if type(self.background.obConstraints) is list:
                         OC = copy.copy(self.background.obConstraints)
@@ -172,6 +237,12 @@ class Scene(MappedClass):
                     shuffle(OC)
                 oc = OC.pop()
                 NewOb = copy.copy(o) # resets size each iteration as well as position
+                if NewOb.action is not None:
+                    is_compatible = self.check_compatibility(self.background,NewOb.action)
+                    if not is_compatible: #Check if it is even possible to use the action
+                        if RaiseError:
+                            raise Exception('Action',NewOb.action.name,'is incompatible with bg', self.background.name)
+                        pass
                 if self.background.obstacles:
                     Obst = self.background.obstacles+ObToAdd
                 else:
@@ -228,6 +299,7 @@ class Scene(MappedClass):
         scn : string scene name
             Scene to render within .blend file. Defaults to current scene.
         """
+        # print(self.camera.fix_location)
         scn = bvpu.blender.set_scene(scn)
         # set layers to correct setting
         scn.layers = [True]+[False]*19

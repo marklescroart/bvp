@@ -168,23 +168,27 @@ class ObConstraint(PosConstraint):
             maxXYZpos = Ob.max_xyz_pos
             Sz = Ob.size3D
             X_OK, Y_OK, r_OK, Z_OK = True, True, True, True # True by default
-            #TODO: Doesn't take into account the objects size. may cause some weirdness, but taking object size into account will completely fail for some backgrounds like Oasis, where Z is constrained to a single value.
+            #TODO: What is the correct way to take object size into account?
             if self.X:
-                xA = True if self.X[2] is None else (minXYZpos[0])>=self.X[2]
-                xB = True if self.X[3] is None else (maxXYZpos[0])<=self.X[3]
+                xA = True if self.X[2] is None else (minXYZpos[0]-Sz/2)>=self.X[2]
+                xB = True if self.X[3] is None else (maxXYZpos[0]+Sz/2)<=self.X[3]
                 X_OK = xA and xB
             if self.Y:
-                yA = True if self.Y[2] is None else (minXYZpos[1])>=self.Y[2]
-                yB = True if self.Y[3] is None else (maxXYZpos[1])<=self.Y[3]
+                yA = True if self.Y[2] is None else (minXYZpos[1]-Sz/2)>=self.Y[2]
+                yB = True if self.Y[3] is None else (maxXYZpos[1]+Sz/2)<=self.Y[3]
                 Y_OK = yA and yB
             if self.Z:
-                zA = True if self.Z[2] is None else (minXYZpos[2])>=self.Z[2]
-                zB = True if self.Z[3] is None else (maxXYZpos[2])<=self.Z[3]
+                zA = True if self.Z[2] is None else (minXYZpos[2]-Sz/2)>=self.Z[2]
+                zB = True if self.Z[3] is None else (maxXYZpos[2]+Sz/2)<=self.Z[3]
                 Z_OK = (zA and zB) or (Ob.action is not None and (self.Z[2] == self.Z[3])) # Alert: Special case for constrained Z
             if self.r:
                 oX, oY, oZ = self.origin
-                maxR = ((maxXYZpos[0]-oX)**2+(maxXYZpos[1]-oY)**2)**.5
-                minR = ((minXYZpos[0]-oX)**2+(minXYZpos[1]-oY)**2)**.5
+                maxR = ((max(abs(maxXYZpos[0]-oX),abs(minXYZpos[0]-oX)))**2
+                       +(max(abs(maxXYZpos[1]-oY),abs(minXYZpos[1]-oY)))**2
+                       +(max(abs(maxXYZpos[2]-oZ),abs(minXYZpos[2]-oZ)))**2)**.5
+                minR = ((min(abs(maxXYZpos[0]-oX),abs(minXYZpos[0]-oX)))**2
+                       +(min(abs(maxXYZpos[1]-oY),abs(minXYZpos[1]-oY)))**2
+                       +(min(abs(maxXYZpos[2]-oZ),abs(minXYZpos[2]-oZ)))**2)**.5
                 rA = True if self.r[2] is None else (minR-Sz/2.)>=self.r[2]
                 rB = True if self.r[3] is None else (maxR+Sz/2.)<=self.r[3]
                 r_OK = rA and rB
@@ -216,7 +220,7 @@ class ObConstraint(PosConstraint):
             ObDistOK = boolean; True if 2D projection of XYZpos overlaps less than (ObOverlap) with other objects/obstacles 
         """
         # (TODO: Make flexible for EdgeDist, ObOverlap being 0-1 or 0-100?)
-        #TODO: Currently only looks at object distances in the first frame. It is computationally hard, and possibly unnecessary to check it for every frame.
+        #TODO: Currently only looks at object one_wall_distances in the first frame. It is computationally hard, and possibly unnecessary to check it for every frame.
 
         TmpOb = Object(pos3D=Ob.pos3D, size3D=Ob.size3D)
         tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100))
@@ -573,24 +577,33 @@ class CamConstraint(PosConstraint):
 
         TO DO: 
         More constraints? max angle to change wrt camera? fixation change speed constraints?
-
+. 
         ML 2012.01.31
         """
         #TODO : Why did this break?
+        method = 'mean'
         fix_location = list()
         for ii in range(len(frames)):
             # So far: No computation of how far apart the frames are, so no computation of how fast the fixation point is moving. ADD??
             if not obj:
                 Tmpfix_location = (self.sample_w_constr(self.fixX), self.sample_w_constr(self.fixY), self.sample_w_constr(self.fixZ))
             else:
-                ObPos = [o.pos3D for o in obj]
-                ObPosX = [None, None, min([x[0] for x in ObPos]), max([x[0] for x in ObPos])] # (Mean, Std, Min, Max) for sample_w_constr
-                ObPosY = [None, None, min([x[1] for x in ObPos]), max([x[1] for x in ObPos])]
-                #ObPosZ = [None, None, min([x[2] for x in ObPos]), max([x[2] for x in ObPos])] # use if we ever decide to do floating objects??
-                Tmpfix_location = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(self.fixZ))
+                if method == 'mean':
+                    ObPos = [o.bounding_box_center for o in obj]
+                    ObDims = [o.bounding_box_dimensions for o in obj]
+                    posX = sum([x[0]*y[0] for x,y in zip(ObPos, ObDims)])/sum([y[0] for y in ObDims])
+                    posY = sum([x[1]*y[1] for x,y in zip(ObPos, ObDims)])/sum([y[1] for y in ObDims])
+                    Tmpfix_location = (posX, posY, self.sample_w_constr(self.fixZ))
+                else:
+                    ObPos = [o.pos3D for o in obj]
+                    ObPosX = [None, None, min([x[0] for x in ObPos]), max([x[0] for x in ObPos])] # (Mean, Std, Min, Max) for sample_w_constr
+                    ObPosY = [None, None, min([x[1] for x in ObPos]), max([x[1] for x in ObPos])]
+                    #ObPosZ = [None, None, min([x[2] for x in ObPos]), max([x[2] for x in ObPos])] # use if we ever decide to do floating objects??
+                    Tmpfix_location = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(self.fixZ))
             # Necessary??
             #Tmpfix_location = tuple([a+b for a, b in zip(Tmpfix_location, self.origin)])
             fix_location.append(Tmpfix_location)
+        print(fix_location)
         return fix_location
     def sampleCamPos(self, frames=None):
         """
