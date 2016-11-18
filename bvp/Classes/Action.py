@@ -94,6 +94,7 @@ class Action(MappedClass):
                     setattr(self, k, v)        # Set _temp_params, etc.
         self._temp_fields = []
         self._data_fields = []
+        self.mid_pos = [(0,0,0) for i in range(5)]
 
     def save(self, context):
         """Save Action to database; must be called inside an active Blender session"""
@@ -182,6 +183,8 @@ class Action(MappedClass):
             min_xyz_trajectory=min_xyz_trajectory,
             max_xyz_trajectory=max_xyz_trajectory,
             dbi=dbi)
+        bvpact.min_path = mn
+        bvpact.max_path = mx
         return bvpact
 
     def __repr__(self):

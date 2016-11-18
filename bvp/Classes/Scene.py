@@ -148,9 +148,9 @@ class Scene(MappedClass):
         -----
         Could possibly extend to objects with a certain size
         """
-        act_contains_x_origin = act.max_xyz[0] > 0 > act.min_xyz[0]
-        act_contains_y_origin = act.max_xyz[1] > 0 > act.min_xyz[1]
-        act_contains_z_origin = act.max_xyz[2] > 0 > act.min_xyz[2]
+        act_contains_x_origin = act.max_xyz[0] >= 0 >= act.min_xyz[0]
+        act_contains_y_origin = act.max_xyz[1] >= 0 >= act.min_xyz[1]
+        act_contains_z_origin = act.max_xyz[2] >= 0 >= act.min_xyz[2]
         tmp_ob = Object()
         tmp_ob.action = act
         const = bg.obConstraints
@@ -166,15 +166,13 @@ class Scene(MappedClass):
             if (const.Z[2] == const.Z[3]):
                 if debug:
                     print('Constraint Z is constant for background %s. Ignoring Z constraint'%bg.name)
-                Z_OK = (max_pos[2] - min_pos[2]) < const.Sz[3] + 10*tmp_ob.size3D/100
+                Z_OK = (max_pos[2] - min_pos[2]) < const.Sz[3] + 10*tmp_ob.size3D/100 #TODO Is this even valid
             else:
                 Z_OK = (max_pos[2] - min_pos[2]) < (const.Z[3] - const.Z[2])
         if const.r:
-            minR = 0
             maxR = ((max_pos[0]-min_pos[0])**2+(max_pos[1]-min_pos[1])**2+(max_pos[2]-min_pos[2])**2)**.5 #TODO: Enforce this better
-            rA = True if const.r[2] is None else (minR)>=const.r[2]
             rB = True if const.r[3] is None else (maxR)<=const.r[3]
-            r_OK = rA and rB
+            r_OK = rB
         if all([X_OK, Y_OK, Z_OK, r_OK, act_contains_x_origin, act_contains_y_origin, act_contains_z_origin]):
             return True
         else:
@@ -276,7 +274,7 @@ class Scene(MappedClass):
             print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
         self.objects = ObToAdd
         # Make sure last fixation hasn't "wandered" away from objects: 
-        fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=ObToAdd)
+        fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
         self.camera.fix_location = self.camera.fix_location[:-1]+[fPosFin[0], ]
 
     def get_occlusion(self):

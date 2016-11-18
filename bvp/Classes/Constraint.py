@@ -204,7 +204,7 @@ class ObConstraint(PosConstraint):
             ObDstOK_3D[c] = not Ob.collides_with(Obst[c])
         return BGboundOK_3D, ObDstOK_3D
 
-    def checkXYZS_2D(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50.):
+    def checkXYZS_2D(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50., num_frames=5):
         """
         Verify that a particular position and size is acceptable given "Obst" obstacles and 
         the position constraints of this object (in 2D images space). 
@@ -221,45 +221,51 @@ class ObConstraint(PosConstraint):
         """
         # (TODO: Make flexible for EdgeDist, ObOverlap being 0-1 or 0-100?)
         #TODO: Currently only looks at object one_wall_distances in the first frame. It is computationally hard, and possibly unnecessary to check it for every frame.
+        edge_ok_list = []
+        obdst_ok_list = []
+        for frame_num in range(num_frames):
+            mid_frame_pos = (Ob.pos3D[0]+Ob.action.mid_pos[frame_num][0],Ob.pos3D[1]+Ob.action.mid_pos[frame_num][1],Ob.pos3D[2]+Ob.action.mid_pos[frame_num][2])
+            TmpOb = Object(pos3D=mid_frame_pos, size3D=Ob.size3D)
+            tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100))
+            TmpObSz_X = abs(tmpIP_R[0]-tmpIP_L[0])
+            TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
+            TmpImPos = [bvpu.bvpMath.listMean([tmpIP_R[0], tmpIP_L[0]]), bvpu.bvpMath.listMean([tmpIP_Bot[1], tmpIP_Top[1]])]
+            ### --- (1) Check distance from screen edges --- ###
+            Top_OK = EdgeDist < tmpIP_Top[1]
+            Bot_OK = 100-EdgeDist > tmpIP_Bot[1]
+            L_OK = EdgeDist < tmpIP_L[0]
+            R_OK = 100-EdgeDist > tmpIP_R[0]
+            EdgeOK_2D = all([Top_OK, Bot_OK, L_OK, R_OK])
+            ### --- (2) Check distance from other objects in 2D --- ###
+            if Obst:
+                nObj = len(Obst)
+            else:
+                nObj = 0
+            obstPos2D_List = []
+            Dist_List = []
+            Dthresh_List = []
+            ObstSz_List = []
+            ObDstOK_2D = [True for x in range(nObj)]
+            for c in range(nObj):
+                # Get position of obstacle
+                obstIP_Top, obstIP_Bot, obstIP_L, obstIP_R = bvpu.bvpMath.PerspectiveProj(Obst[c], Cam, ImSz=(1., 1.))
+                obstSz_X = abs(obstIP_R[0]-obstIP_L[0])
+                obstSz_Y = abs(obstIP_Bot[1]-obstIP_Top[1])
+                obstPos2D = [bvpu.bvpMath.listMean([obstIP_R[0], obstIP_L[0]]), bvpu.bvpMath.listMean([obstIP_Bot[1], obstIP_Top[1]])]
+                ObstSz2D = bvpu.bvpMath.listMean([obstSz_X, obstSz_Y])
+                ObjSz2D = bvpu.bvpMath.listMean([TmpObSz_X, TmpObSz_Y])
+                # Note: this is an approximation! But we're ok for now (2012.10.08) with overlap being a rough measure
+                PixDstThresh = (ObstSz2D/2. + ObjSz2D/2.) - (min([ObjSz2D, ObstSz2D]) * ObOverlap)
+                ObDstOK_2D[c] = bvpu.bvpMath.vecDist(TmpImPos, obstPos2D) > PixDstThresh
+                # For debugging
+                obstPos2D_List.append(obstPos2D) 
+                Dist_List.append(bvpu.bvpMath.vecDist(TmpImPos, obstPos2D))
+                Dthresh_List.append(PixDstThresh)
+                ObstSz_List.append(ObstSz2D)
+            edge_ok_list.append(EdgeOK_2D)
+            obdst_ok_list.append(ObDstOK_2D)
+        return all(edge_ok_list), [all([obdst_ok[i] for obdst_ok in obdst_ok_list]) for i in range(len(obdst_ok_list[0]))]
 
-        TmpOb = Object(pos3D=Ob.pos3D, size3D=Ob.size3D)
-        tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100))
-        TmpObSz_X = abs(tmpIP_R[0]-tmpIP_L[0])
-        TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
-        TmpImPos = [bvpu.bvpMath.listMean([tmpIP_R[0], tmpIP_L[0]]), bvpu.bvpMath.listMean([tmpIP_Bot[1], tmpIP_Top[1]])]
-        ### --- (1) Check distance from screen edges --- ###
-        Top_OK = EdgeDist < tmpIP_Top[1]
-        Bot_OK = 100-EdgeDist > tmpIP_Bot[1]
-        L_OK = EdgeDist < tmpIP_L[0]
-        R_OK = 100-EdgeDist > tmpIP_R[0]
-        EdgeOK_2D = all([Top_OK, Bot_OK, L_OK, R_OK])
-        ### --- (2) Check distance from other objects in 2D --- ###
-        if Obst:
-            nObj = len(Obst)
-        else:
-            nObj = 0
-        obstPos2D_List = []
-        Dist_List = []
-        Dthresh_List = []
-        ObstSz_List = []
-        ObDstOK_2D = [True for x in range(nObj)]
-        for c in range(nObj):
-            # Get position of obstacle
-            obstIP_Top, obstIP_Bot, obstIP_L, obstIP_R = bvpu.bvpMath.PerspectiveProj(Obst[c], Cam, ImSz=(1., 1.))
-            obstSz_X = abs(obstIP_R[0]-obstIP_L[0])
-            obstSz_Y = abs(obstIP_Bot[1]-obstIP_Top[1])
-            obstPos2D = [bvpu.bvpMath.listMean([obstIP_R[0], obstIP_L[0]]), bvpu.bvpMath.listMean([obstIP_Bot[1], obstIP_Top[1]])]
-            ObstSz2D = bvpu.bvpMath.listMean([obstSz_X, obstSz_Y])
-            ObjSz2D = bvpu.bvpMath.listMean([TmpObSz_X, TmpObSz_Y])
-            # Note: this is an approximation! But we're ok for now (2012.10.08) with overlap being a rough measure
-            PixDstThresh = (ObstSz2D/2. + ObjSz2D/2.) - (min([ObjSz2D, ObstSz2D]) * ObOverlap)
-            ObDstOK_2D[c] = bvpu.bvpMath.vecDist(TmpImPos, obstPos2D) > PixDstThresh
-            # For debugging
-            obstPos2D_List.append(obstPos2D) 
-            Dist_List.append(bvpu.bvpMath.vecDist(TmpImPos, obstPos2D))
-            Dthresh_List.append(PixDstThresh)
-            ObstSz_List.append(ObstSz2D)
-        return EdgeOK_2D, ObDstOK_2D
     def checkSize2D(self, Obj, Cam, MinSz2D):
         """
         Usage: checkSize2D(TmpPos, Cam, MinSz2D)
@@ -459,6 +465,7 @@ class ObConstraint(PosConstraint):
             BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(TmpOb, Obst=Obst)
             # BoundOK_3D = [True for i in BoundOK_3D] #Adding these for debugging purposes. Make sure to remove later
             # Check on 2D bounds
+            #TODO Insert loop here that checks tmpOb cam compatibility at different points
             EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpOb, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
             # Instantiate temp object and...
             # ... check on 2D size
@@ -603,7 +610,6 @@ class CamConstraint(PosConstraint):
             # Necessary??
             #Tmpfix_location = tuple([a+b for a, b in zip(Tmpfix_location, self.origin)])
             fix_location.append(Tmpfix_location)
-        print(fix_location)
         return fix_location
     def sampleCamPos(self, frames=None):
         """
