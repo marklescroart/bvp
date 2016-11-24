@@ -18,8 +18,7 @@ class Action(MappedClass):
     def __init__(self, name='DummyAction', fname=None, armature='mixamo_human', type='Action',
         wordnet_label=None, wordnet_frames=None, is_armature=True, _id=None, _rev=None, n_frames=None,
         is_cyclic=False, is_translating=False, is_broken=False, bg_interaction=False, obj_interaction=False, 
-        is_interactive=False, is_animal=False, fps=24, min_xyz=None, max_xyz=None, min_xyz_trajectory=None,
-        max_xyz_trajectory=None, dbi=None):
+        is_interactive=False, is_animal=False, fps=24, min_xyz=None, max_xyz=None, min_trajectory=None, max_trajectory = None, dbi=None):
         """Class to store an armature-based action for an object in a BVP scene. 
 
         Parameters
@@ -64,10 +63,10 @@ class Action(MappedClass):
         max_xyz : list 
             maximum x, y, and z positions for animated object during action 
             (part of bounding box for action)   
-        min_xyz_trajectory : list of lists
-            list of minimum x,y,z coordinates over time (currently, fixed at 5 time points across action)
-        max_xyz_trajectory : list of lists
-            list of maximum x,y,z coordinates over time (currently, fixed at 5 time points across action)
+        min_trajectory : list of tuples
+            min points of the object's bounding box at different points in trajectory
+        max_trajectory : list of tuples
+            max points of the object's bounding box at different points in trajectory
         dbi : DBInterface object
             Database interface (for saving, loading, etc)
 
@@ -94,7 +93,7 @@ class Action(MappedClass):
                     setattr(self, k, v)        # Set _temp_params, etc.
         self._temp_fields = []
         self._data_fields = []
-        self.mid_pos = [(0,0,0) for i in range(5)]
+        self.motion_trajectory = [(0,0,0) for i in range(5)]
 
     def save(self, context):
         """Save Action to database; must be called inside an active Blender session"""
@@ -179,12 +178,10 @@ class Action(MappedClass):
             n_frames=n_frames, 
             fps=act.Action.fps, 
             min_xyz=min_xyz, 
-            max_xyz=max_xyz, 
-            min_xyz_trajectory=min_xyz_trajectory,
-            max_xyz_trajectory=max_xyz_trajectory,
+            max_xyz=max_xyz,
+            min_path = np.array(mn)[np.floor(np.linspace(1,len(mn),num=5))],
+            max_path = np.array(mn)[np.floor(np.linspace(1,len(mx),num=5))],
             dbi=dbi)
-        bvpact.min_path = mn
-        bvpact.max_path = mx
         return bvpact
 
     def __repr__(self):
