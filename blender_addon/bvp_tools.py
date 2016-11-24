@@ -46,8 +46,10 @@ bl_info = {
 ### --- Misc parameters --- ###
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
 #dbport = bvp.Settings['db']['port']
-dbpath = bvp.config.get('path', 'db_dir') # only necessary for creating client instances...
-dbname = bvp.config.get('db', 'name')
+
+dbname = bvp.config.get('db', 'dbname')
+dbi = bvp.DBInterface()
+dbpath = dbi.db_dir # only necessary for creating client instances...
 to_save = {}
 db_results = []
 last_import = ""
@@ -365,7 +367,7 @@ class DBSaveObject(bpy.types.Operator):
 		pfile = grp.Object.parent_file
 		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
 		if thisfile=="":
-			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Objects/')))		
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbi.db_dir,'Objects/')))		
 			# Need to check for over-writing file? 
 		if pfile=="":
 			pfile = os.path.split(bpy.data.filepath)[1][:-6]

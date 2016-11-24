@@ -79,13 +79,13 @@ def _getuuid():
     uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
     return uu
     
-def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
+def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
     """Run a job on the cluster."""
     # Command to write to file to execute
     cmd = ' '.join(cmd)
     cmd = '#!/bin/sh\n#SBATCH\n'+cmd
     # Command to 
-    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'all', '--mem', str(mem), '-o', logfile]
+    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'regular', '--mem', str(mem), '-o', logfile]
     clust = subprocess.Popen(slurm_cmd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -94,7 +94,7 @@ def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
     jobid = _re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
     return jobid, stderr
 
-def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
+def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=False, **kwargs):
     """Run Blender with a given script.
 
     Parameters
@@ -160,12 +160,12 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         
     else:
         # Call via cluster
-        if verbosity_level>3:
+        if is_verbose:
             print('Calling via cluster: %s'%(' '.join(blender_cmd)))
         jobid, stderr = _cluster(blender_cmd, **kwargs)
         # Check stderr for presence of errors? 
         # Raise them if they exist?
-        return jobid
+        return jobid, stderr
 
 __all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
            'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
