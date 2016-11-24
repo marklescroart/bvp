@@ -508,18 +508,43 @@ def add_img_background(imfile, imtype='FILE', scn=None):
     scn.node_tree.links.new(img_node.outputs['Image'], mix_node.inputs[1])
     scn.node_tree.links.new(mix_node.outputs['Image'], compositor_output.inputs['Image'])
 
+def apply_material(obj, mat, proxy_object=False, uv=True):
+    """Apply a material to ab object"""
+    if proxy_object:
+        for g in obj.dupli_group.objects:
+            grab_only(obj)
+            if not g.type=='MESH':
+                continue
+            bpy.ops.object.proxy_make(object=g.name)
+            o = bpy.context.object
+            for ms in o.material_slots:
+                ms.material = mat
+            # Get rid of proxy now that material is set
+            bpy.context.scene.objects.unlink(o)
+        return
+    # Get object
+    grab_only(obj)
+    # Apply to object
+    try:
+        obj.material_slots[0].material = mat
+    except:
+        obj.data.materials.append(mat)
+    if uv:
+        bpy.ops.uv.smart_project()
+
 def set_material(proxy_ob, mat):
-    """Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
-    for g in proxy_ob.dupli_group.objects:
-        grab_only(proxy_ob)
-        if not g.type=='MESH':
-            continue
-        bpy.ops.object.proxy_make(object=g.name)
-        o = bpy.context.object
-        for ms in o.material_slots:
-            ms.material = mat
-        # Get rid of proxy now that material is set
-        bpy.context.scene.objects.unlink(o)
+    """DEPRECATED: use apply_material(..., proxy_object=True) Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
+    apply_material(proxy_ob, mat, proxy_object=True, uv=False)
+    # for g in proxy_ob.dupli_group.objects:
+    #     grab_only(proxy_ob)
+    #     if not g.type=='MESH':
+    #         continue
+    #     bpy.ops.object.proxy_make(object=g.name)
+    #     o = bpy.context.object
+    #     for ms in o.material_slots:
+    #         ms.material = mat
+    #     # Get rid of proxy now that material is set
+    #     bpy.context.scene.objects.unlink(o)
 
 def set_scene(scene_name=None):
     """Sets all blender screens in an open Blender session to scene_name
