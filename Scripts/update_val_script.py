@@ -57,8 +57,8 @@ print(min_xyz_trajectory)
 print(max_xyz_trajectory)
 
 # Uncomment these lines to make update for real
-dbi._update_value(act_doc, "min_xyz_trajectory", min_xyz_trajectory)
-dbi._update_value(act_doc, "max_xyz_trajectory", max_xyz_trajectory)
+#dbi._update_value(act_doc, "min_xyz_trajectory", min_xyz_trajectory)
+#dbi._update_value(act_doc, "max_xyz_trajectory", max_xyz_trajectory)
 """
 
 
