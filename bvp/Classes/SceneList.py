@@ -22,6 +22,7 @@ import time
 import pickle
 import subprocess
 import numpy as np
+import bvp
 from matplotlib import pyplot as plt
 from .. import utils as bvpu
 
@@ -500,7 +501,7 @@ class SceneList(object):
               Instruct SLURM to connect the batch script's standard error directly to the file name specified in the "filename pattern".  See the --input option for filename specification options.
         """
         ### --- General set-up: --- ###
-        Blender = config.get('path', 'blender') #bvp.Settings['Paths']['BlenderCmd'] 
+        Blender = 'blender' #config.get('path', 'blender') #bvp.Settings['Paths']['BlenderCmd'] 
         BlendFile = os.path.join(bvp.__path__[0], 'BlendFiles', 'Blank.blend')
         if isinstance(nCPUs, int):
             nCPUs = str(nCPUs) 
@@ -530,17 +531,17 @@ class SceneList(object):
         ### --- Creation of temporary files --- ###
         # Pre: set up temp directory
         BaseDir = os.path.dirname(os.path.split(self.RenderOptions.BVPopts['BasePath'])[0])
-        if bvp.Verbosity_Level > 3: 
+        if True: 
             print('I think the base directory is :\n%s'%BaseDir)
         if not os.path.exists(BaseDir):
             os.mkdir(BaseDir)
-            if bvp.Verbosity_Level > 3:
+            if True:
                 print('made base dir!')
-        if bvp.Verbosity_Level > 3:
+        if True:
             print('I think the log directory is :\n%s'%os.path.join(BaseDir, 'Log'))
         if not os.path.exists(os.path.join(BaseDir, 'Log')):
             os.mkdir(os.path.join(BaseDir, 'Log'))
-            if bvp.Verbosity_Level > 3:
+            if True:
                 print('made log dir!')
         ### --- [optionally] Cull list to remove already-rendered files --- ### 
         if not Is_Overwrite:

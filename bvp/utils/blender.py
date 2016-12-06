@@ -160,7 +160,7 @@ def set_layers(ob, LayerList):
     ob = blender object data structure
     LayerList = list of numbers of layers you want the object to appear on, e.g. [0, 9] (ZERO-BASED)
     """
-    if not bvp.Is_Blender:
+    if not is_blender:
         print("Sorry, won't run outside of Blender!")
         return
     LL = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
@@ -215,10 +215,14 @@ def grab_only(ob):
 
 def find_group_parent(group):
     """Find parent object among group objects"""
-    no_parent = [o for o in group.objects if o.parent is None]
+    if isinstance(group, bpy.types.Group):
+        obs = group.objects
+    else:
+        obs = group
+    no_parent = [o for o in obs if o.parent is None]
     if len(no_parent)>1:
         # OK, try for an armature:
-        armatures = [o for o in group.objects if o.type=='ARMATURE']
+        armatures = [o for o in obs if o.type=='ARMATURE']
         if len(armatures) == 1:
             return armatures[0]
         else:
@@ -415,6 +419,16 @@ def add_img_material(name, imfile, imtype):
         full path to movie or image to add
     imtype : string
         one of : 'sequence', 'file', 'generated', 'movie'
+
+    ## NOTE: 
+    #name = 'ori_noise'
+    #imfile = '/Users/mark/Projects/Mixamo_Downloads/Demo/bg_camo.png'
+    #from bvp.utils.blender import add_img_material
+    import bvp
+    name = 'ori_motion'
+    imfile = '/Users/mark/Notebooks/ori_noise2.gif'
+    imtype = 'movie' # options: 'sequence','file','generated','movie'
+    im = bvp.utils.blender.add_img_material(name,imfile,imtype)        
     """
     # Load image
     from bpy_extras.image_utils import load_image
@@ -432,18 +446,43 @@ def add_img_material(name, imfile, imtype):
     mat.texture_slots[0].texture = tex
     return mat
 
+def apply_material(obj, mat, proxy_object=False, uv=True):
+    """Apply a material to ab object"""
+    if proxy_object:
+        for g in obj.dupli_group.objects:
+            grab_only(obj)
+            if not g.type=='MESH':
+                continue
+            bpy.ops.object.proxy_make(object=g.name)
+            o = bpy.context.object
+            for ms in o.material_slots:
+                ms.material = mat
+            # Get rid of proxy now that material is set
+            bpy.context.scene.objects.unlink(o)
+        return
+    # Get object
+    grab_only(obj)
+    # Apply to object
+    try:
+        obj.material_slots[0].material = mat
+    except:
+        obj.data.materials.append(mat)
+    if uv:
+        bpy.ops.uv.smart_project()
+
 def set_material(proxy_ob, mat):
-    """Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
-    for g in proxy_ob.dupli_group.objects:
-        grab_only(proxy_ob)
-        if not g.type=='MESH':
-            continue
-        bpy.ops.object.proxy_make(object=g.name)
-        o = bpy.context.object
-        for ms in o.material_slots:
-            ms.material = mat
-        # Get rid of proxy now that material is set
-        bpy.context.scene.objects.unlink(o)
+    """DEPRECATED: use apply_material(..., proxy_object=True) Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
+    apply_material(proxy_ob, mat, proxy_object=True, uv=False)
+    # for g in proxy_ob.dupli_group.objects:
+    #     grab_only(proxy_ob)
+    #     if not g.type=='MESH':
+    #         continue
+    #     bpy.ops.object.proxy_make(object=g.name)
+    #     o = bpy.context.object
+    #     for ms in o.material_slots:
+    #         ms.material = mat
+    #     # Get rid of proxy now that material is set
+    #     bpy.context.scene.objects.unlink(o)
 
 def set_scene(scene_name=None):
     """Sets all blender screens in an open Blender session to scene_name
@@ -502,7 +541,7 @@ def set_up_group(ObList=None, scn=None):
     np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
     if p:
         for o in np:
-            GrabOnly(o)
+            grab_only(o)
             bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
             if 'ChildOf' in o.constraints.keys():
                 o.constraints.remove(o.constraints['ChildOf'])
@@ -516,21 +555,21 @@ def set_up_group(ObList=None, scn=None):
     for Dim in range(3):
         SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
     
-    if not ToSet_Size==max(SzXYZ):
-        ScaleF = ToSet_Size/max(SzXYZ)
+    ScaleF = ToSet_Size/max(SzXYZ)
     if verbosity_level > 3: 
         print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size, ScaleF, max(SzXYZ)))
     
     for o in ObList:
-        GrabOnly(o)
+        grab_only(o)
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         o.scale = o.scale * ScaleF
         o.location = ToSet_Loc
+        bpy.ops.object.transform_apply(rotation=True, scale=True, location=True)
 
     scn.update()
     # Re-parent everything
     for o in np:
-        GrabOnly(p)
+        grab_only(p)
         o.select = True
         bpy.ops.object.parent_set()
     # Create group (if necessary) and name group
@@ -560,7 +599,7 @@ def get_group_bounding_box(ob_list=None):
     BBy = list()
     BBz = list()
     for ob in ob_list: 
-        bvp.utils.blender.grab_only(ob)
+        grab_only(ob)
         if ob.type in bb_types:
             bpy.ops.object.transform_apply(rotation=True)
         for ii in range(8):
@@ -805,6 +844,7 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         G.name = name
     else:
         print('Did not find group! adding...')
+        old_obs = list(bpy.context.scene.objects)
         bpy.ops.wm.append(
             directory=os.path.join(fpath, fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
             filepath="//"+fname+"\\Group\\"+name, # local filepath within .blend file to the scene to be imported
@@ -813,7 +853,9 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
             #relative_path=False, 
             autoselect=True, 
             instance_groups=proxy)
-        G = bpy.context.object
+        new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
+        G  = find_group_parent(new_obs)
+        grab_only(G)
     return G
 
 # Belongs in Object or Shape

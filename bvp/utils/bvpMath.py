@@ -178,7 +178,7 @@ def CirclePos(radius, nPos, x_center=0, y_center=0, Direction='BotCCW'):
         Pos = [[x, y] for x, y in zip(PosX, PosY)]
         return Pos
 
-def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)): 
+def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
     """
     Usage: imPos_Top, imPos_Bot, imPos_L, imPos_R = PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.))
     
@@ -195,7 +195,8 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)):
         Should contain a list of (x, y, z) camera and fixation positions for n frames
     ImSz : tuple or list
         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
-    
+    frame_index : Int
+        Which frame in camera's frame list to compute the projection for
 
     Created by ML 2011.10.06
     """
@@ -219,15 +220,25 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)):
     
     """
     ImDist = 32. # Blender assumption - see above!
-    FOV = 2*atand(ImDist/(2*bvpCam.lens))
+    if cam_lens is not None:
+        FOV = 2*atand(ImDist/(2*cam_lens))
+    else:
+        FOV = 2*atand(ImDist/(2*bvpCam.lens))
 
     objPos = bvpObj.pos3D
-    camPos = bvpCam.location
-    fix_location = bvpCam.fix_location
+    if cam_location is not None:
+        camPos = cam_location
+    else:
+        camPos = bvpCam.location[0]
+    if cam_fix_location is not None:
+        fix_location = cam_fix_location
+    else:
+        fix_location = bvpCam.fix_location[0]
+    
     # Convert to vector
-    cPos = VectorFn(camPos[0]) # Only do this wrt first frame for now!
+    cPos = VectorFn(camPos)
     #cPos.shape = (3, 1) 
-    fPos = VectorFn(fix_location[0])
+    fPos = VectorFn(fix_location)
     #fPos.shape = (3, 1)
     oPos = VectorFn(objPos) #np.array(bvpObj.pos3D) 
     # Prep for shift in L, R directions (wrt camera)
