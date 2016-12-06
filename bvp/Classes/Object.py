@@ -383,3 +383,49 @@ class Object(MappedClass):
         collides = x_collision and y_collision and z_collision
 
         return collides
+
+    @property
+    def min_xyz_trajectory(self):
+        """Returns the min point of the object's bounding box at some points on the trajectory of its motion in xyz
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        List of tuples: list of (default 5) positions at equally spaced points in time
+        """
+        if self.action:
+            sf = self.size3D/10
+            min_points = self.action.min_xyz_trajectory
+            return [(sf*pt[0], sf*pt[1], sf*pt[2]) for pt in min_points]
+        else:
+            return [self.pos3D]
+
+    @property
+    def max_xyz_trajectory(self):
+        """Returns the max point of the object's bounding box at some points on the trajectory of its motion in xyz
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        List of tuples: list of (default 5) positions at equally spaced points in time
+        """
+        if self.action:
+            sf = self.size3D/10
+            max_points = self.action.max_xyz_trajectory
+            return [(sf*pt[0], sf*pt[1], sf*pt[2]) for pt in max_points]
+        else:
+            return [self.pos3D]
+
+    @property
+    def xyz_trajectory(self):
+        min_pt = self.min_xyz_trajectory
+        max_pt = self.max_xyz_trajectory
+        pos = self.pos3D
+        return [(pos[0]+(mi[0]+ma[0])/2,pos[1]+(mi[1]+ma[1])/2, pos[2]+mi[2]) for mi, ma in zip(min_pt, max_pt)]
+    

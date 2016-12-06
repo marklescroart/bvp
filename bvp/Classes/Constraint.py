@@ -8,6 +8,7 @@ import sys # perhaps not necessary... see below
 from .Object import Object # Should this be here...? Unclear. 
 from .. import utils as bvpu
 from math import sqrt
+import numpy as np
 
 # TODO: Remove. Rely on numpy. 
 randn = random.gauss # Takes inputs Mean, Std
@@ -167,30 +168,31 @@ class ObConstraint(PosConstraint):
             minXYZpos = Ob.min_xyz_pos
             maxXYZpos = Ob.max_xyz_pos
             Sz = Ob.size3D
+            tolerance_factor = 5
             X_OK, Y_OK, r_OK, Z_OK = True, True, True, True # True by default
             #TODO: What is the correct way to take object size into account?
             if self.X:
-                xA = True if self.X[2] is None else (minXYZpos[0]-Sz/2)>=self.X[2]
-                xB = True if self.X[3] is None else (maxXYZpos[0]+Sz/2)<=self.X[3]
+                xA = True if self.X[2] is None else (minXYZpos[0]>=self.X[2])
+                xB = True if self.X[3] is None else (maxXYZpos[0]<=self.X[3])
                 X_OK = xA and xB
             if self.Y:
-                yA = True if self.Y[2] is None else (minXYZpos[1]-Sz/2)>=self.Y[2]
-                yB = True if self.Y[3] is None else (maxXYZpos[1]+Sz/2)<=self.Y[3]
+                yA = True if self.Y[2] is None else (minXYZpos[1]>=self.Y[2])
+                yB = True if self.Y[3] is None else (maxXYZpos[1]<=self.Y[3])
                 Y_OK = yA and yB
             if self.Z:
-                zA = True if self.Z[2] is None else (minXYZpos[2]-Sz/2)>=self.Z[2]
-                zB = True if self.Z[3] is None else (maxXYZpos[2]+Sz/2)<=self.Z[3]
-                Z_OK = (zA and zB) or (Ob.action is not None and (self.Z[2] == self.Z[3])) # Alert: Special case for constrained Z
+                if self.Z[2] == self.Z[3]:
+                    zA = True if self.Z[2] is None else (minXYZpos[2] >= self.Z[2]-Sz/tolerance_factor)
+                    zB = True if self.Z[2] is None else (maxXYZpos[2] <= self.Z[3] + self.Sz[3] - Sz)
+                else:
+                    zA = True if self.Z[2] is None else (minXYZpos[2]>=self.Z[2]-Sz/tolerance_factor)
+                    zB = True if self.Z[3] is None else (maxXYZpos[2]<=self.Z[3])
+                Z_OK = (zA and zB)
             if self.r:
                 oX, oY, oZ = self.origin
-                maxR = ((max(abs(maxXYZpos[0]-oX),abs(minXYZpos[0]-oX)))**2
-                       +(max(abs(maxXYZpos[1]-oY),abs(minXYZpos[1]-oY)))**2
-                       +(max(abs(maxXYZpos[2]-oZ),abs(minXYZpos[2]-oZ)))**2)**.5
-                minR = ((min(abs(maxXYZpos[0]-oX),abs(minXYZpos[0]-oX)))**2
-                       +(min(abs(maxXYZpos[1]-oY),abs(minXYZpos[1]-oY)))**2
-                       +(min(abs(maxXYZpos[2]-oZ),abs(minXYZpos[2]-oZ)))**2)**.5
-                rA = True if self.r[2] is None else (minR-Sz/2.)>=self.r[2]
-                rB = True if self.r[3] is None else (maxR+Sz/2.)<=self.r[3]
+                maxR = ((maxXYZpos[0]-oX)**2 + (maxXYZpos[1]-oY)**2 + (maxXYZpos[2]-oZ)**2)**.5
+                minR = ((minXYZpos[0]-oX)**2 + (minXYZpos[1]-oY)**2 + (minXYZpos[2]-oZ)**2)**.5
+                rA = True if self.r[2] is None else (minR)>=self.r[2]
+                rB = True if self.r[3] is None else (maxR)<=self.r[3]
                 r_OK = rA and rB
             BGboundOK_3D = [X_OK, Y_OK, Z_OK, r_OK] # all([...])
         # (2) Check distance from other objects in 3D
@@ -200,7 +202,7 @@ class ObConstraint(PosConstraint):
             nObj = 0
         ObDstOK_3D = [True]*nObj
         for c in range(nObj):
-            print(Obst[c])
+            # print(Obst[c])
             ObDstOK_3D[c] = not Ob.collides_with(Obst[c])
         return BGboundOK_3D, ObDstOK_3D
 
@@ -223,10 +225,15 @@ class ObConstraint(PosConstraint):
         #TODO: Currently only looks at object one_wall_distances in the first frame. It is computationally hard, and possibly unnecessary to check it for every frame.
         edge_ok_list = []
         obdst_ok_list = []
+        ob_positions = Ob.xyz_trajectory
+        cam_frames_idx = np.floor(np.linspace(0, Cam.frames[-1], num_frames, endpoint = False)).astype(np.int) #select 5 equally spaced camera frames
+        cam_fix_location = list(np.array([np.linspace(Cam.fix_location[0][i], Cam.fix_location[-1][i],Cam.frames[-1]) for i in range(3)]).T) #interpolate cam fixation location for those frames
+        cam_location = list(np.array([np.linspace(Cam.location[0][i], Cam.location[-1][i], Cam.frames[-1]) for i in range(3)]).T) #same for camera position
+               
         for frame_num in range(num_frames):
-            mid_frame_pos = (Ob.pos3D[0]+Ob.action.mid_pos[frame_num][0],Ob.pos3D[1]+Ob.action.mid_pos[frame_num][1],Ob.pos3D[2]+Ob.action.mid_pos[frame_num][2])
-            TmpOb = Object(pos3D=mid_frame_pos, size3D=Ob.size3D)
-            tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100))
+            object_pos = ob_positions[frame_num]
+            TmpOb = Object(pos3D=object_pos, size3D=Ob.size3D)
+            tmpIP_Top, tmpIP_Bot, tmpIP_L, tmpIP_R = bvpu.bvpMath.PerspectiveProj(TmpOb, Cam, ImSz=(100, 100),cam_location=cam_location[frame_num],cam_fix_location= cam_fix_location[frame_num],cam_lens = Cam.lens)
             TmpObSz_X = abs(tmpIP_R[0]-tmpIP_L[0])
             TmpObSz_Y = abs(tmpIP_Bot[1]-tmpIP_Top[1])
             TmpImPos = [bvpu.bvpMath.listMean([tmpIP_R[0], tmpIP_L[0]]), bvpu.bvpMath.listMean([tmpIP_Bot[1], tmpIP_Top[1]])]
@@ -463,7 +470,7 @@ class ObConstraint(PosConstraint):
             TmpOb = Object(pos3D=TmpPos, size3D=Sz, action = Ob.action)
             # Check on 3D bounds
             BoundOK_3D, ObDstOK_3D = self.checkXYZS_3D(TmpOb, Obst=Obst)
-            # BoundOK_3D = [True for i in BoundOK_3D] #Adding these for debugging purposes. Make sure to remove later
+           # BoundOK_3D = [True for i in BoundOK_3D] #Adding these for debugging purposes. Make sure to remove later
             # Check on 2D bounds
             #TODO Insert loop here that checks tmpOb cam compatibility at different points
             EdgeOK_2D, ObDstOK_2D = self.checkXYZS_2D(TmpOb, Cam, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap)
@@ -471,6 +478,7 @@ class ObConstraint(PosConstraint):
             # ... check on 2D size
 
             SzOK_2D = self.checkSize2D(TmpOb, Cam, MinSz2D)
+
             if all(ObDstOK_3D) and all(ObDstOK_2D) and EdgeOK_2D and all(BoundOK_3D) and SzOK_2D:
                 TooClose = False
                 TmpPos = bvpu.basics.make_blender_safe(TmpPos, 'float')

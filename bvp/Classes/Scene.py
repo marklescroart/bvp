@@ -16,6 +16,9 @@ from ..utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent
 from ..utils.blender import set_cursor
 from ..utils.bvpMath import ImPosCount
 from ..options import config
+
+import numpy as np
+
 try:
     import bpy
     is_blender = True
@@ -136,18 +139,26 @@ class Scene(MappedClass):
     def check_compatibility(self,bg, act, debug=True):
         """Helper function for populate_scene
 
-        Does a preleminary check of whether or not it is possible to place a given action in a given background.
+        Does a quick check of whether or not a given action is compatible with a given background.
         
         Parameters
         ----------
-        bg : Background to be checked
-        act : Action to check
-        debug : prints debug information about the background and the action
+        bg : Background instance
+            Background to check
+        act : Action instance
+            Action to check
+        debug : boolprints debug information about the background and the action
 
         Notes
         -----
         Could possibly extend to objects with a certain size
         """
+        if bg == None or act == None:
+            if RaiseError:
+                raise Exception('Invalid Background or Action passed into check_compatibility!')
+            if debug:
+                print('Invalid Background or Action passed into check_compatibility!')
+            return
         act_contains_x_origin = act.max_xyz[0] >= 0 >= act.min_xyz[0]
         act_contains_y_origin = act.max_xyz[1] >= 0 >= act.min_xyz[1]
         act_contains_z_origin = act.max_xyz[2] >= 0 >= act.min_xyz[2]
@@ -166,12 +177,12 @@ class Scene(MappedClass):
             if (const.Z[2] == const.Z[3]):
                 if debug:
                     print('Constraint Z is constant for background %s. Ignoring Z constraint'%bg.name)
-                Z_OK = (max_pos[2] - min_pos[2]) < const.Sz[3] + 10*tmp_ob.size3D/100 #TODO Is this even valid
+                Z_OK = (max_pos[2] - min_pos[2]) < const.Sz[3] - tmp_ob.size3D
             else:
                 Z_OK = (max_pos[2] - min_pos[2]) < (const.Z[3] - const.Z[2])
         if const.r:
             maxR = ((max_pos[0]-min_pos[0])**2+(max_pos[1]-min_pos[1])**2+(max_pos[2]-min_pos[2])**2)**.5 #TODO: Enforce this better
-            rB = True if const.r[3] is None else (maxR)<=const.r[3]
+            rB = True if const.r[3] is None else (maxR)<=2*const.r[3]
             r_OK = rB
         if all([X_OK, Y_OK, Z_OK, r_OK, act_contains_x_origin, act_contains_y_origin, act_contains_z_origin]):
             return True
@@ -221,11 +232,12 @@ class Scene(MappedClass):
             if ResetCam:
                 # Start w/ random camera, fixation position
                 cPos = self.background.CamConstraint.sampleCamPos(self.frame_range)
+                print('cpos', cPos)
+                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=ObToAdd)
             # Multiple object constraints for moving objects
             OC = []
             for o in ObList:
                 # Randomly cycle through object constraints (in case there are multiple exclusive possible locations for an object)
-                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=ObToAdd)
                 self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
                 if not OC:
                     if type(self.background.obConstraints) is list:
@@ -239,7 +251,7 @@ class Scene(MappedClass):
                     is_compatible = self.check_compatibility(self.background,NewOb.action)
                     if not is_compatible: #Check if it is even possible to use the action
                         if RaiseError:
-                            raise Exception('Action',NewOb.action.name,'is incompatible with bg', self.background.name)
+                            raise Exception('Action' + NewOb.action.name +'is incompatible with bg' + self.background.name)
                         pass
                 if self.background.obstacles:
                     Obst = self.background.obstacles+ObToAdd
@@ -274,8 +286,9 @@ class Scene(MappedClass):
             print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
         self.objects = ObToAdd
         # Make sure last fixation hasn't "wandered" away from objects: 
-        fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
-        self.camera.fix_location = self.camera.fix_location[:-1]+[fPosFin[0], ]
+        
+        # fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
+        # self.camera.fix_location = self.camera.fix_location[:-1]+[fPosFin[0], ]
 
     def get_occlusion(self):
         """

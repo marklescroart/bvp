@@ -63,7 +63,7 @@ print(max_xyz_trajectory)
 
 
 act_list = dbi.query(type='Action')
-for act in act_list[:1]: # This is the pythonic way to iterate over a list
+for act in act_list: # This is the pythonic way to iterate over a list
     #act = act_list[i] # This is a very matlab / C way to program =-)
     script = db_update_script.format(act_name=act.name)
     stdout, stderr = bvp.blend(script, blend_file=act.fpath)
