@@ -206,7 +206,7 @@ class ObConstraint(PosConstraint):
             ObDstOK_3D[c] = not Ob.collides_with(Obst[c])
         return BGboundOK_3D, ObDstOK_3D
 
-    def checkXYZS_2D(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50., num_frames=5):
+    def checkXYZS_2D(self, Ob, Cam, Obst=None, EdgeDist=0., ObOverlap=50.):
         """
         Verify that a particular position and size is acceptable given "Obst" obstacles and 
         the position constraints of this object (in 2D images space). 
@@ -226,6 +226,7 @@ class ObConstraint(PosConstraint):
         edge_ok_list = []
         obdst_ok_list = []
         ob_positions = Ob.xyz_trajectory
+        num_frames = len(ob_positions)
         cam_frames_idx = np.floor(np.linspace(0, Cam.frames[-1], num_frames, endpoint = False)).astype(np.int) #select 5 equally spaced camera frames
         cam_fix_location = list(np.array([np.linspace(Cam.fix_location[0][i], Cam.fix_location[-1][i],Cam.frames[-1]) for i in range(3)]).T) #interpolate cam fixation location for those frames
         cam_location = list(np.array([np.linspace(Cam.location[0][i], Cam.location[-1][i], Cam.frames[-1]) for i in range(3)]).T) #same for camera position
