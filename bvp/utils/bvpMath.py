@@ -527,8 +527,8 @@ class ImPosCount(object):
         r = np.random.rand()
         i = min(np.nonzero(r<cumP)[0])
         keep = idx[i]
-        yAdd = self.yBin[np.floor(keep/(len(self.yBin)-1))]
-        xAdd = self.xBin[np.mod(keep, len(self.xBin)-1)]
+        yAdd = self.yBin[int( np.floor(keep/(len(self.yBin)-1)) )]
+        xAdd = self.xBin[int( np.mod(keep, len(self.xBin)-1) )]
         x = xp+xAdd
         y = yp+yAdd
         return make_blender_safe(x, 'float'), make_blender_safe(y, 'float')
@@ -581,7 +581,7 @@ class ImPosCount(object):
     def noisyAdjPinv(self):
         p = self.adjPinv #.flatten()
         # The minimum here effectively sets the minimum likelihood for drawing a position.
-        n = np.random.randn(self.nBins**.5, self.nBins**.5)*.001
+        n = np.random.randn(int(self.nBins**.5), int(self.nBins**.5))*.001
         p += n
         p -= np.min(p)
         p /= np.sum(p)

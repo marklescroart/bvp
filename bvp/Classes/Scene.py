@@ -231,8 +231,7 @@ class Scene(MappedClass):
             #    print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
             if ResetCam:
                 # Start w/ random camera, fixation position
-                cPos = self.background.CamConstraint.sampleCamPos(self.frame_range)
-                print('cpos', cPos)
+                cPos = self.background.CamConstraint.sampleCamPos(self.frame_range) #TODO fix
                 fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=ObToAdd)
             # Multiple object constraints for moving objects
             OC = []
@@ -296,6 +295,78 @@ class Scene(MappedClass):
         TO COME (?)
         """
         pass
+
+    def bake(self, bone, change_camera_position=False):
+        """
+        Perform tasks that should be performed before render time, but still need to run in Blender. Currently calculates camera trajectory when it is made to follow a body part.
+        
+        Parameters
+        ----------
+
+        bone : Bone for the camera to follow
+        """
+
+        #TODO find some way to specify object to track.
+
+        scn = bvpu.blender.set_scene(None)
+        # set layers to correct setting
+        scn.layers = [True]+[False]*19
+        # Place objects
+        linked_objects = []
+        for o in self.objects:
+            try:
+                o.place()
+            except Exception as e:
+                if is_working:
+                    linked_objects.append(o)
+                    pass
+                else:
+                    raise e
+        arm = bpy.context.object #Pick an object
+        #TODO error catching. Should we do it?
+        bone = arm.pose.bones[bone] #Find the bone to track
+        
+        positions = [] # List of positions of the bone. The next few lines fill this.
+        object_locations = [] #xyz location of the central (z) axis of the parent object during the same time
+
+        #Extract action in order to get frame range
+        st = int(np.floor(self.frame_range[0]))
+        fin = int(np.ceil(self.frame_range[1]))
+        
+        # Loop over all frames in action, getting locations of the bone and the central axis
+        for fr in range(st,fin):
+            # Update scene frame 
+            scn.frame_set(fr)
+            scn.update()
+            positions.append(arm.matrix_world*bone.matrix*bone.location) #Calculate global position
+            object_locations.append(arm.location)
+
+        self.camera.fix_location = tuple(positions)
+
+        if change_camera_position:
+            def extrapolate_cam_loc_from_ob(loc, bone_pos, final_dist):
+                x_scale = (bone_pos[0]-loc[0])+0.00001
+                y_scale = (bone_pos[1]-loc[1])+0.00001
+                x_normalized = x_scale/np.sqrt(x_scale**2+y_scale**2)
+                y_normalized = x_scale/np.sqrt(x_scale**2+y_scale**2)
+                return [loc[0]+x_scale*final_dist,loc[1]+y_scale*final_dist]
+
+            camera_distance = self.objects[0].size3D*3 #TODO make this less arbitrary
+
+            self.camera.location = [ tuple(extrapolate_cam_loc_from_ob(loc, pos, camera_distance)+[self.camera.location[0][2]]) for loc,pos in zip(object_locations, positions)]
+            
+            self.camera.lens /= 1.2 # The camera is closer in this setting, so we should zoom less
+
+
+        dist = np.linalg.norm(np.array(scn.camera.location[0])-np.array(scn.objects[0].location[0]))
+        obsz = self.objects[0].size3D
+        self.camera.lens *= (dist/obsz)*1.713*3
+
+        #TODO this doesn't seem to work
+        for o in linked_objects:
+            bpy.context.scene.unlink(o)
+
+
 
 
     def create(self, render_options=None, scn=None, is_working=False):
