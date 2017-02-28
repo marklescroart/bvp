@@ -2,6 +2,7 @@
 import math as bnp
 from .Constraint import CamConstraint
 from .. import utils as bvpu
+import numpy as np
 
 try:
     import bpy
@@ -104,24 +105,30 @@ class Camera(object):
         fix.location = self.fix_location[0]
         fix.empty_draw_type = 'SPHERE'
         fix.empty_draw_size = draw_size
-        # Add camera constraints to look at target (both necessary...? Unclear. Currently works, tho.)
-        trk1 = cam.constraints.new('TRACK_TO')
-        trk1.target = fix
-        trk1.track_axis = 'TRACK_NEGATIVE_Z'
-        trk1.up_axis = 'UP_Z'
+        scn.objects.link(fix)
+        # Add camera constraints to look at target
         trk2 = cam.constraints.new('TRACK_TO')
         trk2.target = fix
         trk2.track_axis = 'TRACK_NEGATIVE_Z'
         trk2.up_axis = 'UP_Y'
+
         cam.data.lens = self.lens
         cam.data.clip_start, cam.data.clip_end = self.clip
 
         # Set camera motion (multiple camera positions for diff. frames)
         ## !!! TODO fix make_location_animation awful function and variable names
-        a = bvpu.blender.make_location_animation(self.location, self.frames, action_name='CamMotion', handle_type='VECTOR')
+        frames = self.frames
+        if (len(self.frames) == 2) and (self.frames[0] == 0) and (len(self.location) != 2):
+            num_frames = len(self.location)
+            frames = np.floor(np.linspace(0, self.frames[-1], num_frames, endpoint = True)).astype(np.int)
+        a = bvpu.blender.make_location_animation(self.location, frames, action_name='CamMotion', handle_type='VECTOR')
         cam.animation_data_create()
         cam.animation_data.action = a
-        f = bvpu.blender.make_location_animation(self.fix_location, self.frames, action_name='FixMotion', handle_type='VECTOR')
+        
+        if (len(self.frames) == 2) and (self.frames[0] == 0) and (len(self.fix_location) != 2):
+            num_frames = len(self.fix_location)
+            frames = np.floor(np.linspace(0, self.frames[-1], num_frames, endpoint = True)).astype(np.int)
+        f = bvpu.blender.make_location_animation(self.fix_location, frames, action_name='FixMotion', handle_type='VECTOR')
         fix.animation_data_create()
         fix.animation_data.action = f
 

@@ -227,7 +227,7 @@ class ObConstraint(PosConstraint):
         obdst_ok_list = []
         ob_positions = Ob.xyz_trajectory
         num_frames = len(ob_positions)
-        cam_frames_idx = np.floor(np.linspace(0, Cam.frames[-1], num_frames, endpoint = False)).astype(np.int) #select 5 equally spaced camera frames
+        cam_frames_idx = np.floor(np.linspace(0, Cam.frames[-1], num_frames, endpoint = True)).astype(np.int) #select 5 equally spaced camera frames
         cam_fix_location = list(np.array([np.linspace(Cam.fix_location[0][i], Cam.fix_location[-1][i],Cam.frames[-1]) for i in range(3)]).T) #interpolate cam fixation location for those frames
         cam_location = list(np.array([np.linspace(Cam.location[0][i], Cam.location[-1][i], Cam.frames[-1]) for i in range(3)]).T) #same for camera position
                
@@ -551,7 +551,7 @@ class ObConstraint(PosConstraint):
 
 class CamConstraint(PosConstraint):
     """
-    Extension of PosConstraint to have:
+    Extension of PosConstraint to have:/
     *camera speed (measured in Blender Units*) per second (assumes 15 fps)
     *pan / zoom constraints (True/False for whether pan/zoom are allowed)
 

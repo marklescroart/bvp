@@ -36,3 +36,6 @@ except Exception as e:
         stdout, stderr = bvp.blend(script)
         print(str(stdout,'utf-8'))
         print(str(stderr,'utf-8'))
+
+print([bg.name for bg in bg_list])
+print([act.name for act in act_list])
