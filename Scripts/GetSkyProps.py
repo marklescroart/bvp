@@ -1,4 +1,4 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Gets properties for all skies in a .blend file. Stores properties in a list 
@@ -11,16 +11,16 @@ Critical to the sky
 
 dictionaries are of the form:
 {
-'parentFile':'/path/to/Category_Blah.blend',
-'grpName':'Sky_001_Whatever',
-'semanticCat':['cloudy','day']
-'realWorldSize':100.000, # size of whole space in meters
+'fname':'/path/to/Category_Blah.blend',
+'name':'Sky_001_Whatever',
+'semantic_category':['cloudy','day']
+'real_world_size':100.000, # size of whole space in meters
 'nVertices':1000,
 'nFaces':900,
 }
 
 ML 2012.02
-'''
+"""
 
 # Imports
 import bpy,bvp,os,re
@@ -34,7 +34,7 @@ BaseCat = re.search('(?<=Category_)[A-Z,a-z,0-9]*',fName).group()
 for G in bpy.data.groups:
 	try:
 		try:
-			semCat = G.objects[0]['SemanticCat'].split(',')
+			semCat = G.objects[0]['semantic_category'].split(',')
 		except:
 			semCat = [BaseCat]
 		# Add file title category to list of categories, if not present:
@@ -55,10 +55,10 @@ for G in bpy.data.groups:
 		raise Exception("Why aren't there any lamps in sky %s??"%G.name)
 
 	d.append(dict(
-			parentFile=bpy.data.filepath,
-			grpName=G.name,
-			semanticCat=semCat,
-			realWorldSize=rws,
+			fname=bpy.data.filepath,
+			name=G.name,
+			semantic_category=semCat,
+			real_world_size=rws,
 			lightLoc=LightLoc,
 			lightRot=LightRot,
 			lightType=LightType,

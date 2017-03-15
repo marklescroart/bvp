@@ -13,5 +13,3 @@ The scripts (generally) make some modification to that file, or they save some
 information about that file to a pickle (.pik) file. 
 
 But really, you should just leave them alone.
-
-ML 2012.07.25

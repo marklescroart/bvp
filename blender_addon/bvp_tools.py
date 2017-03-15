@@ -45,9 +45,11 @@ bl_info = {
 
 ### --- Misc parameters --- ###
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
-dbport = bvp.Settings['db']['port']
-dbpath = bvp.Settings['Paths']['LibDir'] # only necessary for creating client instances...
-dbname = bvp.Settings['db']['name']
+#dbport = bvp.Settings['db']['port']
+
+dbname = bvp.config.get('db', 'dbname')
+dbi = bvp.DBInterface()
+dbpath = dbi.db_dir # only necessary for creating client instances...
 to_save = {}
 db_results = []
 last_import = ""
@@ -159,18 +161,18 @@ def enum_wn_results(self,context):
 	return out
 
 def enum_dbs(self,context):
-	"""Enumerate all active databases for pymongo server (if running)"""
+	"""Enumerate all active databases for couchdb server (if running)"""
 	try:
 		# TO DO: Add ShapeNet / ModelNet to this list?
-		dbi = bvp.bvpDB(port=dbport)
-		dbnm = [(d,d,'') for d in dbi.dbi.client.database_names() if not d in ['local','admin']]
+		dbi = bvp.DBInterface()
+		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
 	except:
 		dbnm = [('(none)','(none)','')]
 	return dbnm
 
 ## -- General property declarations -- ##
 def declare_properties():
-	'''Declarations of extra object properties
+	"""Declarations of extra object properties
 
 	These properties contain (most of) the meta-data stored about 
 	each scene element in the BVP database.
@@ -182,7 +184,7 @@ def declare_properties():
 
 	DEPRECATED. All objects in DB will need to be updated to put these
 	properties onto GROUPS rather than objects. 
-	'''
+	"""
 	### --- DEPRECATED --- ###
 
 	# ## -- For both object and background elements -- ##
@@ -190,7 +192,7 @@ def declare_properties():
 	# bpy.types.Object.RealWorldSize = bpy.props.FloatProperty(name="RealWorldSize",min=.001,max=300.,default=1.)
 	# # Imprecise list of semantic labels for an object; for convenience 
 	# # (a string, w/ comma-separated descriptors/categories for the object in question)
-	# bpy.types.Object.SemanticCat = bpy.props.StringProperty(name='SemanticCat',default='thing')
+	# bpy.types.Object.semantic_category = bpy.props.StringProperty(name='semantic_category',default='thing')
 	# # Precise definitional label for object
 	# bpy.types.Object.wordnet_label = bpy.props.StringProperty(name='wordnet_label',default='entity.n.01')
 	# # Reasonably realistic-looking, not cartoony or otherwise bad.
@@ -204,7 +206,7 @@ def declare_properties():
 	# Semantic Category of allowable objects (within scene)
 	bpy.types.Object.ObjectSemanticCat = bpy.props.StringProperty(name='ObjectSemanticCat',default='thing')
 	# Semantic Category of allowable skies (for scene)
-	bpy.types.Object.SkySemanticCat = bpy.props.StringProperty(name='SkySemanticCat',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
+	bpy.types.Object.sky_semantic_category = bpy.props.StringProperty(name='sky_semantic_category',default='all') # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 	# Focal length of camera (for background)
 	bpy.types.Object.Lens = bpy.props.FloatProperty(name='Lens',min=25.,max=50.,default=50.) # DomeTex, FlatTex, BlenderSky, Night, Day, etc...
 
@@ -213,13 +215,13 @@ def declare_properties():
 	## -- By class -- ## 
 	bpy.types.Object.groups = bpy.props.EnumProperty(name='groups',description='Groups using this object',items=enum_groups)
 	
-	bpy.types.Group.bvpObject = bpy.props.PointerProperty(type=ObjectProps)
+	bpy.types.Group.Object = bpy.props.PointerProperty(type=ObjectProps)
 	bpy.types.Group.is_object = bpy.props.BoolProperty(name='is_object',default=True)
 
-	bpy.types.Group.bvpBG = bpy.props.PointerProperty(type=BGProps)
+	bpy.types.Group.Background = bpy.props.PointerProperty(type=BGProps)
 	#bpy.types.Group.is_bg = bpy.props.BoolProperty(name='is_bg',default=False)
 	
-	bpy.types.Action.bvpAction = bpy.props.PointerProperty(type=ActionProps)
+	bpy.types.Action.Action = bpy.props.PointerProperty(type=ActionProps)
 	
 	bpy.types.Scene.bvpRenderOptions = bpy.props.PointerProperty(type=RenderOptions)
 	## -- For database management -- ##
@@ -324,7 +326,7 @@ class RescaleGroup(bpy.types.Operator):
 		return {"FINISHED"}
 
 	def get_group_bounding_box(self,ob_list):
-		'''Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
+		"""Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
 
 		Parameters
 		----------
@@ -336,7 +338,7 @@ class RescaleGroup(bpy.types.Operator):
 		minxyz,maxxyz : lists
 			min/max x,y,z coordinates for all objects. Think about re-structuring this to be a
 			more standard format for a bounding box. 
-		'''
+		"""
 		BBx = list()
 		BBy = list()
 		BBz = list()
@@ -361,11 +363,11 @@ class DBSaveObject(bpy.types.Operator):
 		wm = context.window_manager
 		ob = context.object
 		grp = bpy.data.groups[wm.active_group]
-		# Parent file nonsense because we can't set bvpObject.parent_file here:
-		pfile = grp.bvpObject.parent_file
+		# Parent file nonsense because we can't set Object.parent_file here:
+		pfile = grp.Object.parent_file
 		thisfile = bpy.data.filepath #if len(bpy.data.filepath)>0 else pfile
 		if thisfile=="":
-			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Objects/')))		
+			raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbi.db_dir,'Objects/')))		
 			# Need to check for over-writing file? 
 		if pfile=="":
 			pfile = os.path.split(bpy.data.filepath)[1][:-6]
@@ -389,35 +391,37 @@ class DBSaveObject(bpy.types.Operator):
 		## Vertices
 		nverts = sum([len(oo.data.vertices) for oo in grp.objects if oo.type=='MESH'])
 		## Semantic categories
-		semcat = [s.strip() for s in grp.bvpObject.semantic_cat.split(',')]
+		semcat = [s.strip() for s in grp.Object.semantic_cat.split(',')]
 		semcat = [s.lower() for s in semcat if s]
 		## WordNet labels
-		wordnet = [s.strip() for s in grp.bvpObject.wordnet_label.split(',')]
+		wordnet = [s.strip() for s in grp.Object.wordnet_label.split(',')]
 		wordnet = [s.lower() for s in wordnet if s]
 		#is_manifold = False # worth it? 
 		# Create database instance
-		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		dbi = bvp.DBInterface(dbname=wm.active_db)
 		# Construct object struct to save
 		to_save = dict(
 			# Edited through UI
 			name=wm.active_group, # also not great.
-			parent_file=pfile, # hacky. ugly. 
+			type='Object',
+			fname=pfile, # hacky. ugly. 
 			wordnet_label=wordnet,
-			semantic_cat=semcat,
-			basic_cat=grp.bvpObject.basic_cat,
-			real_world_size=grp.bvpObject.real_world_size,
-			is_realistic=grp.bvpObject.is_realistic,
-			is_cycles=grp.bvpObject.is_cycles,
+			semantic_category=semcat,
+			basic_category=grp.Object.basic_cat,
+			real_world_size=grp.Object.real_world_size,
+			is_realistic=grp.Object.is_realistic,
+			is_cycles=grp.Object.is_cycles,
 			# Computed
-			nfaces=nfaces,
-			nvertices=nverts,
-			nposes=nposes,
+			n_faces=nfaces,
+			n_vertices=nverts,
+			n_poses=nposes,
 			constraints=None,
 			#is_manifold=is_manifold, # worth it? 
 			#_id='tempX12345', # dbi.db.id? generate_id? Look up ID? Check database for extant
 			)
-		dbi.objects.save(to_save)
-		save_path = os.path.join(dbpath,'Objects',pfile+'.blend')
+		# Create object instance instead, call save method? NEED ID...
+		dbi.put_document(to_save)
+		save_path = os.path.join(dbpath, 'Object', pfile+'.blend')
 		if save_path==thisfile:
 			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
@@ -444,12 +448,12 @@ class DBSaveAction(bpy.types.Operator):
 		global to_save
 		wm = context.window_manager
 		# Create database instance
-		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		dbi = bvp.DBInterface(dbname=wm.active_db)
 
 		if self.do_save:
 			print('Saving %s in database'%repr(to_save))
 			# Save in database
-			dbi.dbi.Action.save(to_save)
+			dbi.put_document(to_save)
 			# Save parent file
 			save_path = os.path.join(dbpath,'Action',to_save['file_name'])
 			print('NOT saving %s'%save_path)
@@ -469,65 +473,12 @@ class DBSaveAction(bpy.types.Operator):
 		return {'FINISHED'}
 		
 	def invoke(self,context,event):
-		global to_save
-		bvpAct = bvp.bvpAction.from_blender(context)
-		to_save = bvpAct.docdict
-		wm = context.window_manager
-		# ob = context.object
-		# act = ob.animation_data.action
-		# ## -- Compute parameters -- ##
-		# ## Frames
-		# nframes = np.floor(act.frame_range[1])-np.ceil(act.frame_range[0])
-		# ## WordNet labels
-		# wordnet_labels = [s.name for s in act.bvpAction.wordnet_label]
-		# wordnet_frames = [s.frame for s in act.bvpAction.wordnet_label]
-		# ## Bounding box
-		# if isinstance(ob.data,bpy.types.Armature):
-		# 	# Get child objects, armatures have no position information
-		# 	ob_list = [ob]+list(ob.children)
-		# scn = context.scene
-		# mn,mx = [],[]
-		# for fr in range(int(np.floor(act.frame_range[0])),int(np.ceil(act.frame_range[1]))):
-		#     scn.frame_set(fr)
-		#     scn.update()
-		#     mntmp,mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
-		#     mn.append(mntmp)
-		#     mx.append(mxtmp)
-		# min_xyz = np.min(np.vstack(mn),axis=0).tolist()
-		# max_xyz = np.max(np.vstack(mx),axis=0).tolist()
-		# #bvp.utils.blender.make_cube('bbox',min_xyz,max_xyz) # works. This shows the bounding box, if you want. 
-		# bvp.utils.blender.grab_only(ob)
-		# ## Parent file
-		# #pfile = act.bvpAction.parent_file
-		# # The above value (pfile) is ignored for now. Need to eventually implement some way to take the contents 
-		# # of the current file (group/action/whatever) and save them (append them) to another specfied file
-		# # in the database. Currently NOT IMPLEMENTED.
-		# thisfile = os.path.split(bpy.data.filepath)[1] #if len(bpy.data.filepath)>0 else pfile
-		# if thisfile=="":
-		# 	# Require saving in db-appropriate location 
-		# 	raise NotImplementedError("Please save this file into %s before trying to save to database."%(os.path.join(dbpath,'Actions/')))
+		global bvpact
+		bvpact = Action.from_blender(context, dbi)
+		# (get docdict)
+		chk = dbi.query(**bvpact.docdict)
 
-		# # Construct action struct to save
-		# to_save = dict(
-		# 	# Edited through UI 
-		# 	act_name=act.name,
-		# 	parent_file=thisfile,
-		# 	wordnet_label=wordnet_labels,
-		# 	wordnet_frames=wordnet_frames,
-		# 	is_cyclic=act.bvpAction.is_cyclic,
-		# 	is_translating=act.bvpAction.is_translating,
-		# 	is_broken=act.bvpAction.is_broken,
-		# 	is_armature=act.bvpAction.is_armature,
-		# 	bg_interaction=act.bvpAction.bg_interaction,
-		# 	obj_interaction=act.bvpAction.obj_interaction,
-		# 	is_interactive=act.bvpAction.is_interactive,
-		# 	is_animal=act.bvpAction.is_animal,
-		# 	# Computed / assumed
-		# 	nframes=nframes,
-		# 	fps=act.bvpAction.fps,
-		# 	min_xyz=min_xyz,
-		# 	max_xyz=max_xyz,
-		# 	)
+		## OLD
 		# Create database instance
 		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
 		# Check for existence of to_save in database
@@ -542,7 +493,7 @@ class DBSaveAction(bpy.types.Operator):
 			to_save['_id'] = chk['_id']
 			return wm.invoke_props_dialog(self)
 
-# Eventual class to start up mongo database server (or other server...)
+# Eventual class to start up database server
 # Look into SQLite!
 # class DBStartup(bpy.types.Operator):
 # 	try:
@@ -635,7 +586,7 @@ class WordNetAddLabel(bpy.types.Operator):
 		# Add current label at current frame
 		wm = context.window_manager
 		act = context.object.animation_data.action
-		added = act.bvpAction.wordnet_label.add()
+		added = act.Action.wordnet_label.add()
 		added.name = wm.wn_results
 		added.frame = bpy.context.scene.frame_current
 		return {'FINISHED'}
@@ -647,7 +598,7 @@ class WordNetRemoveLabel(bpy.types.Operator):
 	def execute(self,context): 
 		wm = context.window_manager
 		act = context.object.animation_data.action
-		act.bvpAction.wordnet_label.remove(wm.wn_label_index)
+		act.Action.wordnet_label.remove(wm.wn_label_index)
 		return {'FINISHED'}
 
 class DBImport(bpy.types.Operator):
@@ -664,7 +615,7 @@ class DBImport(bpy.types.Operator):
 		if last_import=='object':
 			print('--- importing: ---')
 			print(to_import)
-			O = bvp.bvpObject(**to_import)
+			O = bvp.Object(**to_import)
 			O.Place(proxy=self.proxy_import)
 		elif last_import=='action':
 			raise NotImplementedError('Not yet! need to apply actions to objects!')
@@ -783,19 +734,19 @@ class BVP_PANEL_object_tools(View3DPanel,Panel):
 				col.label("WordNet:")
 				col.label('Real size:')
 				# Boolean properties
-				col.prop(grp.bvpObject,'is_realistic',text='realistic')
+				col.prop(grp.Object,'is_realistic',text='realistic')
 				# Button for re-scaling object groups 
 				col.operator('bvp.rescale_group',text='Rescale')	
 				
 				## -- 2nd column -- ##
 				col = spl.column()
 				col.prop(ob,'groups',text="")
-				col.prop(grp.bvpObject,'parent_file',text='')
-				col.prop(grp.bvpObject,'semantic_cat',text='')
-				col.prop(grp.bvpObject,'basic_cat',text='')
-				col.prop(grp.bvpObject,'wordnet_label',text='')
-				col.prop(grp.bvpObject,'real_world_size',text='')
-				col.prop(grp.bvpObject,'is_cycles',text='cycles')
+				col.prop(grp.Object,'parent_file',text='')
+				col.prop(grp.Object,'semantic_cat',text='')
+				col.prop(grp.Object,'basic_cat',text='')
+				col.prop(grp.Object,'wordnet_label',text='')
+				col.prop(grp.Object,'real_world_size',text='')
+				col.prop(grp.Object,'is_cycles',text='cycles')
 				# Button for re-scaling object groups 
 				col.operator('bvp.db_save_object',text='Save to DB')
 
@@ -830,14 +781,14 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		## -- 2nd column -- ##
 		col = spl.column()
 		col.prop(act,'name',text="")
-		#col.prop(act.bvpAction,'parent_file',text='')
-		#col.prop(act.bvpAction,'semantic_cat',text='')
+		#col.prop(act.Action,'parent_file',text='')
+		#col.prop(act.Action,'semantic_cat',text='')
 		row = col.row(align=True)
 		row.prop(wm,'wn_results',text="")
 		#row.prop(wm,'label_frame',text="")
 		row.operator('bvp.wn_addlabel',text="Add label")
 		row = layout.row()
-		row.template_list("WordNet_Label_List", "wordnet labels", act.bvpAction, "wordnet_label",wm,"wn_label_index")
+		row.template_list("WordNet_Label_List", "wordnet labels", act.Action, "wordnet_label",wm,"wn_label_index")
 		col = row.column(align=True)
 		col.operator("bvp.wn_removelabel", icon='ZOOMOUT', text="")
 		#col.operator("object.material_slot_remove", icon='ZOOMOUT', text="")
@@ -846,16 +797,16 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 		# Boolean properties - column 1
 		spl = layout.split()		
 		col = spl.column()
-		col.prop(act.bvpAction,'is_cyclic',text='cyclic')
-		col.prop(act.bvpAction,'bg_interaction',text='needs bg')
-		col.prop(act.bvpAction,'is_translating',text='translating')
-		col.prop(act.bvpAction,'is_interactive',text='interactive')
+		col.prop(act.Action,'is_cyclic',text='cyclic')
+		col.prop(act.Action,'bg_interaction',text='needs bg')
+		col.prop(act.Action,'is_translating',text='translating')
+		col.prop(act.Action,'is_interactive',text='interactive')
 		# Boolean properties - column 2
 		col = spl.column()
-		col.prop(act.bvpAction,'is_broken',text='broken')
-		col.prop(act.bvpAction,'obj_interaction',text='needs obj.')
-		col.prop(act.bvpAction,'is_armature',text='armature')
-		col.prop(act.bvpAction,'is_animal',text='animal/unique')
+		col.prop(act.Action,'is_broken',text='broken')
+		col.prop(act.Action,'obj_interaction',text='needs obj.')
+		col.prop(act.Action,'is_armature',text='armature')
+		col.prop(act.Action,'is_animal',text='animal/unique')
 		## -- Break -- ##
 		spl = layout.split()
 		col = spl.column()
@@ -891,7 +842,7 @@ class BVP_PANEL_scene_tools(View3DPanel,Panel):
 		row = layout.row()
 		row.label('(Work in progress)')
 		# Search through scene objects to determine if any are BVP bg objects
-		# Display bvpBG properties (constraints,realworldsize,wordnet_label,etc...)
+		# Display Background properties (constraints,realworldsize,wordnet_label,etc...)
 		# Editing:
 		# Buttons to add constraints of different types
 		# Buttons to test constraints / reset scene
@@ -926,7 +877,7 @@ class BVP_PANEL_render(RenderPanel,Panel):
 		row = layout.row()
 		row.label('for scene: %s'%context.scene.name)
 		# Search through scene objects to determine if any are BVP bg objects
-		# Display bvpBG properties (constraints,realworldsize,wordnet_label,etc...)
+		# Display Background properties (constraints,realworldsize,wordnet_label,etc...)
 		# Editing:
 		# Buttons to add constraints of different types
 		# Buttons to test constraints / reset scene

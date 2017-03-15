@@ -9,12 +9,13 @@ elements" (objects, backgrounds, skies/lighting setups, shadows, and cameras) st
 
 Scene elements are all managed by classes that wrap functionality of native Blender objects and store meta-data about each element (for example, the semantic category or size of an object). Each individual scene element is stored in a archival .blend files, and managed by a database system based on mongodb (http://www.mongodb.com/).
 
-Scene elements can be combined using a bvpScene class, which has methods to populate a given scene with objects in random locations, render the scene, and more.
+Scene elements can be combined using a Scene class, which has methods to populate a 
+given scene with objects in random locations, render the scene, and more.
 
-All relevant information for a set of scenes is stored in the bvpSceneList 
-class, which has* methods for permanent storage* / write-out of stimulus lists to archival hdf5 files*. 
+All relevant information for a set of scenes is stored in the SceneList 
+class, which has methods for permanent storage / write-out of stimulus lists to archival files*. 
 
-*Still to come 2014.10.23
+*Still to come 2017.03
 
 
 Installation
