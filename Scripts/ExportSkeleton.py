@@ -1,4 +1,4 @@
-''' 
+""" 
 
 #######################################################
 
@@ -18,7 +18,7 @@ requires environment variable "BVPDIR" to be set to base directory (dir containi
 
 ML 2011.06.24
 
-'''
+"""
 import off_export,bvp,bpy,os,re
 import pfSkel as sk
 Div = '~'*40
@@ -34,17 +34,17 @@ Res = sk.Settings['VolRes'] # Default (2012.08.13) = 96
 #	raise Exception('Path problem! pfSkel settings "LibDir" does not match bvp settings "LibDir". GAAAAAA!')
 
 Lib = bvp.bvpLibrary()
-grpName = 'Reptile_005_Frog' #'Mammal_005_Cat'
-#for grpName in Lib.getGrpNames():
+name = 'Reptile_005_Frog' #'Mammal_005_Cat'
+#for name in Lib.getGrpNames():
 # Get & add object
-O = bvp.bvpObject(grpName,Lib,size3D=10)
-O.PlaceObj()
+O = bvp.Object(name,Lib,size3D=10)
+O.Place()
 G = bpy.context.object
 # Make proxy objects & create render mesh for all objects in group
 ObList = []
 scn = bpy.context.scene
 for o in G.dupli_group.objects:
-	bvp.utils.blender.GrabOnly(G)
+	bvp.utils.blender.grab_only(G)
 	bpy.ops.object.proxy_make(object=G.name,type=o.name)
 	NewOb = bpy.context.object
 	if NewOb.type=='MESH':
@@ -60,9 +60,9 @@ for o in ObList:
 	o.select = True
 bpy.ops.object.join()
 Ob = bpy.context.object
-bvp.utils.blender.GrabOnly(Ob)
+bvp.utils.blender.grab_only(Ob)
 # Export off
-OFFf = os.path.join(sk.OFFdir,grpName+'.off')
+OFFf = os.path.join(sk.OFFdir,name+'.off')
 off_export.write(OFFf)
 # Voxelize off @ (default) resolution
 sk.preproc.Voxelize(OFFf,Res=Res)

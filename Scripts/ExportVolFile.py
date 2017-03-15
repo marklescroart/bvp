@@ -1,8 +1,8 @@
-'''
+"""
 Exports all groups in a file to voxelized .vol files, for later processing of shape skeleton (medial axis structure)
 
 ML 2012.02
-'''
+"""
 # Imports
 import bpy,bvp,os,re
 # Path setup

@@ -1,4 +1,4 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Gets properties for all objects (groups) in a .blend files. Stores properties in a list 
@@ -9,11 +9,11 @@ These .pik files are loaded by the bvpLibrary class.
 
 dictionaries are of the form:
 {
-'parentFile':'/path/to/Category_Blah.blend',
-'grpName':'001_Whoopee',
-'realWorldSize':0.2,
+'fname':'/path/to/Category_Blah.blend',
+'name':'001_Whoopee',
+'real_world_size':0.2,
 'basicCat':'whoopie cushion',
-'semanticCat':['artsm','tool','whoopie cushion']
+'semantic_category':['artsm','tool','whoopie cushion']
 'nVertices':1000,
 'nFaces':900,
 'nPoses' = None, # None for un-rigged objects
@@ -26,7 +26,7 @@ dictionaries are of the form:
 Object constraints are not working yet (2012.02.29)!
 
 ML 2012.02
-'''
+"""
 
 # Imports
 import bpy,bvp,os,re,copy
@@ -40,8 +40,8 @@ for G in bpy.data.groups:
 	
 	try:
 		# slight processing of semantic categories before storage in list
-		semCat = G.objects[0]['SemanticCat'].split(',')
-		# "*" in semanticCat list denotes the "basic level" category of the object (as in Rosch, 1976)
+		semCat = G.objects[0]['semantic_category'].split(',')
+		# "*" in semantic_category list denotes the "basic level" category of the object (as in Rosch, 1976)
 		basicCat = [x.replace('*','') for x in semCat if '*' in x] # better be only 1 asterisk!
 		semCat = [x.replace('*','') for x in semCat]
 		if basicCat:
@@ -72,11 +72,11 @@ for G in bpy.data.groups:
 		# New for version 2.63 w/ bmeshes:
 		nFaces = sum([len(oo.data.polygons) for oo in G.objects if oo.type=='MESH'])
 	d.append(dict(
-			parentFile=bpy.data.filepath,
-			grpName=G.name,
+			fname=bpy.data.filepath,
+			name=G.name,
 			basicCat=basicCat,
-			semanticCat=semCat,
-			realWorldSize=rws,
+			semantic_category=semCat,
+			real_world_size=rws,
 			nVertices=sum([len(oo.data.vertices) for oo in G.objects if oo.type=='MESH']),
 			nFaces=nFaces,
 			nPoses=nPoses,

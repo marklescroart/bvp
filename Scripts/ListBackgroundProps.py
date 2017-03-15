@@ -1,23 +1,23 @@
-'''
+"""
 .B.lender .V.ision .P.roject file operation
 
 Lists properties for all backgrounds (groups) in a .blend file, and prints them
 to a text file called "backgroundProps.txt", which is stored in the main bvp 
 directory. This is useful as a human-readable reference for all the backgrounds
 in a directory. Also, the text file can be amended (for example, to specify 
-the true "realWorldSize" of each background). The amended file can then be used 
+the true "real_world_size" of each background). The amended file can then be used 
 by "SetBackgroundProps.py" to (re-) set properties of backgrounds (groups). In this 
 way, it's possible to modify the properties of the groups within many files 
 at once.
 
 Each group will have its own line in the text file, thus:
-GrpName :: NewGrpName :: realWorldSize :: semanticCatString :: ob
+name :: NewGrpName :: real_world_size :: semanticCatString :: ob
 
-GrpName = the name of the group in the .blend file
+name = the name of the group in the .blend file
 NewGrpName = "x" by default. If it is changed from "x", 
 	then "SetBGProps" will change the name of the group 
 	to the NewGrpName
-realWorldSize = size in meters (floating point value)
+real_world_size = size in meters (floating point value)
 semanticCatString = hierarchical list of categories to which the object 
 	belongs, from most general to most specific. 
 
@@ -27,7 +27,7 @@ GetBGProps.py - creates a list of property dicts for each group in a file,
 	stored in a .pik file (Category_Blah.blend -> Category_Blah.pik)
 
 ML 2012.02.15
-'''
+"""
 
 # Imports
 import bpy,re,os,sys
@@ -53,7 +53,7 @@ with open(sName,'a') as fid:
 		except:
 			Sz = 100.000
 		try:
-			SemStr = gOb['SemanticCat']
+			SemStr = gOb['semantic_category']
 		except:
 			SemStr = BaseCat.lower()
 		try:
@@ -61,7 +61,7 @@ with open(sName,'a') as fid:
 		except:
 			obStr = 'all'
 		try:
-			skyStr = gOb['SkySemanticCat']
+			skyStr = gOb['sky_semantic_category']
 		except:
 			skyStr = 'all'
 		try:

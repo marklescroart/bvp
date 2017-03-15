@@ -27,13 +27,13 @@ for o in ToRender:
 	for rotZ in rotList:
 		if o['nPoses']:
 			for p in range(o['nPoses']):
-				ObToAdd.append(bvp.bvpObject(obID=o['grpName'],Lib=Lib,pos3D=(0,0,0),size3D=10,rot3D=(0,0,rotZ),pose=p))
+				ObToAdd.append(bvp.Object(obID=o['name'],Lib=Lib,pos3D=(0,0,0),size3D=10,rot3D=(0,0,rotZ),pose=p))
 		else:
-			ObToAdd.append(bvp.bvpObject(obID=o['grpName'],Lib=Lib,pos3D=(0,0,0),size3D=10,rot3D=(0,0,rotZ)))
+			ObToAdd.append(bvp.Object(obID=o['name'],Lib=Lib,pos3D=(0,0,0),size3D=10,rot3D=(0,0,rotZ)))
 	# Camera, Lights (Sky), Background
-	Cam = bvp.bvpCamera()
-	Sky = bvp.bvpSky()
-	BG = bvp.bvpBG()
+	Cam = bvp.Camera()
+	Sky = bvp.Sky()
+	BG = bvp.Background()
 	# Set up list of scenes for SceneList
 	
 	for Obj in ObToAdd:
@@ -43,11 +43,11 @@ for o in ToRender:
 			pNum = Obj.pose+1
 		else:
 			pNum = 1
-		ScnL.append(bvp.bvpScene(Num=ObCt,Obj=(Obj,),BG=BG,Sky=Sky,
+		ScnL.append(bvp.Scene(Num=ObCt,Obj=(Obj,),BG=BG,Sky=Sky,
 							Shadow=None,Cam=Cam,FrameRange=(1,1),
-							fPath='%s_%s_p%d_r%d_fr##'%(Obj.semanticCat[0],Obj.grpName,pNum,Obj.rot3D[2]),FrameRate=15))
+							fpath='%s_%s_p%d_r%d_fr##'%(Obj.semantic_category[0],Obj.name,pNum,Obj.rot3D[2]),FrameRate=15))
 # Convert list of scenes to SceneList	
-SL = bvp.bvpSceneList(ScnList=ScnL,RenderOptions=RO)
+SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)
 SL.RenderSlurm(RenderGroupSize=1)
 
 #[12,14,15,17,18]

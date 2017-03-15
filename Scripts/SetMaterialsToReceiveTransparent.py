@@ -1,8 +1,8 @@
-'''
+"""
 Script to change all materials to receive transparent shadows.
 
 ML 2012.01.26
-'''
+"""
 
 import bpy
 M = bpy.data.materials
