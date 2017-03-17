@@ -114,7 +114,7 @@ def RunScriptForAllFiles(scriptF, fNm, Is_Cluster=False, Inpts=None):
 	else:
 		nCPUs = '2'
 		ClusterGrp = 'blender' # For now, GLab Slurm computers enabled to run Blender
-		TempScriptDir = os.path.join(bvp.__path__[0], 'Temp')
+		TempScriptDir = os.path.join(bvp.__path__[0], 'Temp') # FAAAAK fix me
 		for ii, BlendFile in enumerate(fNm):
 			full_cmd = [blender_cmd, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?				
 			TempScriptName = os.path.join(TempScriptDir, 'RunScriptForAllFiles_%s_%04d.sh'%(time.strftime('%Y%m%d_%m%M'), ii+1))
@@ -139,7 +139,7 @@ def loadPik(pikFile):
 	ML 2012.02
 	"""
 	with open(pikFile, 'rb') as fid:
-		d = bvp.pickle.load(fid)
+		d = pickle.load(fid)
 	return d
 
 def savePik(d, pikFile, protocol=2):

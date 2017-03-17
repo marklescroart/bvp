@@ -48,7 +48,7 @@ from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 from .Classes.Constraint import  ObConstraint, CamConstraint
-
+from .Classes.Material import Material
 from .Classes.Object import Object
 from .Classes.RenderOptions import RenderOptions
 from .Classes.Scene import Scene
@@ -63,7 +63,6 @@ from .DB import DBInterface
 # NOTE: UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
 
 bvp_dir = _os.path.dirname(__file__)
-
 
 def set_scn(fname='bvp_test'):
     """Quickie default setup of camera + lighting for an object
@@ -80,13 +79,13 @@ def _getuuid():
     uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
     return uu
     
-def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
+def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
     """Run a job on the cluster."""
     # Command to write to file to execute
     cmd = ' '.join(cmd)
     cmd = '#!/bin/sh\n#SBATCH\n'+cmd
     # Command to 
-    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'all', '--mem', str(mem), '-o', logfile]
+    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'regular', '--mem', str(mem), '-o', logfile]
     clust = subprocess.Popen(slurm_cmd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -95,7 +94,7 @@ def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=15500, ncpus=2):
     jobid = _re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
     return jobid, stderr
 
-def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
+def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=False, **kwargs):
     """Run Blender with a given script.
 
     Parameters
@@ -123,8 +122,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
     """
     # Inputs
     if blend_file is None:
-        blend_file = _os.path.abspath(_os.path.join(bvp_dir, '../' 'BlendFiles', 'Blank.blend'))
-        print(blend_file)
+        blend_file = _os.path.abspath(_os.path.join(bvp_dir, 'BlendFiles', 'Blank.blend'))
     # Check for existence of script
     if not _os.path.exists(script):
         # TO DO: look into doing this with pipes??
@@ -149,6 +147,12 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         stdout, stderr = proc.communicate()
         if del_tmp_script and not stderr:
             _os.unlink(tmpf)
+        try:
+            # Change formatting of byte objects in python3
+            stdout = stdout.decode()
+            stderr = stderr.decode()
+        except:
+            pass
         # Raise exception if stderr? 
         # Or leave that to calling function? 
         # Optional?
@@ -156,13 +160,13 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', **kwargs):
         
     else:
         # Call via cluster
-        if verbosity_level>3:
+        if is_verbose:
             print('Calling via cluster: %s'%(' '.join(blender_cmd)))
         jobid, stderr = _cluster(blender_cmd, **kwargs)
         # Check stderr for presence of errors? 
         # Raise them if they exist?
-        return jobid
+        return jobid, stderr
 
-__all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 
+__all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
            'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
            'utils','config'] 

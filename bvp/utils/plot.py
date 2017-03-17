@@ -6,7 +6,8 @@
 
 try:
 	from mpl_toolkits.mplot3d import Axes3D
-
+except:
+	pass
 def plot_cam_location(camera_list, n, fig=None, ax=None):
 	FigSz = (8, 8)
 	L = np.array([list(c.location[n]) for c in camera_list])

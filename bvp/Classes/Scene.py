@@ -84,7 +84,10 @@ class Scene(MappedClass):
         inpt = locals()
         for k, v in inpt.items():
             if not k in ['self', 'type']:
-                setattr(self, k, v)
+                if v == 'None':
+                    setattr(self, k, None)
+                else:
+                    setattr(self, k, v)
         self._temp_fields = ['camera'] # hmm... 
         self._data_fields = []
         self._db_fields = ['objects', 'background', 'sky', 'shadow']

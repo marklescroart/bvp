@@ -37,6 +37,7 @@ from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
 #from .Classes.Constraint import  ObConstraint, CamConstraint
+from .Classes.Material import Material
 from .Classes.Object import Object
 #from .Classes.RenderOptions import RenderOptions
 #from .Classes.Scene import Scene
@@ -52,6 +53,7 @@ try:
         Action=Action,
         Background=Background,
         Camera=Camera,
+        Material=Material,
         Object=Object,
         #RenderOptions=RenderOptions,
         #Scene=Scene,
@@ -75,32 +77,28 @@ verbosity_level = 3
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
 class DBInterface(docdb.couchclient.CouchDocDBClient):
-    """Class to interface with bvp elements stored in couch db
-    
-    Files in the library directory must be stored according to bvp directory structure: 
-    
-    BaseDirectory/ object/*.blend
-                   background/*.blend
-                   sky/*.blend
-                   shadow/*.blend
-    Parameters
-    ----------
-    dbhost : string
-        Name for host server. Read from config file. Config default is intialized to be 'localhost'
-    dbname : string
-        Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
-    port : scalar
-        Port number for database. 
-    Notes
-    -----
-    """
     def __init__(self, dbhost=dbhost, dbname=dbname, queries=('basic', 'bvp'), 
         is_verbose=is_verbose, return_objects=return_objects):
+        """Class to interface with bvp elements stored in couch db
+        
+        Files in the library directory must be stored according to bvp directory structure: 
+        
+        BaseDirectory/ object/*.blend
+                       background/*.blend
+                       sky/*.blend
+                       shadow/*.blend
+        Parameters
+        ----------
+        dbhost : string
+            Name for host server. Read from config file. Config default is intialized to be 'localhost'
+        dbname : string
+            Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
+        """
         super(DBInterface, self).__init__(dbhost, dbname, queries=queries, 
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir
         try:
-            self.db_dir = self.db['config']['db_dir']
+            self.db_dir = os.path.expanduser(self.db['config']['db_dir'])
         except:
             # TODO: Make this an error
             self.db_dir = None
@@ -403,6 +401,9 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             # Done with this object!
     @classmethod
     def create_db_from_json(cls, fname, dbname, dbhost, db_dir):
+        """Creates database from a json file
+
+        If fname for json file is None, just creates an empty database"""
         import couchdb
         server = couchdb.Server(dbhost)
         print("Creating database {} on {}".format(dbname, dbhost))
@@ -412,9 +413,10 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         dbi.__init__(dbname=dbname, dbhost=dbhost)
         print("Setting up queries...")
         dbi.set_up_db()
-        docs = json.load(open(fname))
-        print("Uploading documents...")
-        dbi.put_documents(docs)
+        if fname is not None:
+            docs = json.load(open(fname))
+            print("Uploading documents...")
+            dbi.put_documents(docs)
         print("Done!")
 
 

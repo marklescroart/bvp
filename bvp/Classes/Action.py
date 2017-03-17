@@ -1,5 +1,6 @@
 # Imports
 import os
+import numpy as np
 from .MappedClass import MappedClass
 from .. import utils as bvpu
 from ..options import config
@@ -17,7 +18,8 @@ class Action(MappedClass):
     def __init__(self, name='DummyAction', fname=None, armature='mixamo_human', type='Action',
         wordnet_label=None, wordnet_frames=None, is_armature=True, _id=None, _rev=None, n_frames=None,
         is_cyclic=False, is_translating=False, is_broken=False, bg_interaction=False, obj_interaction=False, 
-        is_interactive=False, is_animal=False, fps=24, min_xyz=None, max_xyz=None, min_xyz_trajectory=None, max_xyz_trajectory = None, dbi=None):
+        is_interactive=False, is_animal=False, fps=24, min_xyz=None, max_xyz=None, min_xyz_trajectory=None,
+        max_xyz_trajectory=None, dbi=None):
         """Class to store an armature-based action for an object in a BVP scene. 
 
         Parameters
@@ -62,10 +64,10 @@ class Action(MappedClass):
         max_xyz : list 
             maximum x, y, and z positions for animated object during action 
             (part of bounding box for action)   
-        min_xyz_trajectory : list of tuples
-            min points of the object's bounding box at different points in trajectory
-        max_xyz_trajectory : list of tuples
-            max points of the object's bounding box at different points in trajectory
+        min_xyz_trajectory : list of lists
+            list of minimum x,y,z coordinates over time (currently, fixed at 5 time points across action)
+        max_xyz_trajectory : list of lists
+            list of maximum x,y,z coordinates over time (currently, fixed at 5 time points across action)
         dbi : DBInterface object
             Database interface (for saving, loading, etc)
 
@@ -86,8 +88,10 @@ class Action(MappedClass):
         self.type = 'Action'
         for k, v in inpt.items(): 
             if not k in ('self', 'type'):
-                setattr(self, k, v)
-        # Set _temp_params, etc.
+                if v == 'None':
+                    setattr(self, k, None)
+                else:
+                    setattr(self, k, v)        # Set _temp_params, etc.
         self._temp_fields = []
         self._data_fields = []
         # self.motion_trajectory = [(0,0,0) for i in range(5)]
@@ -112,6 +116,7 @@ class Action(MappedClass):
         """
         # Idiot-proofing
         assert is_blender, "from_blender() only works within an active blender session."
+        n_samples = 5 # Number of samples for object trajectory (for bounding box across time)
         # Get relevant blender objects 
         wm = context.window_manager
         ob = context.object
@@ -128,7 +133,9 @@ class Action(MappedClass):
             ob_list = [ob]+list(ob.children)
         scn = context.scene
         mn, mx = [], []
-        for fr in range(int(np.floor(act.frame_range[0])), int(np.ceil(act.frame_range[1]))):
+        st = int(np.floor(act.frame_range[0]))
+        fin = int(np.ceil(act.frame_range[1]))
+        for fr in range(st, fin):
             scn.frame_set(fr)
             scn.update()
             # Re-visit me
@@ -137,6 +144,10 @@ class Action(MappedClass):
             mx.append(mxtmp)
         min_xyz = np.min(np.vstack(mn), axis=0).tolist()
         max_xyz = np.max(np.vstack(mx), axis=0).tolist()
+        idx = np.floor(np.linspace(st, fin, n_samples)).astype(np.int)
+        min_xyz_trajectory = [mn[ii].tolist() for ii in idx]
+        max_xyz_trajectory = [mx[ii].tolist() for ii in idx]
+
         #bvpu.blender.make_cube('bbox', min_xyz, max_xyz) # works. This shows the bounding box, if you want. 
         bvpu.blender.grab_only(ob)
         ## Parent file
@@ -168,9 +179,9 @@ class Action(MappedClass):
             n_frames=n_frames, 
             fps=act.Action.fps, 
             min_xyz=min_xyz, 
-            max_xyz=max_xyz,
-            min_xyz_trajectory = np.array(mn)[np.floor(np.linspace(1,len(mn),num=5))],
-            max_xyz_trajectory = np.array(mn)[np.floor(np.linspace(1,len(mx),num=5))],
+            max_xyz=max_xyz, 
+            min_xyz_trajectory=min_xyz_trajectory,
+            max_xyz_trajectory=max_xyz_trajectory,
             dbi=dbi)
         return bvpact
 
