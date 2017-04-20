@@ -31,19 +31,20 @@ pymongo # MOVE to optional dependency...
 #?# OpenEXR for handling Z depth / normal images
 
 """
-## -- Startup stuff -- ##
+# Startup stuff
 from __future__ import absolute_import
 __version__ = '0.2a' 
 
-## -- Imports -- ##
-import re as _re
-import os as _os
+# Imports
+import re
+import os
+import uuid
+import time
 import subprocess
 from . import utils 
 from .options import config
 
 # Classes
-# Annoyingly, this makes python 2 sad.
 from .Classes.Action import Action
 from .Classes.Background import Background
 from .Classes.Camera import Camera
@@ -62,7 +63,7 @@ from .DB import DBInterface
 
 # NOTE: UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
 
-bvp_dir = _os.path.dirname(__file__)
+bvp_dir = os.path.dirname(__file__)
 
 def set_scn(fname='bvp_test'):
     """Quickie default setup of camera + lighting for an object
@@ -79,11 +80,12 @@ def _getuuid():
     uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
     return uu
     
-def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
+def _cluster_orig(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
     """Run a job on the cluster."""
     # Command to write to file to execute
     cmd = ' '.join(cmd)
     cmd = '#!/bin/sh\n#SBATCH\n'+cmd
+    print(cmd)
     # Command to 
     slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'regular', '--mem', str(mem), '-o', logfile]
     clust = subprocess.Popen(slurm_cmd,
@@ -91,8 +93,116 @@ def _cluster(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
     stdout, stderr = clust.communicate(cmd)
-    jobid = _re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
+    print(stdout)
+    print(stderr)
+    jobid = re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
     return jobid, stderr
+
+def _get_uuid():
+    return str(uuid.uuid4()).replace('-','')
+
+
+def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_node_%N_job_%j.out',
+    slurm_err=True, job_name=None, dep=None, mem=30, ncpus=3, partition='regular'):
+    """Run a python script on the cluster.
+    
+    Parameters
+    ----------
+    script : string
+        Either a full script (as a string, probably in triple quoters) or a path to a script file
+    logdir : string
+        Directory in which to store slurm logs
+    slurm_out : string
+        File name for slurm log file. For slurm outputs, %j is job id; %N is node name
+    slurm_err : string 
+        File name for separate error file (if desired - if slurm_err is None, errors are 
+        written to the `slurm_out` file)
+    job_name : string
+        Name that will appear in the slurm queue
+    dep : string | None
+        String job numbers for dependencies, e.g. '78823,78824,78825' (for 
+        3 slurm job dependencies with those job id numbers). default=None
+    mem : scalar
+        Memory usage in gigabytes 
+    ncpus : scalar {1 OR 3}
+        Number of CPUs requested. Glab convention is to request 1 cpu per ~8GB of memory
+    partition : string
+        Either 'regular' or 'big' (regular = 32GB memory max, big = 64GB memory max)
+    """
+    if os.path.exists(script):
+        with open(script,'r') as fid:
+            script=fid.read()
+    if slurm_err is True:
+        slurm_err = 'Error_'+slurm_out
+    if job_name is None:
+        job_name = 'glab_script_'+time.strftime('%Y_%m_%d_%H%M',time.localtime())
+    #tmp_logfile = os.path.join('/tmp/', slurm_out)
+    logfile = os.path.join(logdir, slurm_out)
+    header = '#!/usr/bin/env python\n#SBATCH\n\n'
+    if slurm_err is None:
+        error_handling = ""
+    else:
+        #tmp_err = os.path.join('/tmp/', slurm_err)
+        errfile = os.path.join(logdir, slurm_err)
+        error_handling = """
+# Cleanup error files
+import socket,os
+ef = '{slurm_err}'.replace('%j',os.getenv('SLURM_JOB_ID'))
+ef = ef.replace('%N',socket.gethostname())
+with open(ef,'r') as fid:
+    output=fid.read()
+if len(output)>0:
+    print('Warnings detected!')
+    print(output)
+    os.unlink(ef)
+else:
+    print('Cleanup -> removing ' + ef)
+    os.unlink(ef)
+""".format(slurm_err=errfile) # write error file locally
+        
+    # Create full script     
+    python_script = header + script + error_handling
+    script_name = os.path.join(logdir, "{}_{}.py".format(job_name, _get_uuid()))
+    with open(script_name, "w") as fp:
+        fp.write(python_script)
+    # Create slurm command
+    slurm_cmd = ['sbatch', 
+                 '-c', str(ncpus),
+                 '-p', partition,
+                 '--mem', str(mem)+'G',
+                 '-o', logfile,
+                 '-J', job_name]
+    if not dep is None:
+        slurm_cmd += ['-d', dep]
+    if not slurm_err is None:
+        slurm_cmd += ['-e', errfile]
+    # Force immediate buffer write
+    slurm_script = """#!/bin/bash
+    #SBATCH
+    stdbuf -o0 -e0 python {script_name}
+    echo "Job finished! cleanup:"
+    echo "removing {script_name}"
+    rm {script_name}
+    """.format(script_name=script_name)
+    #export TMP1="{tmp_logfile}"
+    #export TMP2="${{TMP1/\%j/$SLURM_JOB_ID}}"
+    #export JOB_FILE="${{TMP2/\%N/$(hostname)}}"
+    #echo "moving log file ($JOB_FILE) to {logdir}"
+    #mv $JOB_FILE {logdir}
+ 
+    #slurm_script = tmp_script.format(script_name=script_name, tmp_logfile=tmp_logfile, logdir=logdir)
+    # Call slurm
+    clust = subprocess.Popen(slurm_cmd,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE)
+    stdout, stderr = clust.communicate(slurm_script)
+    # Retrieve job ID
+    try:
+        job_id = re.search('(?<=Submitted batch job )[0-9]*',stdout).group()
+    except:
+        raise Exception('Slurm job submission failed! %s'%stderr)
+    return job_id, stderr
 
 def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=False, **kwargs):
     """Run Blender with a given script.
@@ -100,10 +210,8 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
     Parameters
     ----------
     script : string file name or script
-        if `script` is a file that exists (_os.path.exists), this function will open
-        an instance of Blender and run that file in Blender. If it is a string, it 
-        will create a dummy temp file, write the string to it, and delete the dummy 
-        file once it has run (or failed). 
+        Script to run. Scripts saved to files are read into RAM and piped to blender
+        command via the --python-expr argument 
     blend_file : string (optional)
         File path to Blender file
     is_local : bool
@@ -122,31 +230,37 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
     """
     # Inputs
     if blend_file is None:
-        blend_file = _os.path.abspath(_os.path.join(bvp_dir, 'BlendFiles', 'Blank.blend'))
+        blend_file = os.path.abspath(os.path.join(bvp_dir, 'BlendFiles', 'Blank.blend'))
     # Check for existence of script
-    if not _os.path.exists(script):
-        # TO DO: look into doing this with pipes??
-        del_tmp_script = True
-        tmpf = _os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
-        with open(tmpf, 'w') as fid:
-            fid.writelines(script)
-        script = tmpf
-    else:
-        del_tmp_script = False
+    # NEW: read script into memory
+    if os.path.exists(script):
+        with open(script) as fid:
+            lines = script.readlines()
+        script = '\n'.join(lines)
+    # OLD write script to disk
+    #if not os.path.exists(script):
+    #    # TO DO: look into doing this with pipes??
+    #    del_tmp_script = True
+    #    tmpf = os.path.join(tmpdir, 'blender_temp_%s.py'%_getuuid())
+    #    with open(tmpf, 'w') as fid:
+    #        fid.writelines(script)
+    #    script = tmpf
+    #else:
+    #    del_tmp_script = False
+    # Ya fuk dis noise
+    #heredoc = '<<PYTHONSCRIPT\n' + script + '\nPYTHONSCRIPT'
     # Run 
     blender = config.get('path', 'blender_cmd') #Settings['Paths']['BlenderCmd']
-    blender_cmd = [blender, '-b', blend_file, '-P', script]
+    blender_cmd = [blender, '-b', blend_file, '--python-expr', script]
     if is_local:
-        # To do (?) 
-        # - Use subprocess.Popen and PIPE instead of writing temp script? 
-        # - check output for error?
         proc = subprocess.Popen(blender_cmd,
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE)
         stdout, stderr = proc.communicate()
-        if del_tmp_script and not stderr:
-            _os.unlink(tmpf)
+        # OLD
+        #if del_tmp_script and not stderr:
+        #    os.unlink(tmpf)
         try:
             # Change formatting of byte objects in python3
             stdout = stdout.decode()
@@ -160,11 +274,15 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
         
     else:
         # Call via cluster
-        if is_verbose:
-            print('Calling via cluster: %s'%(' '.join(blender_cmd)))
-        jobid, stderr = _cluster(blender_cmd, **kwargs)
-        # Check stderr for presence of errors? 
-        # Raise them if they exist?
+        #if is_verbose:
+        #    print('Calling via cluster: %s'%(' '.join(blender_cmd)))
+        #jobid, stderr = _cluster_orig(blender_cmd, **kwargs)
+        pyscript = """
+import bvp
+tmp_script = '''{script}'''
+bvp.blend(tmp_script, is_local=True, blend_file="{blend_file}", is_verbose={is_verbose})
+""".format(script=script, blend_file=blend_file, is_verbose=is_verbose)
+        jobid, stderr = _cluster(pyscript, **kwargs)
         return jobid, stderr
 
 __all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
