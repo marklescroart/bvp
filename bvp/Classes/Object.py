@@ -120,6 +120,8 @@ class Object(MappedClass):
             into the scene. This is sufficient for most rendering purposes, and minimizes
             the complexity of the scene if you are working within Blender. 
         """
+        # Make file local, if it isn't already
+        self.cloud_download()
         # Optionally link to a specific scene
         scn = bvpu.blender.set_scene(scn)
         if self.name=='DummyObject':

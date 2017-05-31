@@ -49,6 +49,8 @@ class Shadow(MappedClass):
     def place(self, scn=None, scale=None):
         """Adds shadow object to Blender scene
         """
+        # Make file local, if it isn't already
+        self.cloud_download()
         if not scn:
             scn = bpy.context.scene # Get current scene if input not supplied
         if self.name:

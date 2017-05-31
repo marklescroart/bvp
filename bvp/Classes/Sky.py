@@ -159,6 +159,8 @@ class Sky(MappedClass):
     def place(self, number=0, scn=None, scale=None):
         """Adds sky to Blender scene
         """
+        # Make file local, if it isn't already
+        self.cloud_download()
         lamp_ob = []
         if scn is None:
             scn = bpy.context.scene # Get current scene if input not supplied

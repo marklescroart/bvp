@@ -91,7 +91,6 @@ class MappedClass(object):
     
     # Temporary, meant to be overwritten by child classes
     dbi = None
-
     @property
     def path(self):
         if self.dbi is None:
@@ -117,6 +116,12 @@ class MappedClass(object):
                 return os.path.join(self.path, self.fname)
         else:
             return None
+    # @property
+    # def is_local(self):
+    #     return os.path.exists(self.path)
+
+    # @property
+    # def temp_local(self):
 
     # move me to just a property
     def get_docdict(self, rm_fields=()): #('is_verbose', 'fpath', 'datadict')): # remove is_verbose?
@@ -231,6 +236,39 @@ class MappedClass(object):
                 return False, chk[0]
         else:
             return False, chk
+
+    def cloud_download(self, local_dir='/tmp/'):
+        """Retrieve file stored on cloud to local file.
+
+        This specifically download files stored in google drive (looks for 'gdrive' in 
+        `self.path`); other cloud storage types still WIP.
+
+        Parameters
+        ----------
+        local_dir : str
+            path where file will be stored locally (temporarily, maybe?)
+        """
+        if self.path is None:
+            # Nothing to see here (possibly raise exception?)
+            return
+        if not os.path.exists(self.path):
+            import cottoncandy as cc
+            if 'gdrive/' in self.path:
+                gcci = cc.get_interface(backend='gdrive')
+                cloud_dir = self.path.split('gdrive/')[-1]
+            elif 's3/' in self.path:
+                cloud_dir = self.path.split('s3/')[-1]
+                bucket_name = cloud_dir.split('/')[0]
+                cci = cc.get_interface(bucket_name=bucket_name)
+            tmp_dir = os.path.join(local_dir, cloud_dir)
+            if not os.path.exists(tmp_dir):
+                os.makedirs(tmp_dir)
+            cci.download_to_file(os.path.join(cloud_dir, self.fname), os.path.join(tmp_dir, self.fname))
+            # Shouldn't overwrite permanent property permanently...
+            #self.path = tmp_dir
+            self._tmppath = tmp_dir
+        else:
+            print("Doing nothing - file exists locally.")
 
     def save(self, is_overwrite=False):
         """Save the meta-data for this object to docdb database
