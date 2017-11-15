@@ -33,18 +33,18 @@ import json
 from .options import config
 from . import dbqueries
 
-from .Classes.Action import Action
-from .Classes.Background import Background
-from .Classes.Camera import Camera
+from .Classes.action import Action
+from .Classes.background import Background
+from .Classes.camera import Camera
 #from .Classes.Constraint import  ObConstraint, CamConstraint
-from .Classes.Material import Material
-from .Classes.Object import Object
-#from .Classes.RenderOptions import RenderOptions
+from .Classes.material import Material
+from .Classes.object import Object
+#from .Classes.render_options import RenderOptions
 #from .Classes.Scene import Scene
 #from .Classes.SceneList import SceneList
-from .Classes.Shadow import Shadow
+from .Classes.shadow import Shadow
 #from .Classes.Shape import Shape # Move to Object...?
-from .Classes.Sky import Sky
+from .Classes.sky import Sky
 
 try:
     import docdb_lite as docdb
@@ -65,7 +65,7 @@ try:
     # add db queries for bvp stuff
     setattr(docdb.dbqueries, 'bvp', dbqueries)
 except ImportError:
-    print("No docdb_lite present! WTF!") # Make me a better error message
+    print("No docdb_lite present! Database functionality won't work!") # Make me a better error message
 
 # Defaults
 dbhost = config.get('db','dbhost')

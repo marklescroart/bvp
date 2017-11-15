@@ -5,7 +5,7 @@ import os
 import math as bnp
 from six import string_types
 from .. import utils as bvpu
-from .MappedClass import MappedClass
+from .mapped_class import MappedClass
 
 try:
     import bpy

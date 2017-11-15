@@ -2,13 +2,13 @@
 
 # Imports
 import copy
-from .MappedClass import MappedClass
-from .Action import Action
-from .Camera import Camera
-from .Background import Background
-from .Object import Object
-from .Sky import Sky
-from .Shadow import Shadow
+from .mapped_class import MappedClass
+from .action import Action
+from .camera import Camera
+from .background import Background
+from .object import Object
+from .sky import Sky
+from .shadow import Shadow
 
 # TODO: Get rid of all these imports, call e.g. bvpu.basics.fixedKeyDict
 from .. import utils as bvpu

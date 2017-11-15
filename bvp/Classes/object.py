@@ -11,9 +11,9 @@ Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
 import os
 import random
 import warnings
-from .MappedClass import MappedClass
-from .. import utils as bvpu
-from ..options import config
+from .mapped_class import MappedClass
+from bvp import utils as bvpu
+from bvp.options import config
 
 try:
     import bpy

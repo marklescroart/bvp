@@ -91,7 +91,7 @@ class Camera(object):
         #     print('setting lens - this is some dumb shit!')
         #     self.clip = (.1, 500.)
         #     self.lens = 50.
-        # AddCameraWithTarget(scn, name='cam_'+id_name, location=self.location[0], 
+        # add_camera_with_target(scn, name='cam_'+id_name, location=self.location[0], 
         #                             fix_name='camtarget_'+id_name, fix_location=self.fix_location[0], clip=self.clip, lens=self.lens)
 
         # Add camera

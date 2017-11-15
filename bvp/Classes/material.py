@@ -2,13 +2,12 @@
 
 # Imports.
 import os
-from .MappedClass import MappedClass
+from .mapped_class import MappedClass
 
 try:
     import bpy
-    is_blender = True
 except ImportError:
-    is_blender = False
+    pass
 
 # Class def
 class Material(MappedClass):

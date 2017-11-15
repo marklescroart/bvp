@@ -11,7 +11,7 @@ Prints:
 
 import numpy as np
 import bvp
-from bvp import Object
+from bvp.classes.object import Object
 
 threshold = 0.8
 
@@ -64,25 +64,21 @@ def check_compatibility(bg, act, debug=False):
 
 if __name__ == '__main__':
     dbi = bvp.DBInterface()
-    all_bgs = dbi.query(type="Background")
-    all_actions = dbi.query(type="Action")
+    all_bgs = dbi.query(type="Background")[:10]
+    all_actions = dbi.query(type="Action")[:10]
 
     # bg = dbi.query(1, type='Background', name='BG_019_Tent')
     # act = dbi.query(1, type='Action', name='armada_01')
     # ob = dbi.query(semantic_category='human')[0]
 
-    x = len(all_bgs)
-    y = len(all_actions)
+    compat = np.zeros((len(all_bgs), len(all_actions)))
 
-    compat = np.zeros((x,y))
+    for ibg, bg in enumerate(all_bgs):
+        for iact, act in enumerate(all_actions):
+            compat[ibg,iact] += 1*(check_compatibility(bg, act, debug=True))
 
-    for i in range(x):
-        for j in range(y):
-            compat[i,j] += 1*(check_compatibility(all_bgs[i],all_actions[j], debug=True))
-
-    bg_compats = np.sum(compat,axis=1)
-    act_compats = np.sum(compat,axis=0)
-
+    bg_compats = np.sum(compat, axis=1)
+    act_compats = np.sum(compat, axis=0)
 
     bad_bg_indices = np.arange(x)[bg_compats < threshold*x]
     bad_act_indices = np.arange(x)[act_compats < threshold*y]

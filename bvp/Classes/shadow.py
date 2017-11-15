@@ -2,8 +2,8 @@
 
 # Imports.
 import os
-from ..utils.blender import add_group
-from .MappedClass import MappedClass
+from bvp.utils.blender import add_group
+from .mapped_class import MappedClass
 
 try:
     import bpy

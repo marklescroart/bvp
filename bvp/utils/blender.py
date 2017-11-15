@@ -9,43 +9,42 @@ import subprocess
 import warnings
 import copy
 import re
-import math as bnp
+import numpy as np
 from six import string_types
-from .bvpMath import circ_dst # 
+from bvp.utils.bvpMath import circ_dst
 
 #from ..Classes.Constraint import CamConstraint
-from ..options import config
+from bvp.options import config
 
 try:
     import bpy
-    import mathutils as bmu
     is_blender = True
 except ImportError: 
     is_blender = False
 
 verbosity_level = 3 # Get rid of me? Implement in a better way?
 
-def xyz2constr(xyz, ConstrType, originXYZ=(0., 0., 0.)):
+def xyz2constr(xyz, constraint_type, origin_xyz=(0., 0., 0.)):
     """
     Convert a cartesian (xyz) location to a constraint on azimuth 
     angle (theta), elevation angle (phi) or radius (rho).
     
-    originXYZ is the origin of the coordinate system (default=(0, 0, 0))
+    origin_xyz is the origin of the coordinate system (default=(0, 0, 0))
 
     Returns angles in degrees.
     """
     X, Y, Z = xyz
-    oX, oY, oZ = originXYZ
+    oX, oY, oZ = origin_xyz
     X = X-oX
     Y = Y-oY
     Z = Z-oZ
-    if ConstrType.lower() == 'phi':
-        Out = bnp.degrees(bnp.atan2(Z, bnp.sqrt(X**2+Y**2)))
-    elif ConstrType.lower() == 'theta':
-        Out = bnp.degrees(bnp.atan2(Y, X))
-    elif ConstrType.lower() == 'r':
-        Out = (X**2+Y**2+Z**2)**.5
-    return Out
+    if constraint_type.lower() == 'phi':
+        out = np.degrees(np.arctan2(Z, np.sqrt(X**2 + Y**2)))
+    elif constraint_type.lower() == 'theta':
+        out = np.degrees(np.arctan2(Y, X))
+    elif constraint_type.lower() == 'r':
+        out = (X**2 + Y**2 + Z**2)**0.5
+    return out
 
 def make_location_animation(location_list, frames, action_name='ObjectMotion', handle_type='VECTOR'):
     """Create a location-changing action in Blender from a list of frames and XYZ coordinates.
@@ -85,7 +84,7 @@ def make_location_animation(location_list, frames, action_name='ObjectMotion', h
         a.fcurves[iXYZ].extrapolation = 'CONSTANT'
     return a
 
-def AddSelectedToGroup(gNm):
+def add_selected_to_group(gNm):
     """
     Adds all selected objects to group named gNm
     """
@@ -95,7 +94,7 @@ def AddSelectedToGroup(gNm):
     for o in ob:
         G.objects.link(o)
 
-def GetScenesToRender(SL):
+def get_scenes_to_render(SL):
     """Check on which scenes within a scene list have already been rendered.
 
     DEPRECATED?? Overlapping in function with something else? 
@@ -112,16 +111,15 @@ def GetScenesToRender(SL):
             ScnToRender = range(iChk-1, iChk+RenderGrpSize-1)
             return ScnToRender
 
-def SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False):
-    """
-    Usage: SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False)
+def set_no_memory_mode(n_threads=None, n_parts_xy=6, revert=False):
+    """During rendering, sets mode to no undos, 
     During rendering, sets mode to no undos, allows how many threads 
     to specify for rendering (default = auto detect, maybe not the 
     nicest thing to do if rendering is being done on a cluster)
-    Setting Revert=True undoes the changes.
+    Setting revert=True undoes the changes.
     """
     scn = bpy.context.scene
-    if not Revert:
+    if not revert:
         bpy.context.user_preferences.edit.use_global_undo = False
         bpy.context.user_preferences.edit.undo_steps = 0
     else:
@@ -129,30 +127,30 @@ def SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False):
         bpy.context.user_preferences.edit.undo_steps = 32
 
     # Set threading to 1 for running multiple threads on multiple machines:
-    if not nThreads:
+    if not n_threads:
         scn.render.threads_mode = 'AUTO'
     else: 
         scn.render.threads_mode = 'FIXED'
-        scn.render.threads = nThreads
+        scn.render.threads = n_threads
     # More parts to break up rendering...
-    scn.render.tile_x = nPartsXY
-    scn.render.tile_y = nPartsXY
+    scn.render.tile_x = n_parts_xy
+    scn.render.tile_y = n_parts_xy
 
-def RemoveMeshFromMemory(MeshName):
+def remove_mesh_from_memory(mesh_name):
     """
     Removes meshes from memory. Be careful with the use of this function; it can crash Blender to have meshes removed with objects that still rely on them.
     """
-    Mesh = bpy.data.meshes[MeshName]
-    Mesh.user_clear()
-    bpy.data.meshes.remove(Mesh)
+    mesh = bpy.data.meshes[mesh_name]
+    mesh.user_clear()
+    bpy.data.meshes.remove(mesh)
 
-def RemoveActionFromMemory(ActionName):
+def remove_action_from_memory(action_name):
     """
     Removes actions from memory. Called to clear scenes between loading / rendering scenes. Be careful, this can crash Blender! 
     """
-    Act = bpy.data.actions[ActionName]
-    Act.user_clear()
-    bpy.data.actions.remove(Act)
+    act = bpy.data.actions[action_name]
+    act.user_clear()
+    bpy.data.actions.remove(act)
 
 def set_layers(ob, LayerList):
     """ 
@@ -242,7 +240,7 @@ def get_mesh_objects(scn=None, select=True):
             ob.select = True
     return MeOb
 
-def CommitModifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
+def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
     """
     Commits mirror / subsurf / other modifiers to meshes (use before joining meshes)
     
@@ -281,7 +279,7 @@ def CommitModifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
                 print("Applying Subsurf modifier to %s"%(o.name))
             bpy.ops.object.modifier_apply(modifier=m.name)
 
-def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
+def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=False):
     """
     Returns a list of surface point locations for a given object (or group of objects) in a regular grid. 
     Grid size is specified by "size" input.
@@ -298,35 +296,35 @@ def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
     ## Get current scene:
     scn = bpy.context.scene
     # Set up no memory mode: 
-    if not showVox:
+    if not show_vox:
         if verbosity_level>5:
             print('Setting no memory mode!')
-        SetNoMemoryMode()
+        set_no_memory_mode()
     # Recursive call to deal with groups with multiple objects:
     if isinstance(obj, bpy.types.Group):
-        Ct = 0
+        ct = 0
         verts = []
         norms = []
         for o in obj.objects:
-            v, n = getVoxelizedVertList(o, size=size, smooth=smooth, showVox=showVox)
+            v, n = get_voxelized_vert_list(o, size=size, smooth=smooth, show_vox=show_vox)
             verts += v
             norms += n
-        if fNm:
-            if Ct==0:
+        if fname:
+            if ct==0:
                 todo = 'w' # create / overwrite
             else:
                 todo = 'a' # append
-            with open(fNm, todo) as fid:
+            with open(fname, todo) as fid:
                 for v in verts:
                     fid.write('%.5f, %.5f, %.5f\n'%(v[0], v[1], v[2]))
             # Skip normal output! These are fucked anyway!
-            #with open(fNm, todo) as fid:
+            #with open(fname, todo) as fid:
             #   for n in norms:
             #       fid.write('%.5f, %.5f, %.5f\n'%(n[0], n[1], n[2]))
-            Ct+=1
+            ct+=1
         return verts, norms
     ## fix all transforms & modifiers:
-    if showVox:
+    if show_vox:
         obj.hide = obj.hide_render = True
     if not obj.type in ('MESH', 'CURVE', 'SURFACE'):
         # Skip any non-mesh(able) objects
@@ -386,21 +384,21 @@ def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
     bpy.ops.object.mode_set()
     verts = [list(x.co) for x in dup.data.vertices]
     norms = [list(x.normal) for x in dup.data.vertices]
-    if fNm:
-        with open(fNm, 'w') as fid:
+    if fname:
+        with open(fname, 'w') as fid:
             for v in verts:
                 fid.write('%.5f, %.5f, %.5f\n'%(v[0], v[1], v[2]))
         # Skip normal write-out - these are fucked anyway!
-        #with open(fNm+'_Normals.txt', 'w') as fid:
+        #with open(fname+'_Normals.txt', 'w') as fid:
         #   for n in norms:
         #       fid.write('%.5f, %.5f, %.5f\n'%(n[0], n[1], n[2]))
-    if not showVox:
+    if not show_vox:
         scn.objects.unlink(dup)
-        RemoveMeshFromMemory(me.name)
-        #SetNoMemoryMode(Revert=True)
+        remove_mesh_from_memory(me.name)
+        #set_no_memory_mode(revert=True)
     if verbosity_level>4:
         t1=time.time()
-        print('getVoxelizedVertList took %d mins, %.2f secs'%divmod((t1-t0), 60))
+        print('get_voxelized_vert_list took %d mins, %.2f secs'%divmod((t1-t0), 60))
     return verts, norms
 
 def add_img_material(name, imfile, imtype):
@@ -531,20 +529,6 @@ def apply_material(obj, mat, proxy_object=False, uv=True):
         obj.data.materials.append(mat)
     if uv:
         bpy.ops.uv.smart_project()
-
-def set_material(proxy_ob, mat):
-    """DEPRECATED: use apply_material(..., proxy_object=True) Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
-    apply_material(proxy_ob, mat, proxy_object=True, uv=False)
-    # for g in proxy_ob.dupli_group.objects:
-    #     grab_only(proxy_ob)
-    #     if not g.type=='MESH':
-    #         continue
-    #     bpy.ops.object.proxy_make(object=g.name)
-    #     o = bpy.context.object
-    #     for ms in o.material_slots:
-    #         ms.material = mat
-    #     # Get rid of proxy now that material is set
-    #     bpy.context.scene.objects.unlink(o)
 
 def set_scene(scene_name=None):
     """Sets all blender screens in an open Blender session to scene_name
@@ -761,9 +745,9 @@ def get_collada_action(collada_file, act_name=None, scale=1.0):
 ### ---       Adding BVP elements to a scene        --- ###
 ###########################################################
 
-def AddCameraWithTarget(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.], Lens=50., Clip=(.1, 300.)):
+def add_camera_with_target(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.], Lens=50., Clip=(.1, 300.)):
     """
-    Usage: AddCameraWithTarget(scn, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.])
+    Usage: add_camera_with_target(scn, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.])
     Adds a camera to a scene with an empty named <FixName> 
     This is a bit quick & dirty - make sure it grabs the right "camera" data, that it's not duplicating names; also that the scene is handled well
     ML 2011.06.16
@@ -833,11 +817,11 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
 
     LampOut = list()
     # Make parent / master object the first object in the list: 
-    LampCt = 1
+    Lampct = 1
     for L in LampOb:
         scn.objects.link(L)
         LampOut.append(L)
-        LampCt += 1
+        Lampct += 1
     scn.world = nScn.world
     scn.update()
     bpy.data.scenes.remove(nScn)

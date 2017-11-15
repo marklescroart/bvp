@@ -47,18 +47,18 @@ from . import utils
 from .options import config
 
 # Classes
-from .Classes.Action import Action
-from .Classes.Background import Background
-from .Classes.Camera import Camera
-from .Classes.Constraint import  ObConstraint, CamConstraint
-from .Classes.Material import Material
-from .Classes.Object import Object
-from .Classes.RenderOptions import RenderOptions
-from .Classes.Scene import Scene
+from .Classes.action import Action
+from .Classes.background import Background
+from .Classes.camera import Camera
+from .Classes.constraint import  ObConstraint, CamConstraint
+from .Classes.material import Material
+from .Classes.object import Object
+from .Classes.render_options import RenderOptions
+from .Classes.scene import Scene
 #from .Classes.SceneList import SceneList # STILL WIP
-from .Classes.Shadow import Shadow
+from .Classes.shadow import Shadow
 #from .Classes.Shape import Shape # STILL WIP Move to Object...?
-from .Classes.Sky import Sky
+from .Classes.sky import Sky
 
 from . import DB
 from . import files

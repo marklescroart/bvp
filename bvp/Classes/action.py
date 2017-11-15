@@ -1,7 +1,7 @@
 # Imports
 import os
 import numpy as np
-from .MappedClass import MappedClass
+from .mapped_class import MappedClass
 from .. import utils as bvpu
 from ..options import config
 

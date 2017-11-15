@@ -1,82 +1,65 @@
-"""BVP Math utilities
+"""BVP Math utilities"""
 
-Depends on numpy
-"""
+from __future__import division
 
-import math as bnp
-from .basics import make_blender_safe
-# Alternative runtime environments
-# always numpy now (as of 2014.11 [or much earlier...])
 import numpy as np
-MatrixFn = np.matrix
+
+from .basics import make_blender_safe
+
 def VectorFn(a):
     b = np.array(a)
     b.shape = (len(a), 1)
     return b
-GetInverse = np.linalg.pinv
 def lst(a):
     a = np.array(a)
     return list(a.flatten())
-pi = np.pi
-# else:
-#   # Better be working within Blender...
-#   import mathutils as bmu
-#   from math import pio
-#   MatrixFn = bmu.Matrix
-#   VectorFn = bmu.Vector
-#   GetInverse = lambda x: x.inverted()
-#   lst = list
-
-# Math functions
-def listMean(a):
-    """
-    mean function for lists
-    """
-    return sum(a)/float(len(a))
 
 def circ_avg(a, b):
     """
     Circular average of two values (in DEGREES)
     """
-    Tmp = bnp.e**(1j*a/180.*bnp.pi)+bnp.e**(1j*b/180.*bnp.pi)
-    Mean = bnp.atan2(Tmp.imag, Tmp.real)/bnp.pi*180.
+    Tmp = np.e**(1j*a/180.*np.pi)+np.e**(1j*b/180.*np.pi)
+    Mean = np.arctan2(Tmp.imag, Tmp.real)/np.pi*180.
     return Mean
 
-def circ_dst(a, b):
+def circ_dist(a, b, degrees=True):
+    """Compute angle between two angles w/ circular statistics
+
+    
     """
-    Angle between two angles
-    """
-    cPh = bnp.e**(1j*a/180*bnp.pi) / bnp.e**(1j*b/180*bnp.pi)
-    cDst = bnp.degrees(bnp.atan2(cPh.imag, cPh.real))
-    return cDst
+    phase = np.e**(1j*a/180*np.pi) / np.e**(1j*b/180*np.pi)
+    dist = np.degrees(np.arctan2(phase.imag, phase.real))
+    return dist
 
 def vecDist(a, b):
     d = np.linalg.norm(np.array(a)-np.array(b))
     d = make_blender_safe(d, 'float')
     return d
 
-def cosd(theta):
-    theta = bnp.radians(theta)
-    return bnp.cos(theta)
-
+# Lazy man functions
 def sind(theta):
-    theta = bnp.radians(theta)
-    return bnp.sin(theta)
+    return np.sin(np.radians(theta))
+
+def cosd(theta):
+    return np.cos(np.radians(theta))
 
 def tand(theta):
-    theta = bnp.radians(theta)
-    return bnp.tan(theta)
+    return np.tan(np.radians(theta))
 
 def atand(theta):
-    return bnp.degrees(bnp.atan(theta))
+    return np.degrees(np.arctan(theta))
 
 def sph2cart(r, az, elev):
-    """
-    Usage: x, y, z = sph2cart(r, az, elev)
-    Or:    x, y, z = sph2cart(r, theta, phi)
-    Converts spherical to cartesian coordinates. Azimuth and elevation angles in degrees.
+    """Convert spherical to cartesian coordinates
 
-    ML 2011.10.13
+    Parameters
+    ----------
+    r : scalar or array-like
+        radius
+    az : scalar or array-like
+        azimuth angle in degrees
+    elev : scalar or array-like
+        elevation angle in degrees
     """
     z = r * sind(elev);
     rcoselev = r * cosd(elev);
@@ -84,104 +67,85 @@ def sph2cart(r, az, elev):
     y = rcoselev * sind(az);
     return x, y, z
 
-def cart2sph(x, y, z):
-    """
-    Usage: r, theta, phi = cart2sph(x, y, z)
-    Convert cartesian to spherical coordinates (degrees)
-    """
-    r = (x**2+y**2+z**2)**.5
-    theta = bnp.degrees(bnp.atan2(y, x))
-    phi = bnp.degrees(bnp.asin(z/r))
-    return r, theta, phi
+def cart2sph(x, y, z, degrees=True):
+    """Convert cartesian to spherical coordinates
 
-def AddLists(a, b):
+    Parameters
+    ----------
+    x, y, z : scalar or array-like
+        X, Y, and Z coordinates to be converted
+    degrees : bool
+        whether to convert radians to degrees (True= result in degrees, False = result in radians)
     """
-    element-wise addition of two lists. 
-    """
-    if len(b) != len(a):
-        if len(a[0]==len(b)):
-            b = [b]*len(a)
-        elif len(b[0]==len(a)):
-            a = [a]*len(b)
-        else:
-            raise Exception('Incompatible list sizes!')
-    c = [(np.array(aa)+np.array(bb)).tolist() for aa, bb in zip(a, b)]
-    return c
+    r = (x**2 + y**2 + z**2)**0.5
+    theta = np.arctan2(y, x)
+    phi = np.arcsin(z / r)
+    if degrees:
+        return r, np.degrees(theta), np.degrees(phi)
+    else:
+        return r, theta, phi
 
-def CirclePos(radius, nPos, x_center=0, y_center=0, Direction='BotCCW'):
-        """
-        Usage: Pos = mlCirclePos(radius, nPos [, x_center, y_center, Direction])
-        
-        Returns coordinates for [nPos] points around a circle of radius [radius], 
-        centered on [x_center, y_center]. Coordinates returned in [Pos], an nPos 
-        by 2 matrix of [x, y] values. 
-        
-        Inputs: radius = Radius of the circle. Either one value or nPos values.
-                  nPos = number of positions around the circle
-              x_center = duh (defaults to 512)
-              y_center = duh (defaults to 384)
-             Direction = String specifying direction of points around circle - 
-                        either 'BotCCW' (botom Counter-Clockwise), 'BotCW'
-                        (bottom Clockwise), 'TopCCW', or 'TopCW' (Defaults to
-                        'BotCCW')
-                        * Note that Right and Left CW or CCW can be obtained
-                        by switching x and y
-        
-        See function text at the bottom for example usage.
-        
-        Created by ML on ??/??/2007
-        Adapted for python by ML on 06/01/2011
-        No-Numpy version by ML on 2012.02.01
-        """
-        
-        if (isinstance(radius, type(list())) and len(radius)==1):
-            radius = radius*nPos #np.tile(radius, (nPos, 1))
-        elif isinstance(radius, (type(1.0), type(1))):
-            radius = [radius]*nPos
-        
-        #iPos = 0;
-        Deg = 360./nPos
-        Ticks = [ii*Deg for ii in range(nPos)]
-        #Pos = np.nan * np.ones((nPos, 2))
-        PosX = []
-        PosY = []
-        for iPos, tt in enumerate(Ticks):
-            PosX.append(radius[iPos]*sind(tt) + x_center)
-            PosY.append(-radius[iPos]*cosd(tt) + y_center)
-            #iPos += 1
-        del tt
-        del iPos
-        
-        if Direction.upper()=='BOTCCW':
-            0; # Do nothing - it's set this way anyway.
-        elif Direction.upper()=='BOTCW':
-            # reverse order of Y values
-            PosY.reverse()
-        elif Direction.upper()=='TOPCCW':
-            # Keep top position (Pos[1, :]), and invert the rest of the Y values
-            pxRev = copy.copy(PosX)
-            pxRev.reverse()         
-            pyRev = copy.copy(PosY)
-            pyRev.reverse()
+# def AddLists(a, b):
+#     """element-wise addition of two lists. 
+#     """
+#     if len(b) != len(a):
+#         if len(a[0]==len(b)):
+#             b = [b]*len(a)
+#         elif len(b[0]==len(a)):
+#             a = [a]*len(b)
+#         else:
+#             raise Exception('Incompatible list sizes!')
+#     c = [(np.array(aa)+np.array(bb)).tolist() for aa, bb in zip(a, b)]
+#     return c
 
-            PosX = [PosX[0]]+pxRev[:-1]
-            PosY = [PosY[0]]+pyRev[:-1]
-            """
-            Pos = np.concatenate(
-                (Pos[0, :], Pos[::-1, :]), 
-                axis=0)
-            Pos[:, 1] = -(Pos[:, 1]-y_center) + y_center;
-            """
-        elif Direction.upper()=='TOPCW':
-            Pos[:, 1] = -(Pos[:, 2]-y_center) + y_center;
-            #Pos(:, 2) = -Pos(:, 2);
-        Pos = [[x, y] for x, y in zip(PosX, PosY)]
-        return Pos
-
-def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
-    """
-    Usage: imPos_Top, imPos_Bot, imPos_L, imPos_R = PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.))
+def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
+    '''Return points in a circle. 
     
+    Parameters
+    ----------
+    radius : scalar 
+        Radius of the circle. Either one value or n_positions values.
+    n_positions : int 
+        number of positions around the circle
+    x_center : scalar
+        Defaults to 0
+    y_center : scalar
+        Defaults to 0
+    direction : string 
+        Specifies direction of points around circle - 
+            'BotCCW' - start from bottom, go Counter-Clockwise, [default]
+            'BotCW' - start from bottom, go Clockwise,
+            'TopCCW' - top, Counter-Clockwise
+            'TopCW' - top, Clockwise
+        * Note that Right and Left CW or CCW can be obtained
+        by switching x and y
+        
+    '''
+    if (isinstance(radius, list) and len(radius)==1) or isinstance(radius, (float, int)):
+        radius = np.tile(radius, (n_positions, 1))
+    
+    circ_pos = np.nan * np.ones((n_positions, 2))
+    for ii, tt in enumerate(np.arange(0, 360., 360./n_positions)):
+        circ_pos[ii, 0] = radius[ii]*_sind(tt) + x_center
+        circ_pos[ii, 1] = -radius[ii]*_cosd(tt) + y_center
+        ii += 1
+        
+    if direction.upper()=='BOTCCW':
+        pass # default
+    elif direction.upper()=='BOTCW':
+        # reverse order of Y values
+        circ_pos[:, 1] = circ_pos[::-1, 1]
+    elif direction.upper()=='TOPCCW':
+        # Keep top position (circ_pos[1, :]), and invert the rest of the Y values
+        circ_pos = np.vstack((circ_pos[:1, :], circ_pos[::-1, :]))
+        circ_pos[:, 1] = -(circ_pos[:, 1]-y_center) + y_center
+    elif direction.upper()=='TOPCW':
+        circ_pos[:, 1] = -(circ_pos[:, 2]-y_center) + y_center
+    return circ_pos
+
+
+def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
+    """
     Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
@@ -270,28 +234,28 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_lo
     x, y, z = 0, 1, 2
     if Flag['Handedness'].lower() == 'left':
         # X rotation
-        xRot = MatrixFn([[1., 0., 0.], 
+        xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), -sind(cTheta[x])], 
             [0., sind(cTheta[x]), cosd(cTheta[x])]])
         # Y rotation
-        yRot = MatrixFn([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
+        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
             [0., 1., 0.], 
             [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
         # Z rotation
-        zRot = MatrixFn([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
+        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
             [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
     elif Flag['Handedness'].lower() == 'right':
         # X rotation
-        xRot = MatrixFn([[1., 0., 0.], 
+        xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), sind(cTheta[x])], 
             [0., -sind(cTheta[x]), cosd(cTheta[x])]])
         # Y rotation
-        yRot = MatrixFn([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
+        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
             [0., 1., 0.], 
             [sind(cTheta[y]), 0., cosd(cTheta[y])]])
         # Z rotation
-        zRot = MatrixFn([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
+        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
             [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
     else: 
@@ -373,28 +337,28 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
     # Complication?: zero rotation in blender is DOWN, zero rotation for this computation seems to be UP
     if Handedness == 'Left':
         # X rotation
-        xRot = MatrixFn([[1., 0., 0.], 
+        xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), -sind(cTheta[x])], 
             [0., sind(cTheta[x]), cosd(cTheta[x])]])
         # Y rotation
-        yRot = MatrixFn([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
+        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
             [0., 1., 0.], 
             [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
         # Z rotation
-        zRot = MatrixFn([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
+        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
             [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
     elif Handedness == 'Right':
         # X rotation
-        xRot = MatrixFn([[1., 0., 0.], 
+        xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), sind(cTheta[x])], 
             [0., -sind(cTheta[x]), cosd(cTheta[x])]])
         # Y rotation
-        yRot = MatrixFn([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
+        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
             [0., 1., 0.], 
             [sind(cTheta[y]), 0., cosd(cTheta[y])]])
         # Z rotation
-        zRot = MatrixFn([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
+        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
             [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])      
     else: 
