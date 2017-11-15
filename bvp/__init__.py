@@ -38,8 +38,10 @@ __version__ = '0.2a'
 # Imports
 import re
 import os
+import six
 import uuid
 import time
+import textwrap
 import subprocess
 from . import utils 
 from .options import config
@@ -99,6 +101,8 @@ def _cluster_orig(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
+    if six.PY3:
+        cmd = cmd.encode()
     stdout, stderr = clust.communicate(cmd)
     print(stdout)
     print(stderr)
@@ -113,11 +117,38 @@ def _get_uuid():
 bvp_cluster_script = """
 import bvp
 tmp_script = '''{script}'''
-bvp.blend(tmp_script, is_local=True, blend_file="{blend_file}", is_verbose={is_verbose})
+stdout, stderr = bvp.blend(tmp_script, is_local=True, blend_file="{blend_file}", is_verbose={is_verbose})
+done = False
+if stderr:
+    break_str = '='*50
+    chk = stderr.split('\\n')
+    # Exclude INFO lines in error file:
+    chk1 = [c for c in chk if not c=='' and not c[:5]=='INFO:']
+    if len(chk1)==0:
+        done = True
+    else:
+        # Exclude Warning lines in error file:
+        chk2 = [c for c in chk1 if not c=='' and not 'Warning' in c and not 'WARNING' in c and not c[:3]=='Fra']
+        print('%s\\nFiltered error output:\\n%s'%(break_str, break_str))
+        for c in chk2:
+            print(c)
+        if len(chk2)==1:
+            print('%s\\nCode output (Warning detected!):\\n%s'%(break_str, break_str))
+            print(stderr)
+            done = True
+    if not done:
+        # OK, the error was real:
+        print('%s\\nCode output:\\n%s'%(break_str, break_str))
+        #print(out)
+        print("(Suppressed)")
+        print('%s\\nError output:\\n%s'%(break_str,break_str))
+        print(stderr)
+        raise Exception('Python error in Blender script! See above.')
+
 """
 
 def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_node_%N_job_%j.out',
-    slurm_err=True, job_name=None, dep=None, mem=30, ncpus=3, partition='regular'):
+    slurm_err=True, job_name=None, dep=None, mem=30, ncpus=3, partition='regular', instant_buffer_write=True):
     """Run a python script on the cluster.
     
     Parameters
@@ -156,9 +187,10 @@ def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_nod
         error_handling = ""
     else:
         errfile = os.path.join(logdir, slurm_err)
-        error_handling = """
+        error_handling = textwrap.dedent(
+        """
         # Cleanup error files
-        import socket,os
+        import socket, os
         ef = '{slurm_err}'.replace('%j',os.getenv('SLURM_JOB_ID'))
         ef = ef.replace('%N',socket.gethostname())
         with open(ef,'r') as fid:
@@ -169,14 +201,15 @@ def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_nod
             os.unlink(ef)
         else:
             print('Cleanup -> removing ' + ef)
-            os.unlink(ef)
-        """.format(slurm_err=errfile) # write error file locally
+            #os.unlink(ef)
+        """).format(slurm_err=errfile) # write error file locally
         
     # Create full script     
     python_script = header + script + error_handling
-    script_name = os.path.join(logdir, "{}_{}.py".format(job_name, _get_uuid()))
-    with open(script_name, "w") as fp:
-        fp.write(python_script)
+    if instant_buffer_write:
+        script_name = os.path.join(logdir, "{}_{}.py".format(job_name, _get_uuid()))
+        with open(script_name, "w") as fp:
+            fp.write(python_script)
 
     # Create slurm command
     slurm_cmd = ['sbatch', 
@@ -189,23 +222,30 @@ def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_nod
         slurm_cmd += ['-d', dep]
     if not slurm_err is None:
         slurm_cmd += ['-e', errfile]
-
-    # Force immediate buffer write
-    slurm_script = """#!/bin/bash
-    #SBATCH
-    stdbuf -o0 -e0 python {script_name}
-    echo "Job finished! cleanup:"
-    echo "removing {script_name}"
-    rm {script_name}
-    """.format(script_name=script_name)
+    if instant_buffer_write:
+        # Force immediate buffer write
+        slurm_script = textwrap.dedent(
+        """#!/bin/bash
+        #SBATCH
+        stdbuf -o0 -e0 python {script_name}
+        echo "Job finished! cleanup:"
+        echo "removing {script_name}"
+        rm {script_name}
+        """).format(script_name=script_name)
+    else:
+        slurm_script = python_script
 
     # Call slurm
     clust = subprocess.Popen(slurm_cmd,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE)
+    if six.PY3:
+        slurm_script = slurm_script.encode()    
     stdout, stderr = clust.communicate(slurm_script)
-
+    if six.PY3:
+        stdout = stdout.decode()
+        stderr = stderr.decode()
     # Retrieve job ID
     try:
         job_id = re.search('(?<=Submitted batch job )[0-9]*',stdout).group()
@@ -269,7 +309,10 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
         #if is_verbose:
         #    print('Calling via cluster: %s'%(' '.join(blender_cmd)))
         #jobid, stderr = _cluster_orig(blender_cmd, **kwargs)
+        #if instant_buffer_write:
         pyscript = bvp_cluster_script.format(script=script, blend_file=blend_file, is_verbose=is_verbose)
+        #else:
+        #    pyscript = script
         jobid, stderr = _cluster(pyscript, **kwargs)
         return jobid, stderr
 

@@ -486,13 +486,18 @@ def add_img_background(imfile, imtype='FILE', scn=None):
         img = bpy.data.images[imfile]
     else:
         from bpy_extras.image_utils import load_image
-        img = load_image(imfile)
-        img.source = imtype.upper()    
+        if isinstance(imfile, list):
+            img = load_image(imfile[0])
+        else:
+            img = load_image(imfile)
+        img.source = imtype.upper()
     # Base node
     RL = scn.node_tree.nodes.new(type=RLayerNode)
     # Image node
     img_node = scn.node_tree.nodes.new(type=ImageNode)
     img_node.image = img
+    if imtype=='SEQUENCE':
+        img_node.frame_duration = len(imfile)
     # Mix node
     mix_node = scn.node_tree.nodes.new(type=MixNode)
     # Output
