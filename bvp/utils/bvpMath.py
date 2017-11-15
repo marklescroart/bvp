@@ -21,7 +21,7 @@ pi = np.pi
 # else:
 #   # Better be working within Blender...
 #   import mathutils as bmu
-#   from math import pi
+#   from math import pio
 #   MatrixFn = bmu.Matrix
 #   VectorFn = bmu.Vector
 #   GetInverse = lambda x: x.inverted()
@@ -178,7 +178,7 @@ def CirclePos(radius, nPos, x_center=0, y_center=0, Direction='BotCCW'):
         Pos = [[x, y] for x, y in zip(PosX, PosY)]
         return Pos
 
-def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)): 
+def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
     """
     Usage: imPos_Top, imPos_Bot, imPos_L, imPos_R = PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.))
     
@@ -195,7 +195,8 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)):
         Should contain a list of (x, y, z) camera and fixation positions for n frames
     ImSz : tuple or list
         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
-    
+    frame_index : Int
+        Which frame in camera's frame list to compute the projection for
 
     Created by ML 2011.10.06
     """
@@ -219,15 +220,25 @@ def PerspectiveProj(bvpObj, bvpCam, ImSz=(1., 1.)):
     
     """
     ImDist = 32. # Blender assumption - see above!
-    FOV = 2*atand(ImDist/(2*bvpCam.lens))
+    if cam_lens is not None:
+        FOV = 2*atand(ImDist/(2*cam_lens))
+    else:
+        FOV = 2*atand(ImDist/(2*bvpCam.lens))
 
     objPos = bvpObj.pos3D
-    camPos = bvpCam.location
-    fixPos = bvpCam.fixPos
+    if cam_location is not None:
+        camPos = cam_location
+    else:
+        camPos = bvpCam.location[0]
+    if cam_fix_location is not None:
+        fix_location = cam_fix_location
+    else:
+        fix_location = bvpCam.fix_location[0]
+    
     # Convert to vector
-    cPos = VectorFn(camPos[0]) # Only do this wrt first frame for now!
+    cPos = VectorFn(camPos)
     #cPos.shape = (3, 1) 
-    fPos = VectorFn(fixPos[0])
+    fPos = VectorFn(fix_location)
     #fPos.shape = (3, 1)
     oPos = VectorFn(objPos) #np.array(bvpObj.pos3D) 
     # Prep for shift in L, R directions (wrt camera)
@@ -356,8 +367,8 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
         # ensure that Z < 0
         Z = -Z
     cPos = VectorFn(bvpCam.location[0]) 
-    fixPos = VectorFn(bvpCam.fixPos[0])
-    cTheta = vec2eulerXYZ(lst(fixPos-cPos))
+    fix_location = VectorFn(bvpCam.fix_location[0])
+    cTheta = vec2eulerXYZ(lst(fix_location-cPos))
     cTheta = VectorFn(cTheta)
     # Complication?: zero rotation in blender is DOWN, zero rotation for this computation seems to be UP
     if Handedness == 'Left':
@@ -516,8 +527,8 @@ class ImPosCount(object):
         r = np.random.rand()
         i = min(np.nonzero(r<cumP)[0])
         keep = idx[i]
-        yAdd = self.yBin[np.floor(keep/(len(self.yBin)-1))]
-        xAdd = self.xBin[np.mod(keep, len(self.xBin)-1)]
+        yAdd = self.yBin[int( np.floor(keep/(len(self.yBin)-1)) )]
+        xAdd = self.xBin[int( np.mod(keep, len(self.xBin)-1) )]
         x = xp+xAdd
         y = yp+yAdd
         return make_blender_safe(x, 'float'), make_blender_safe(y, 'float')
@@ -570,7 +581,7 @@ class ImPosCount(object):
     def noisyAdjPinv(self):
         p = self.adjPinv #.flatten()
         # The minimum here effectively sets the minimum likelihood for drawing a position.
-        n = np.random.randn(self.nBins**.5, self.nBins**.5)*.001
+        n = np.random.randn(int(self.nBins**.5), int(self.nBins**.5))*.001
         p += n
         p -= np.min(p)
         p /= np.sum(p)

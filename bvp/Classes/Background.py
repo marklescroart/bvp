@@ -3,8 +3,8 @@ import os
 from ..utils.blender import add_group
 from .Constraint import ObConstraint, CamConstraint
 from .MappedClass import MappedClass
+from .Object import Object
 # Should be moved, along with test below
-#from .Object import Object
 #from .Camera import Camera
 #from .Scene import Scene
 #from .Sky import Sky
@@ -32,7 +32,7 @@ class Background(MappedClass):
         bounds of space, what have you) should be in this group. 
         
         Parameters
-        ----------
+        ---------
         name: string 
             a unique identifier for the BG in question. Either a string 
                 (interpreted to be the name of the BG group) or a lambda function
@@ -53,6 +53,23 @@ class Background(MappedClass):
         self._temp_fields = []
         self._data_fields = []
         self._db_fields = []
+        
+        #mappedclass translation is not recursive, so we must set these manually. 
+        #TODO Utkarsh: find better solution to this
+        self.CamConstraint = CamConstraint()
+        if camera_constraints:
+            for k in camera_constraints.keys():
+                setattr(self.CamConstraint,k,camera_constraints[k])
+        
+        self.obConstraints = ObConstraint()
+        if object_constraints:
+            print(object_constraints)
+            for k in object_constraints.keys():
+                setattr(self.obConstraints,k,object_constraints[k])
+
+        if obstacles:
+            print(obstacles)
+            self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] #TODO: SemanticCat =/= semantic_category. Fix this at some point.
 
     def place(self, scn=None):
         """

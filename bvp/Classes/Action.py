@@ -94,6 +94,7 @@ class Action(MappedClass):
                     setattr(self, k, v)        # Set _temp_params, etc.
         self._temp_fields = []
         self._data_fields = []
+        # self.motion_trajectory = [(0,0,0) for i in range(5)]
 
     def save(self, context):
         """Save Action to database; must be called inside an active Blender session"""

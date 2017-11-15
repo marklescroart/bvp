@@ -13,7 +13,7 @@ import random
 import warnings
 from .MappedClass import MappedClass
 from .. import utils as bvpu
-from ..options import config 
+from ..options import config
 
 try:
     import bpy
@@ -106,7 +106,7 @@ class Object(MappedClass):
         if self.n_vertices:
             S+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
         return(S)
-
+ 
     def place(self, scn=None, proxy=True):
         """Places object into Blender scene, with pose & animation information
 
@@ -264,3 +264,170 @@ class Object(MappedClass):
         # (IMPORTANT: otherwise Blender may puke and die with next command)
         bpy.ops.object.posemode_toggle()
 
+    @property
+    def max_xyz_pos(self):
+        """Returns the maximum x,y,z coordinates of an object
+
+        If the object has an action, then the action's max_xyz is added to the object's coordinates. If not, then the object's coordinates are returned as is.
+
+        TODO: Include error handling. Possibly make the bounding box a complete class of its own.
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        (x,y,z): 3-tuple of the object's maximum x,y, and z coordinates respectively.
+        """
+        #
+        if self.action:
+            sf = self.size3D/10
+            return (sf*self.action.max_xyz[0] + self.pos3D[0],sf*self.action.max_xyz[1] + self.pos3D[1],sf*self.action.max_xyz[2] + self.pos3D[2])
+        else:
+            return self.pos3D
+
+    @property
+    def min_xyz_pos(self):
+        """Returns the minimum x,y,z coordinates of an object
+
+        If the object has an action, then the action's min_xyz is added to the object's coordinates. If not, then the object's coordinates are returned as is.
+
+        TODO: Include error handling. Possibly make the bounding box a complete class of its own.
+
+        Parameters
+        ----------
+        self: self
+
+        Returns
+        -------
+        (x,y,z): 3-tuple of the object's minimum x,y, and z coordinates respectively.
+        """
+        #
+        sf = self.size3D/10
+        if self.action:
+            return (sf*self.action.min_xyz[0] + self.pos3D[0],sf*self.action.min_xyz[1] + self.pos3D[1],sf*self.action.min_xyz[2] + self.pos3D[2])
+        else:
+            return self.pos3D
+
+    @property
+    def bounding_box_center(self):
+        """Calculates the center for the object's bounding box by averaging the max and min positions.
+
+        The bounding box for the object is defined as an xyz-aligned cuboid with one vertex as the max position, and its diagonally opposite vertex as the min position. This function calculates its center
+
+        TODO: Include error handling. Possibly make the bounding box a complete class of its own.
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        (x,y,z): 3-tuple of the x,y,z coordinates of the center of the object's bounding box.
+        """   
+        # 
+        if self.action is not None:
+            return self.pos3D
+        else:
+            max_pos =  self.max_xyz_pos
+            min_pos =  self.min_xyz_pos
+            return ((max_pos[0]+min_pos[0])/2,(max_pos[1]+min_pos[1])/2,(max_pos[2]+min_pos[2])/2)
+
+    @property
+    def bounding_box_dimensions(self):
+        """Calculates the dimensions for the object's bounding box by differencing the max and min positions.
+
+        The bounding box for the object is defined as an xyz-aligned cuboid with one vertex as the max position, and its diagonally opposite vertex as the min position. This function calculates its dimensions
+
+        TODO: Include error handling. Possibly make the bounding box a complete class of its own.
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        (x,y,z): 3-tuple of the the x,y,z dimensions of the object's bounding box
+        """
+        # 
+        max_pos =  self.max_xyz_pos
+        min_pos =  self.min_xyz_pos
+        return ((max_pos[0]-min_pos[0])+self.size3D,(max_pos[1]-min_pos[1])+self.size3D,(max_pos[2]-min_pos[2])+self.size3D)
+
+    def collides_with(self, ob2):
+        """Returns whether or not this object's bounding box collides  with the bounding box of ob2
+
+        The bounding box for the object is defined as an xyz-aligned cuboid with one vertex as the max position, and its diagonally opposite vertex as the min position. This function calculates its dimensions
+
+        TODO: Include error handling. Possibly make the bounding box a complete class of its own.
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        Bool collides: True if there are collisions, False if there are none.
+        """
+        # 
+        c1 = self.bounding_box_center
+        d1 = self.bounding_box_dimensions
+        c2 = ob2.bounding_box_center
+        d2 = ob2.bounding_box_dimensions
+        
+        x_collision = abs(c1[0]-c2[0]) < (d1[0]+d2[0])/2
+        y_collision = abs(c1[1]-c2[1]) < (d1[1]+d2[1])/2
+        z_collision = abs(c1[2]-c2[2]) < (d1[2]+d2[2])/2
+
+        collides = x_collision and y_collision and z_collision
+
+        return collides
+
+    @property
+    def min_xyz_trajectory(self):
+        """Returns the min point of the object's bounding box at some points on the trajectory of its motion in xyz
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        List of tuples: list of (default 5) positions at equally spaced points in time
+        """
+        pos = self.pos3D
+        if self.action:
+            sf = self.size3D/10
+            min_points = self.action.min_xyz_trajectory
+            return [(pos[0]+sf*pt[0], pos[1]+sf*pt[1], pos[2]+sf*pt[2]) for pt in min_points]
+        else:
+            return [self.pos3D]
+
+    @property
+    def max_xyz_trajectory(self):
+        """Returns the max point of the object's bounding box at some points on the trajectory of its motion in xyz
+
+        Parameters
+        ----------
+        self: self
+        
+        Returns
+        -------
+        List of tuples: list of (default 5) positions at equally spaced points in time
+        """
+        pos = self.pos3D
+        if self.action:
+            sf = self.size3D/10
+            max_points = self.action.max_xyz_trajectory
+            return [(pos[0]+sf*pt[0], pos[1]+sf*pt[1], pos[2]+sf*pt[2]) for pt in max_points]
+        else:
+            return [self.pos3D]
+
+    @property
+    def xyz_trajectory(self):
+        min_pt = self.min_xyz_trajectory
+        max_pt = self.max_xyz_trajectory
+        pos = self.pos3D
+        return [((mi[0]+ma[0])/2,(mi[1]+ma[1])/2, mi[2]) for mi, ma in zip(min_pt, max_pt)]
+    
