@@ -446,6 +446,63 @@ def add_img_material(name, imfile, imtype):
     mat.texture_slots[0].texture = tex
     return mat
 
+# LAZY SHIT MOVE ME
+RLayerNode = 'CompositorNodeRLayers' 
+CompositorNode = 'CompositorNodeComposite'
+OutputFileNode = 'CompositorNodeOutputFile'
+ViewerNode = 'CompositorNodeViewer'
+SepRGBANode = 'CompositorNodeSepRGBA'
+CombRGBANode = 'CompositorNodeCombRGBA'
+IDmaskNode = 'CompositorNodeIDMask'
+MathNode = 'CompositorNodeMath'
+MixNode = 'CompositorNodeMixRGB'
+ImageNode = 'CompositorNodeImage'
+
+
+def add_img_background(imfile, imtype='FILE', scn=None):
+    """Add a background image to a blender scene (to be rendered)
+
+    Currently re-sets entire scene node setup. Perhaps not desirable.
+    """
+    if scn is None:
+        # Get current scene if input not supplied
+        scn = bpy.context.scene
+    scn.use_nodes = True
+    if scn.render.engine=='BLENDER_RENDER':
+        scn.render.alpha_mode = 'TRANSPARENT' # If blender render
+    else:
+        raise Exception("Untested with cycles! hold your horses!")
+    # Re-set all nodes and render layers
+    for n in scn.node_tree.nodes:
+        scn.node_tree.nodes.remove(n)
+    old_render_layers = bpy.context.scene.render.layers.keys()
+    bpy.ops.scene.render_layer_add()
+    for ii in range(len(old_render_layers)):
+        bpy.context.scene.render.layers.active_index = 0
+        bpy.ops.scene.render_layer_remove()
+    bpy.context.scene.render.layers[0].name = 'RenderLayer'
+    # Load image (if not present already)
+    if imfile in [i.name for i in bpy.data.images]:
+        img = bpy.data.images[imfile]
+    else:
+        from bpy_extras.image_utils import load_image
+        img = load_image(imfile)
+        img.source = imtype.upper()    
+    # Base node
+    RL = scn.node_tree.nodes.new(type=RLayerNode)
+    # Image node
+    img_node = scn.node_tree.nodes.new(type=ImageNode)
+    img_node.image = img
+    # Mix node
+    mix_node = scn.node_tree.nodes.new(type=MixNode)
+    # Output
+    compositor_output = scn.node_tree.nodes.new(type=CompositorNode)
+    # Connections
+    scn.node_tree.links.new(RL.outputs['Alpha'], mix_node.inputs['Fac'])
+    scn.node_tree.links.new(RL.outputs['Image'], mix_node.inputs[2])
+    scn.node_tree.links.new(img_node.outputs['Image'], mix_node.inputs[1])
+    scn.node_tree.links.new(mix_node.outputs['Image'], compositor_output.inputs['Image'])
+
 def set_material(proxy_ob, mat):
     """Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
     for g in proxy_ob.dupli_group.objects:

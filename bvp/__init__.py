@@ -59,18 +59,25 @@ from .Classes.Shadow import Shadow
 from .Classes.Sky import Sky
 
 from . import DB
+from . import files
 from .DB import DBInterface
 
 # NOTE: UPDATE LIST BELOW WHEN CLASSES ARE ALL DONE
 
 bvp_dir = os.path.dirname(__file__)
 
-def set_scn(fname='bvp_test'):
+def set_scn(fname='bvp_test', ropts=None, cam=None, sky=None):
     """Quickie default setup of camera + lighting for an object
     """    
-    scn = Scene(camera=Camera(), sky=Sky(), fname=fname)
-    scn.create()
-    scn.apply_opts(render_options=RenderOptions())
+    if cam is None:
+        cam = Camera()
+    if ropts is None:
+        ropts = RenderOptions()
+    if sky is None:
+        sky = Sky()
+
+    scn = Scene(camera=cam, sky=sky, fname=fname)
+    scn.create(render_options=ropts)
     return scn
 
 ## -- Useful functions -- ##
@@ -268,4 +275,4 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
 
 __all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
            'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
-           'utils','config'] 
+           'utils','config', 'files'] 
