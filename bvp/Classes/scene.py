@@ -11,11 +11,11 @@ from .sky import Sky
 from .shadow import Shadow
 
 # TODO: Get rid of all these imports, call e.g. bvpu.basics.fixedKeyDict
-from .. import utils as bvpu
-from ..utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent version of linspace
-from ..utils.blender import set_cursor
-from ..utils.bvpMath import ImPosCount
-from ..options import config
+from bvp import utils as bvpu
+from bvp.utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent version of linspace
+from bvp.utils.blender import set_cursor
+from bvp.utils.math import ImPosCount
+from bvp.options import config
 
 import numpy as np
 
@@ -28,46 +28,7 @@ except ImportError:
 DEFAULT_FRAME_RATE = int(config.get('render','frame_rate'))
 
 class Scene(MappedClass):
-    """Class for storing an abstraction of a Blender scene. 
-
-    Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
-    position, animation) in the scene. Scenes in .blend files can be created on the fly from these 
-    objects, for rendering or inspection (in an interactive Blender session). 
-    
-    Parameters
-    ----------
-    number : scalar
-        Scene number (one-based by convention) within a list of scenes. Determines default scene name.
-    objects : list of bvpObjects | None
-        Objects with which to populate the scene. Defaults to none (no objects)
-    bg : Background instance | None
-        Scene background; controls background and constraints on object / camera positions. Defaults
-        to complete blank scene. 
-    sky : Sky instance | None
-        Sky and lights; controls sky appearance, world settings, and lighting. Defaults to single
-        sun lamp angled to the back-left of the whole scene, mild environment lighting, and no sky 
-        (all alpha with no image/sky texture)
-    shadow : Shadow instance | None
-        Controls added shadows, if any. Defaults to none (no added shadows)
-    camera : Camera instance | None
-        Camera for the scene. Defaults to slight up-right camera with no camera motion.
-    frame_range : 2-tuple
-        Frame span to render of this scene. NOTE that this is 1-based (the first frame of a scene is 1, 
-        not zero). Defaults to (1, 1)
-
-    Other Parameters
-    ----------------
-    frame_rate : scalar
-        Frame rate of movies to render. Technically this doesn't do much, since most renders are per-frame, 
-        and you specify a final frame rate for a movie when you concatenate the images together, either with
-        Blender, ffmpeg, or whatever your preferred video encoder is. Defaults to 15 (set in bvp.settings)
-    
-    Notes
-    -----
-    Objects can be placed in a scene without their positions / scales specified. You can then use the 
-    Scene.populate_scene() method to set positions for the objects, given the background constraints.
-    """
-    #def __init__(self, scnParams={}):
+    """Class for storing an abstraction of a Blender scene."""
     def __init__(self, 
                  number=0, 
                  objects=None, 
@@ -76,9 +37,49 @@ class Scene(MappedClass):
                  shadow=None, 
                  camera=None, 
                  frame_range=(1, 1), 
-                 fname=None, 
                  frame_rate=DEFAULT_FRAME_RATE): 
         """Class to store scene information in Blender.
+
+        Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
+        position, animation) in the scene. Scenes in .blend files can be created on the fly from these 
+        objects, for rendering or inspection (in an interactive Blender session). 
+        
+        Parameters
+        ----------
+        number : scalar
+            Scene number (one-based by convention) within a list of scenes. Determines default scene name.
+        objects : list of bvpObjects | None
+            Objects with which to populate the scene. Defaults to none (no objects)
+        bg : Background instance | None
+            Scene background; controls background and constraints on object / camera positions. Defaults
+            to complete blank scene. 
+        sky : Sky instance | None
+            Sky and lights; controls sky appearance, world settings, and lighting. Defaults to single
+            sun lamp angled to the back-left of the whole scene, mild environment lighting, and no sky 
+            (all alpha with no image/sky texture)
+        shadow : Shadow instance | None
+            Controls added shadows, if any. Defaults to none (no added shadows)
+        camera : Camera instance | None
+            Camera for the scene. Defaults to slight up-right camera with no camera motion.
+        frame_range : 2-tuple
+            Frame span to render of this scene. NOTE that this is 1-based (the first frame of a scene is 1, 
+            not zero). Defaults to (1, 1)
+       
+        Other Parameters
+        ----------------
+        frame_rate : scalar
+            Frame rate of movies to render. Note that the output will be a bunch of images (one per frame), 
+            so the final frame rate for a movie can be specified after the fact (and different from this 
+            value). However, it is useful to specify here, because scenes can contain animations that evolve
+            over time, and may look odd without a frame rate specified. Defaults to config file value
+            (frame_rate, under [render] heading).
+        name : str
+            For naming the created scene in Blender (scenes need names). Defaults to 
+        Notes
+        -----
+        Objects can be placed in a scene without their positions / scales specified. You can then use the 
+        Scene.populate_scene() method to set positions for the objects, given the background constraints.
+
         """     
         # Add all inputs as class properties (Shady?)
         inpt = locals()
@@ -88,8 +89,8 @@ class Scene(MappedClass):
                     setattr(self, k, None)
                 else:
                     setattr(self, k, v)
-        self._temp_fields = ['camera'] # hmm... 
-        self._data_fields = []
+        self._temp_fields = [] # hmm... 
+        self._data_fields = ['camera']
         self._db_fields = ['objects', 'background', 'sky', 'shadow']
 
         if self.objects is None:
@@ -104,13 +105,10 @@ class Scene(MappedClass):
         # Default camera: Fixed position!
         if self.camera is None:
             self.camera = Camera(lens=self.background.lens) # TO DO: Set camera default to file "Settings"! 
-        #if self.render_options is None:
-        #    self.render_options = RenderOptions()
-        # Final elements, shadows, are not necessary
+        # Final scene components shadows, are not necessary
         # Set file path for renders:
         if self.fname is None:
-            self.fname = 'Sc%04d_##'%self.number
-        self.frame_rate = frame_rate
+            self.fname = 'Sc%07d_##'%self.number
 
     @property
     def n_objects(self):
@@ -136,7 +134,7 @@ class Scene(MappedClass):
             rstr+='%s\n'%o
         return rstr
 
-    def check_compatibility(self,bg, act, debug=True):
+    def check_compatibility(self, bg, act, debug=True):
         """Helper function for populate_scene
 
         Does a quick check of whether or not a given action is compatible with a given background.
@@ -207,7 +205,7 @@ class Scene(MappedClass):
             return False
 
     
-    def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=.50, MinSz2D=0, RaiseError=False, nIter=50):
+    def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=0.50, MinSz2D=0, RaiseError=False, n_iter=50):
         """Choose positions for all objects in "ObList" input within the scene, 
         according to constraints provided by scene background.
         
@@ -222,17 +220,17 @@ class Scene(MappedClass):
         from random import shuffle
         if not ImPosCt:
             ImPosCt = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
-        Attempt = 1
-        Done = False
-        while Attempt<=nIter and not Done:
-            Fail = False
-            ObToAdd = []
+        attempt = 1
+        done = False
+        while attempt<=n_iter and not done:
+            fail = False
+            objects_to_add = []
             #if verbosity_level > 3:
-            #    print('### --- Running populate_scene, Attempt %d --- ###'%Attempt)
+            #    print('### --- Running populate_scene, attempt %d --- ###'%attempt)
             if ResetCam:
                 # Start w/ random camera, fixation position
                 cPos = self.background.CamConstraint.sampleCamPos(self.frame_range) #TODO fix
-                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=ObToAdd)
+                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=objects_to_add)
             # Multiple object constraints for moving objects
             OC = []
             for o in ObList:
@@ -253,9 +251,9 @@ class Scene(MappedClass):
                             raise Exception('Action' + NewOb.action.name +'is incompatible with bg' + self.background.name)
                         pass
                 if self.background.obstacles:
-                    Obst = self.background.obstacles+ObToAdd
+                    Obst = self.background.obstacles+objects_to_add
                 else:
-                    Obst = ObToAdd
+                    Obst = objects_to_add
                 if not o.semantic_category:
                     # Sample semantic category based on bg??
                     # UNFINISHED as of 2012.10.22
@@ -271,19 +269,19 @@ class Scene(MappedClass):
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
                     NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
                     if NewOb.pos3D is None:
-                        Fail=True
+                        fail=True
                         break
-                ObToAdd.append(NewOb)
-            if not Fail:
-                Done=True
+                objects_to_add.append(NewOb)
+            if not fail:
+                done=True
             else:
-                Attempt+=1
+                attempt+=1
         # Check for failure
-        if Attempt>nIter and RaiseError:
-            raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.background.name, nIter))
-        elif Attempt>nIter and not RaiseError:
-            print('Warning! Could not populate scene! Only got to %d objects!'%len(ObToAdd))
-        self.objects = ObToAdd
+        if attempt>n_iter and RaiseError:
+            raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.background.name, n_iter))
+        elif attempt>n_iter and not RaiseError:
+            print('Warning! Could not populate scene! Only got to %d objects!'%len(objects_to_add))
+        self.objects = objects_to_add
         # Make sure last fixation hasn't "wandered" away from objects: 
         
         # fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
@@ -410,7 +408,7 @@ class Scene(MappedClass):
                     pass
                 else:
                     raise e
-        scn.name = self.fname
+        #scn.name = self.fname
         # Details
         for s in self.scn_params.keys():
             setattr(scn, s, self.scn_params[s])

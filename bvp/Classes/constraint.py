@@ -7,7 +7,7 @@ import copy
 import sys # perhaps not necessary... see below
 import numpy as np
 import bvp.utils as bvpu
-from bvp.classes.object import Object # Should this be here...? Unclear. 
+from bvp.Classes.object import Object # Should this be here...? Unclear. 
 
 # TODO: Remove. Rely on numpy. 
 randn = random.gauss # Takes inputs Mean, Std
@@ -620,7 +620,7 @@ class CamConstraint(PosConstraint):
             #Tmpfix_location = tuple([a+b for a, b in zip(Tmpfix_location, self.origin)])
             fix_location.append(Tmpfix_location)
         return fix_location
-        
+
     def sampleCamPos(self, frames=None):
         """
         Sample nFrames positions (X, Y, Z) from position distribution given spherical / XYZ position constraints, 

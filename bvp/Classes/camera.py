@@ -1,6 +1,6 @@
 # Imports
 import math as bnp
-from .Constraint import CamConstraint
+from .constraint import CamConstraint
 from .. import utils as bvpu
 import numpy as np
 

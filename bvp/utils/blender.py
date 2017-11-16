@@ -11,9 +11,8 @@ import copy
 import re
 import numpy as np
 from six import string_types
-from bvp.utils.bvpMath import circ_dst
 
-#from ..Classes.Constraint import CamConstraint
+#from ..Classes.constraint import CamConstraint
 from bvp.options import config
 
 try:

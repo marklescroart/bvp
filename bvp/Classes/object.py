@@ -81,7 +81,7 @@ class Object(MappedClass):
         self._data_fields = []
         self._db_fields = []
         # What to do here?
-        self.pos2D=None # location in the image plane (normalized 0-1)
+        self.pos2D = None # location in the image plane (normalized 0-1)
         # TODO: Determine if this is still necessary (this relates to props stored in .blend files, prob.)
         if isinstance(self.real_world_size, (list, tuple)):
             self.real_world_size = self.real_world_size[0]

@@ -277,7 +277,7 @@ class MappedClass(object):
         """
         # Initial checks
         if (self.dbi is None) or (self.dbi=='None'):
-            raise Exception('Must define dbi for this to work!')
+            raise Exception('Must define database interface for this to work!')
         # Search for extant db object
         proceed,doc = self.db_check(is_overwrite=is_overwrite)
         if not proceed:

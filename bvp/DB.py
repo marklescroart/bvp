@@ -36,12 +36,12 @@ from . import dbqueries
 from .Classes.action import Action
 from .Classes.background import Background
 from .Classes.camera import Camera
-#from .Classes.Constraint import  ObConstraint, CamConstraint
+#from .Classes.constraint import  ObConstraint, CamConstraint
 from .Classes.material import Material
 from .Classes.object import Object
 #from .Classes.render_options import RenderOptions
-#from .Classes.Scene import Scene
-#from .Classes.SceneList import SceneList
+#from .Classes.scene import Scene
+#from .Classes.scene_list import SceneList
 from .Classes.shadow import Shadow
 #from .Classes.Shape import Shape # Move to Object...?
 from .Classes.sky import Sky
