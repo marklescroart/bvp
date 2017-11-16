@@ -549,7 +549,6 @@ class ObConstraint(PosConstraint):
 
 
 class CamConstraint(PosConstraint):
-
     ## Camera position (spherical constraints)
     ## Fixation position (X, Y, Z constraints)
     def __init__(self, r=(30., 3., 20., 40.), theta=(0., 60., -135., 135.), phi=(17.5, 2.5, 12.5, 45.5), 
@@ -593,7 +592,7 @@ class CamConstraint(PosConstraint):
 
         TO DO: 
         More constraints? max angle to change wrt camera? fixation change speed constraints?
-. 
+
         ML 2012.01.31
         """
         #TODO : Why did this break?

@@ -4,6 +4,7 @@ from bvp.utils.blender import add_group
 from .constraint import ObConstraint, CamConstraint
 from .mapped_class import MappedClass
 from .object import Object
+
 # Should be moved, along with test below
 #from .Camera import Camera
 #from .Scene import Scene
