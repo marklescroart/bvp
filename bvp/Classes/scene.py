@@ -1,7 +1,45 @@
 ## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
 
+"""
+
+I have a scene. In that scene are 2 objects. 
+
+I have IDs for those objects; the IDs point to database entries that reflect the unchanging aspects of that object
+(the things that will be the same for that object wherever it appears). 
+
+There are changing aspects of the objects too:
+3d position (x, y, z)
+3d rotation (x, y, z)
+3d size (scalar)
+pose (if armature)
+action (if armature)
+
+2d position (i, j *)
+* depends on camera, time
+
+So: I have my docdict, but I also have a data dict. That data dict specifies values for each of those. 
+Thus, the data for the scene will be one big-ass json file. And that will be DATA (pointed to by a file path), 
+not an entry in the database. So a given scene will have:
+
+{'object1id' : {'pos3d':[2,1,0],
+                'size3d':5,
+                'pose':3,
+                'etc':33.2},
+ 'object2id' : {'pos3d':[2,1,0],
+                'size3d':5,
+                'pose':3,
+                'etc':33.2},
+ 
+ 'camera' : {'camdata1': 2,
+             'camdata2': 3}
+}
+
+"""
+
 # Imports
 import copy
+import numpy as np
+
 from .mapped_class import MappedClass
 from .action import Action
 from .camera import Camera
@@ -12,12 +50,10 @@ from .shadow import Shadow
 
 # TODO: Get rid of all these imports, call e.g. bvpu.basics.fixedKeyDict
 from bvp import utils as bvpu
-from bvp.utils.basics import fixedKeyDict, gridPos, linspace # non-numpy-dependent version of linspace
+from bvp.utils.basics import fixedKeyDict
 from bvp.utils.blender import set_cursor
 from bvp.utils.math import ImPosCount
 from bvp.options import config
-
-import numpy as np
 
 try:
     import bpy
@@ -90,7 +126,7 @@ class Scene(MappedClass):
                 else:
                     setattr(self, k, v)
         self._temp_fields = [] # hmm... 
-        self._data_fields = ['camera']
+        self._data_fields = ['camera', 'objects']
         self._db_fields = ['objects', 'background', 'sky', 'shadow']
 
         if self.objects is None:
@@ -116,12 +152,9 @@ class Scene(MappedClass):
 
     @property
     def scn_params(self):
-        d = fixedKeyDict({
-            'frame_start':self.frame_range[0], 
-            'frame_end':self.frame_range[1] # Default is 3 seconds
-            # MORE??
-            })
-        return d
+        param_dict = fixedKeyDict({'frame_start':self.frame_range[0], 
+                                   'frame_end':self.frame_range[1]}) # Default is 3 seconds
+        return param_dict
 
     def __repr__(self):
         rstr = 'Class "Scene" (number=%d, %.2f s, Frames=(%d-%d)):\n'%(self.number, (self.frame_range[1]-self.frame_range[0]+1)/float(self.frame_rate), self.frame_range[0], self.frame_range[1])
@@ -130,11 +163,11 @@ class Scene(MappedClass):
         rstr+='SHADOW %s\n\n'%self.shadow
         rstr+='CAMERA %s\n\n'%self.camera
         rstr+='OBJECTS\n'
-        for o in self.objects:
-            rstr+='%s\n'%o
+        for ob in self.objects:
+            rstr+='%s\n'%ob
         return rstr
 
-    def check_compatibility(self, bg, act, debug=True):
+    def check_compatibility(self, bg, act, debug=True, RaiseError=True):
         """Helper function for populate_scene
 
         Does a quick check of whether or not a given action is compatible with a given background.
@@ -233,7 +266,7 @@ class Scene(MappedClass):
                 fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=objects_to_add)
             # Multiple object constraints for moving objects
             OC = []
-            for o in ObList:
+            for ob in ObList:
                 # Randomly cycle through object constraints (in case there are multiple exclusive possible locations for an object)
                 self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
                 if not OC:
@@ -243,41 +276,40 @@ class Scene(MappedClass):
                         OC = [copy.copy(self.background.obConstraints)]
                     shuffle(OC)
                 oc = OC.pop()
-                NewOb = copy.copy(o) # resets size each iteration as well as position
-                if NewOb.action is not None:
-                    is_compatible = self.check_compatibility(self.background,NewOb.action)
+                new_ob = copy.copy(ob) # resets size each iteration as well as position
+                if new_ob.action is not None:
+                    is_compatible = self.check_compatibility(self.background, new_ob.action, RaiseError=RaiseError)
                     if not is_compatible: #Check if it is even possible to use the action
                         if RaiseError:
-                            raise Exception('Action' + NewOb.action.name +'is incompatible with bg' + self.background.name)
+                            raise Exception('Action' + new_ob.action.name +'is incompatible with bg' + self.background.name)
                         pass
                 if self.background.obstacles:
-                    Obst = self.background.obstacles+objects_to_add
+                    Obst = self.background.obstacles + objects_to_add
                 else:
                     Obst = objects_to_add
-                if not o.semantic_category:
+                if not ob.semantic_category:
                     # Sample semantic category based on bg??
-                    # UNFINISHED as of 2012.10.22
-                    pass #etc.
-                if not o.size3D:
+                    pass
+                if not ob.size3D:
                     # OR: Make real-world size the default??
                     # OR: Choose objects by size??
-                    NewOb.size3D = oc.sampleSize()
-                if not o.rot3D:
+                    new_ob.size3D = oc.sampleSize()
+                if not ob.rot3D:
                     # NOTE: This is fixing rotation of objects to be within 90 deg of facing camera
-                    NewOb.rot3D = oc.sampleRot(self.camera)
-                if not o.pos3D:
+                    new_ob.rot3D = oc.sampleRot(self.camera)
+                if not ob.pos3D:
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
-                    NewOb.pos3D, NewOb.pos2D = oc.sampleXY(NewOb, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
-                    if NewOb.pos3D is None:
-                        fail=True
+                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
+                    if new_ob.pos3D is None:
+                        fail = True
                         break
-                objects_to_add.append(NewOb)
+                objects_to_add.append(new_ob)
             if not fail:
                 done=True
             else:
                 attempt+=1
         # Check for failure
-        if attempt>n_iter and RaiseError:
+        if attempt > n_iter and RaiseError:
             raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.background.name, n_iter))
         elif attempt>n_iter and not RaiseError:
             print('Warning! Could not populate scene! Only got to %d objects!'%len(objects_to_add))
@@ -295,13 +327,14 @@ class Scene(MappedClass):
         pass
 
     def bake(self, bone, change_camera_position=False):
-        """
-        Perform tasks that should be performed before render time, but still need to run in Blender. Currently calculates camera trajectory when it is made to follow a body part.
+        """Perform computations that must be performed before render time, but still need to run in Blender. 
+
+        Currently calculates camera trajectory when it is made to follow a body part.
         
         Parameters
         ----------
-
-        bone : Bone for the camera to follow
+        bone : 
+            Bone for the camera to follow
         """
 
         #TODO find some way to specify object to track.
@@ -311,12 +344,12 @@ class Scene(MappedClass):
         scn.layers = [True]+[False]*19
         # Place objects
         linked_objects = []
-        for o in self.objects:
+        for ob in self.objects:
             try:
-                o.place()
+                ob.place()
             except Exception as e:
                 if is_working:
-                    linked_objects.append(o)
+                    linked_objects.append(ob)
                     pass
                 else:
                     raise e
@@ -361,10 +394,8 @@ class Scene(MappedClass):
         self.camera.lens *= (dist/obsz)*1.713*3
 
         #TODO this doesn't seem to work
-        for o in linked_objects:
-            bpy.context.scene.unlink(o)
-
-
+        for ob in linked_objects:
+            bpy.context.scene.unlink(ob)
 
 
     def create(self, render_options=None, scn=None, is_working=False):
@@ -400,9 +431,9 @@ class Scene(MappedClass):
         if self.shadow:
             self.shadow.place(scale=self.background.real_world_size)
         # Objects
-        for o in self.objects:
+        for ob in self.objects:
             try:
-                o.place()
+                ob.place()
             except Exception as e:
                 if is_working:
                     pass
@@ -465,68 +496,8 @@ class Scene(MappedClass):
         # Render animation
         bpy.ops.render.render(animation=True, scene=scn.name)
 
-    def clear(self, scn=None):
-        """Resets scene to empty, ready for next.
-
-        Removes all objects, lights, background; resets world settings; clears all nodes; 
-        readies scene for next import /render. This is essential for memory saving in long 
-        render runs. Use with caution. Highly likely to crash Blender.
-
-        Parameters
-        ----------
-        scn : string scene name
-            Scene to clear of all elements.
-        """
-        ### --- Removing objects for next scene: --- ### 
-        scn = bvpu.blender.set_scene(scn)
-        # Remove all mesh objects       
-        Me = list()
-        for o in bpy.data.objects:
-            #ml.grab_only(o)
-            if o.type=='MESH': # Only mesh objects for now = cameras too?? Worlds??
-                Me.append(o.data)
-            if o.name in scn.objects: # May not be... why?
-                scn.objects.unlink(o)
-            o.user_clear()
-            bpy.data.objects.remove(o)      
-        # Remove mesh objects
-        for m in Me:
-            m.user_clear()
-            bpy.data.meshes.remove(m)
-        # Remove all textures:
-        # To come
-        # Remove all images:
-        # To come
-        # Remove all worlds:
-        # To come
-        # Remove all actions/poses:
-        for act in bpy.data.actions:
-            act.user_clear()
-            bpy.data.actions.remove(act)
-        # Remove all armatures:
-        for arm in bpy.data.armatures:
-            arm.user_clear()
-            bpy.data.armatures.remove(arm)
-        # Remove all groups:
-        for g in bpy.data.groups:
-            g.user_clear()
-            bpy.data.groups.remove(g)
-        # Remove all rendering nodes
-        for n in scn.node_tree.nodes:
-            scn.node_tree.nodes.remove(n)
-        # Re-set (delete) all render layers
-        RL = bpy.context.scene.render.layers.keys()
-        bpy.ops.scene.render_layer_add()
-        for ii, n in enumerate(RL):
-            bpy.context.scene.render.layers.active_index=0
-            bpy.ops.scene.render_layer_remove()
-        # Rename newly-added layer (with default properties) to default name:
-        bpy.context.scene.render.layers[0].name = 'RenderLayer'
-        # Set only first layer to be active
-        scn.layers = [True]+[False]*19
-    
     @classmethod
-    def from_blender(cls, number, scn=None, dbi=None):
+    def from_blender(cls, scn=None, dbi=None):
         """Gathers all elements present in a blender scene into a Scene.
         
         FORMERLY bvp.utils.blender.get_scene
@@ -549,37 +520,37 @@ class Scene(MappedClass):
         # Initialize scene:
         new_scn = cls.__new__(blah)
         # Scroll through scene component types:
-        type = ['objects', 'backgrounds', 'skies', 'shadows']
+        scene_components = ['objects', 'backgrounds', 'skies', 'shadows']
         # Get scene components:
         #vL = copy.copy(verbosity_level)
         #verbosity_level=1 # Turn off warnings for not-found library objects
-        for o in scn.objects:
-            for ct in type:
+        for ob in scn.objects:
+            for ct in scene_components:
                 # Search for object name in database... HMM.
-                ob_add = 0 ## SEARCH DATABASE FOR ME, OR DERIVE FROM OBJECT PROPS IN FILE. ##Lib.getSC(o.name, ct)
+                ob_add = 0 ## SEARCH DATABASE FOR ME, OR DERIVE FROM OBJECT PROPS IN FILE. ##Lib.getSC(ob.name, ct)
                 if ob_add and ct=='objects':
-                    if 'ARMATURE' in [x.type for x in o.dupli_group.objects]:
-                        Pob = [x for x in scn.objects if o.name in x.name and 'proxy' in x.name]
+                    if 'ARMATURE' in [x.type for x in ob.dupli_group.objects]:
+                        Pob = [x for x in scn.objects if ob.name in x.name and 'proxy' in x.name]
                         if len(Pob)>1:
                             raise Exception('WTF is up with more than one armature for %s??'%ob_add.name)
                         elif len(Pob)==0:
-                            print('No pose has been set for poseable object %s'%o.name)
+                            print('No pose has been set for poseable object %s'%ob.name)
                         elif len(Pob)==1:
-                            print('Please manually enter the pose for object %s scn.Obj[%d]'%(o.name, len(new_scn.Obj)+1))
-                    new_scn.Obj.append(Object(o.name, Lib, 
-                        size3D=o.scale[0]*10., 
-                        rot3D=list(o.rotation_euler), 
-                        pos3D=list(o.location), 
+                            print('Please manually enter the pose for object %s scn.Obj[%d]'%(ob.name, len(new_scn.Obj)+1))
+                    new_scn.Obj.append(Object(ob.name, Lib, 
+                        size3D=ob.scale[0]*10., 
+                        rot3D=list(ob.rotation_euler), 
+                        pos3D=list(ob.location), 
                         pose=None
                         ))
 
                 elif ob_add and ct=='backgrounds':
-                    new_scn.BG = Background(o.name, Lib)
+                    new_scn.BG = Background(ob.name, Lib)
                 elif ob_add and ct=='skies':
                     # Note: This will take care of lights, too
-                    new_scn.Sky = Sky(o.name, Lib)
+                    new_scn.Sky = Sky(ob.name, Lib)
                 elif ob_add and ct=='shadows':
-                    new_scn.Shadow = Shadow(o.name, Lib)
+                    new_scn.Shadow = Shadow(ob.name, Lib)
         #verbosity_level=vL
         # Get camera:
         C = [c for c in bpy.context.scene.objects if c.type=='CAMERA']

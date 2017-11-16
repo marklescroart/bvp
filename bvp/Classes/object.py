@@ -9,7 +9,6 @@ Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
 
 # Imports
 import os
-import random
 import warnings
 from .mapped_class import MappedClass
 from bvp import utils as bvpu
@@ -17,10 +16,8 @@ from bvp.options import config
 
 try:
     import bpy
-    import mathutils as bmu
-    is_blender = True
 except ImportError: 
-    is_blender = False
+    pass
 
 class Object(MappedClass):
     """Layer of abstraction for objects (imported from other files) in Blender scenes.
@@ -77,8 +74,8 @@ class Object(MappedClass):
                 else:
                     setattr(self, k, v)
 
-        self._temp_fields = ['pos2D', 'pos3D','rot3D', 'size3D', 'action', 'pose']
-        self._data_fields = []
+        self._temp_fields = []
+        self._data_fields = ['pos2D', 'pos3D','rot3D', 'size3D', 'action', 'pose']
         self._db_fields = []
         # What to do here?
         self.pos2D = None # location in the image plane (normalized 0-1)
@@ -88,24 +85,24 @@ class Object(MappedClass):
 
     def __repr__(self):
         """Display string"""
-        S = '\n ~O~ Object "%s" ~O~\n'%(self.name)
+        ob_str = '\n ~O~ Object "%s" ~O~\n'%(self.name)
         if self.fname:
-            S+='Parent File: {}\n'.format(self.fpath)
+            ob_str+='Parent File: {}\n'.format(self.fpath)
         if self.semantic_category:
-            S+=self.semantic_category[0]
-            for s in self.semantic_category[1:]: S+=', %s'%s
-            S+='\n'
+            ob_str += ','.join(self.semantic_category) + '\n' #[0]
+            #for s in self.semantic_category[1:]: ob_str+=', %s'%s
+            #ob_str+='\n'
         if self.pos3D:
-            S+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
+            ob_str+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
         if self.size3D:
-            S+='Size: %.2f '%self.size3D
+            ob_str+='Size: %.2f '%self.size3D
         if self.pose:
-            S+='Pose: #%d'%self.pose
+            ob_str+='Pose: #%d'%self.pose
         if self.pos3D or self.size3D or self.pose:
-            S+='\n'
+            ob_str+='\n'
         if self.n_vertices:
-            S+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
-        return(S)
+            ob_str+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
+        return(ob_str)
  
     def place(self, scn=None, proxy=True):
         """Places object into Blender scene, with pose & animation information
@@ -239,29 +236,27 @@ class Object(MappedClass):
             arm.animation_data_create()
         arm.animation_data.action = act
 
-    def apply_pose(self, Arm, PoseIdx):
+    def apply_pose(self, armature, pose_index):
         """Apply a pose to an armature.
 
         Parameters
         ----------
-        Arm : bpy.data.object contianing armature
+        armature : bpy.data.object containing armature
             Armature to which to apply pose
-        PoseIdx : scalar 
+        pose_index : scalar 
             Index for pose in the armature's pose library
 
         Notes
         -----
-        This function only applies WHOLE-ARMATURE poses (for now). Later it may be useful to update
-        this function to pose individual bones of an armature.
-        
+        This function only applies WHOLE-ARMATURE poses (for now). It would be useful 
+        to update this function to pose individual bones of an armature.
         """
         # Set mode to pose mode
-        bvpu.blender.grab_only(Arm)
+        bvpu.blender.grab_only(armature)
         bpy.ops.object.posemode_toggle()
         bpy.ops.pose.select_all(action="SELECT")
-        bpy.ops.poselib.apply_pose(pose_index=PoseIdx)
-        # Set back to previous mode 
-        # (IMPORTANT: otherwise Blender may puke and die with next command)
+        bpy.ops.poselib.apply_pose(pose_index=pose_index)
+        # Set back to previous mode; otherwise Blender may puke and die with next command
         bpy.ops.object.posemode_toggle()
 
     @property

@@ -93,6 +93,66 @@ def add_selected_to_group(gNm):
     for o in ob:
         G.objects.link(o)
 
+def clear_scene(scn=None):
+    """Resets scene to empty, ready for next.
+
+    Removes all objects, lights, background; resets world settings; clears all nodes; 
+    readies scene for next import /render. This is essential for memory saving in long 
+    render runs. Use with caution. Highly likely to crash Blender.
+
+    Parameters
+    ----------
+    scn : string scene name
+        Scene to clear of all elements.
+    """
+    ### --- Removing objects for next scene: --- ### 
+    scn = bvpu.blender.set_scene(scn)
+    # Remove all mesh objects       
+    Me = list()
+    for o in bpy.data.objects:
+        #ml.grab_only(o)
+        if o.type=='MESH': # Only mesh objects for now = cameras too?? Worlds??
+            Me.append(o.data)
+        if o.name in scn.objects: # May not be... why?
+            scn.objects.unlink(o)
+        o.user_clear()
+        bpy.data.objects.remove(o)      
+    # Remove mesh objects
+    for m in Me:
+        m.user_clear()
+        bpy.data.meshes.remove(m)
+    # Remove all textures:
+    # To come
+    # Remove all images:
+    # To come
+    # Remove all worlds:
+    # To come
+    # Remove all actions/poses:
+    for act in bpy.data.actions:
+        act.user_clear()
+        bpy.data.actions.remove(act)
+    # Remove all armatures:
+    for arm in bpy.data.armatures:
+        arm.user_clear()
+        bpy.data.armatures.remove(arm)
+    # Remove all groups:
+    for g in bpy.data.groups:
+        g.user_clear()
+        bpy.data.groups.remove(g)
+    # Remove all rendering nodes
+    for n in scn.node_tree.nodes:
+        scn.node_tree.nodes.remove(n)
+    # Re-set (delete) all render layers
+    RL = bpy.context.scene.render.layers.keys()
+    bpy.ops.scene.render_layer_add()
+    for ii, n in enumerate(RL):
+        bpy.context.scene.render.layers.active_index=0
+        bpy.ops.scene.render_layer_remove()
+    # Rename newly-added layer (with default properties) to default name:
+    bpy.context.scene.render.layers[0].name = 'RenderLayer'
+    # Set only first layer to be active
+    scn.layers = [True]+[False]*19
+
 def get_scenes_to_render(SL):
     """Check on which scenes within a scene list have already been rendered.
 
