@@ -50,6 +50,10 @@ class Camera(object):
             self.fix_location = constr.sample_fix_location(self.frames)
 
     @property
+    def data(self):
+        # Return data in dictionary format to reconstruct where this camera was
+        pass
+    @property
     def n_loc(self):
         return len(self.location)
 

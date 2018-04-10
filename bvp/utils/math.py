@@ -145,7 +145,7 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
 
 
 def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
-   """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
+    """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
     Parameters
