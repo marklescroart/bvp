@@ -12,8 +12,7 @@ import re
 import numpy as np
 from six import string_types
 
-#from ..Classes.constraint import CamConstraint
-from bvp.options import config
+from ..options import config
 
 try:
     import bpy
@@ -65,13 +64,13 @@ def make_location_animation(location_list, frames, action_name='ObjectMotion', h
     """
     # Make handle_type input into a list of lists for use below
     if isinstance(handle_type, string_types):
-        handle_type = [handle_type]*len(frames)
+        handle_type = [handle_type] * len(frames)
     for ih, h in enumerate(handle_type):
         if isinstance(h, string_types): 
-            handle_type[ih] = [h]*2
+            handle_type[ih] = [h] * 2
         elif isinstance(h, (list,tuple)):
             if len(h)==1:
-                handle_type[ih] = h*2
+                handle_type[ih] = h * 2
     a = bpy.data.actions.new(action_name)
     for iXYZ in range(3):
         a.fcurves.new('location', index=iXYZ, action_group="LocRotScale")
@@ -83,42 +82,47 @@ def make_location_animation(location_list, frames, action_name='ObjectMotion', h
         a.fcurves[iXYZ].extrapolation = 'CONSTANT'
     return a
 
-def add_selected_to_group(gNm):
-    """
-    Adds all selected objects to group named gNm
+def add_selected_to_group(group_name):
+    """Adds all selected objects to group named `group_name`
     """
     scn = bpy.context.scene
-    G = bpy.data.groups[gNm]
+    grp = bpy.data.groups[group_name]
     ob = [o for o in scn.objects if o.select]
     for o in ob:
-        G.objects.link(o)
+        grp.objects.link(o)
 
 def clear_scene(scn=None):
     """Resets scene to empty, ready for next.
 
-    Removes all objects, lights, background; resets world settings; clears all nodes; 
-    readies scene for next import /render. This is essential for memory saving in long 
-    render runs. Use with caution. Highly likely to crash Blender.
+    Removes all objects, lights, background; resets world settings; clears
+    all nodes; readies scene for next import /render. This is essential for
+    memory saving in long render runs. Use with caution. Highly likely to
+    crash Blender.
 
     Parameters
     ----------
     scn : string scene name
         Scene to clear of all elements.
+
+    Notes
+    -----
+    Only removes meshes for now; cameras too?? Worlds??
+    Clears out entire file - not just scene.
     """
+
     ### --- Removing objects for next scene: --- ### 
     scn = bvpu.blender.set_scene(scn)
-    # Remove all mesh objects       
-    Me = list()
+    # Enumerate mesh objects to remove
+    mesh_objects = list()
     for o in bpy.data.objects:
-        #ml.grab_only(o)
-        if o.type=='MESH': # Only mesh objects for now = cameras too?? Worlds??
-            Me.append(o.data)
-        if o.name in scn.objects: # May not be... why?
+        if o.type=='MESH': 
+            mesh_objects.append(o.data)
+        if o.name in scn.objects:
             scn.objects.unlink(o)
         o.user_clear()
         bpy.data.objects.remove(o)      
     # Remove mesh objects
-    for m in Me:
+    for m in mesh_objects:
         m.user_clear()
         bpy.data.meshes.remove(m)
     # Remove all textures:
@@ -146,36 +150,29 @@ def clear_scene(scn=None):
     RL = bpy.context.scene.render.layers.keys()
     bpy.ops.scene.render_layer_add()
     for ii, n in enumerate(RL):
-        bpy.context.scene.render.layers.active_index=0
+        bpy.context.scene.render.layers.active_index = 0
         bpy.ops.scene.render_layer_remove()
     # Rename newly-added layer (with default properties) to default name:
     bpy.context.scene.render.layers[0].name = 'RenderLayer'
     # Set only first layer to be active
-    scn.layers = [True]+[False]*19
-
-def get_scenes_to_render(SL):
-    """Check on which scenes within a scene list have already been rendered.
-
-    DEPRECATED?? Overlapping in function with something else? 
-    """
-    # Get number of scenes to render in one job:
-    RenderGrpSize = SL.RenderOptions.BVPopts['RenderGrpSize']
-    # Check on which scenes have been rendered:
-    fpath, PathEnd = os.path.split(SL.RenderOptions.filepath[:-1]) # Leave out ending "/"
-    # Modify PathEnd to accomodate all render types
-    
-    for iChk in range(1, SL.nScenes, RenderGrpSize):
-        # For now: Only check images. Need to check masks, zdepth, etc...
-        if not os.path.exists(os.path.join(fpath, PathEnd, 'Sc%04d_01.png'%(iChk))):
-            ScnToRender = range(iChk-1, iChk+RenderGrpSize-1)
-            return ScnToRender
+    scn.layers = [True] + [False] * 19
 
 def set_no_memory_mode(n_threads=None, n_parts_xy=6, revert=False):
-    """During rendering, sets mode to no undos, 
-    During rendering, sets mode to no undos, allows how many threads 
-    to specify for rendering (default = auto detect, maybe not the 
-    nicest thing to do if rendering is being done on a cluster)
-    Setting revert=True undoes the changes.
+    """Set to conservative memory mode. 
+
+    Useful during rendering: sets mode to no undos, allows how many threads 
+
+    Parameters
+    ----------
+    n_threads : scalar
+        number of threads for rendering; None auto-detects available threads.
+        Auto-detect is not necessarily optimal for cluster renders (can 
+        monopolize available CPUs)
+    n_parts_xy : scalar
+        Number of tiles across image in x and y dims to render independently
+    revert : bool
+        If True, reverts file toan assumed default (global undo on, 32 undo
+        steps)
     """
     scn = bpy.context.scene
     if not revert:
@@ -196,8 +193,10 @@ def set_no_memory_mode(n_threads=None, n_parts_xy=6, revert=False):
     scn.render.tile_y = n_parts_xy
 
 def remove_mesh_from_memory(mesh_name):
-    """
-    Removes meshes from memory. Be careful with the use of this function; it can crash Blender to have meshes removed with objects that still rely on them.
+    """Removes meshes from memory. 
+
+    Be careful with the use of this function; it can crash Blender to have 
+    meshes removed with objects that still rely on them.
     """
     mesh = bpy.data.meshes[mesh_name]
     mesh.user_clear()
@@ -205,27 +204,33 @@ def remove_mesh_from_memory(mesh_name):
 
 def remove_action_from_memory(action_name):
     """
-    Removes actions from memory. Called to clear scenes between loading / rendering scenes. Be careful, this can crash Blender! 
+    Removes actions from memory. Called to clear scenes between loading / 
+    rendering scenes. Be careful, this can crash Blender! 
     """
     act = bpy.data.actions[action_name]
     act.user_clear()
     bpy.data.actions.remove(act)
 
-def set_layers(ob, LayerList):
-    """ 
-    Convenience function to set layers. Note that active layers affect what will be selected with bpy select_all commands. 
-    ob = blender object data structure
-    LayerList = list of numbers of layers you want the object to appear on, e.g. [0, 9] (ZERO-BASED)
+def set_layers(ob, layer_list):
+    """Convenience function to set layers. 
+
+    Note that active layers affect what will be selected with bpy 
+    select_all commands. 
+
+    Parameters
+    ----------
+    ob : blender object
+        object for which to set layers
+    layer_list : list
+        list of numbers of layers on which you want the object to appear,
+        e.g. [0, 9] (ZERO-BASED)
     """
     if not is_blender:
-        print("Sorry, won't run outside of Blender!")
-        return
-    LL = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    for L in LayerList:
-        LL[L] = True
-    LL = tuple(LL)
+        raise Exception("Can't run outside of Blender!")
+    n_tot_layers = 20
+    layers = tuple([x in layer_list for x in range(n_tot_layers)])
     grab_only(ob)
-    bpy.ops.object.move_to_layer(layers=LL)
+    bpy.ops.object.move_to_layer(layers=layers)
 
 def get_cursor():
     """Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
@@ -288,7 +293,11 @@ def find_group_parent(group):
     return no_parent[0]
 
 def get_mesh_objects(scn=None, select=True):
-    """Returns a list of - and optionally, selects - all mesh objects in a scene
+    """Returns a list of mesh objects in a scene
+
+    Parameters
+    ----------
+    scn : 
     """
     if scn is None:
         scn = bpy.context.scene
@@ -862,8 +871,8 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
     ScnListOld = [s.name for s in bpy.data.scenes]
     # APPEND SCENE CONTAINING LAMPS TO BE ADDED
     bpy.ops.wm.link_append(
-        directory=fpath+fname+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
-        filepath="//"+fname+"\\Scene\\"+scname, # local filepath within .blend file to the scene to be imported
+        directory=fpath+fname+"/Scene/", # i.e., directory WITHIN .blend file (Scenes / Objects)
+        filepath="//"+fname+"/Scene/"+scname, # local filepath within .blend file to the scene to be imported
         filename=scname, # "filename" being the name of the data block, i.e. the name of the scene.
         link=False, 
         relative_path=False, 
@@ -898,7 +907,7 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
         print('Action already exists!')
     else:
         blendfile = os.path.join(fpath, fname)
-        section = "\\Action\\"
+        section = "/Action/"
         print('directory = '+ blendfile + section)
         print('filepath = ' + blendfile + section + action_name)
         print('filename = ' + action_name)
@@ -950,15 +959,17 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     else:
         print('Did not find group! adding...')
         old_obs = list(bpy.context.scene.objects)
+        print(fpath, fname, name, proxy)
         bpy.ops.wm.append(
-            directory=os.path.join(fpath, fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-            filepath="//"+fname+"\\Group\\"+name, # local filepath within .blend file to the scene to be imported
+            directory=os.path.join(fpath, fname)+"/Group/", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+            filepath="//"+fname+"/Group/"+name, # local filepath within .blend file to the scene to be imported
             filename=name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
             link=proxy, 
             #relative_path=False, 
             autoselect=True, 
             instance_groups=proxy)
         new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
+        print(new_obs)
         G  = find_group_parent(new_obs)
         grab_only(G)
     return G

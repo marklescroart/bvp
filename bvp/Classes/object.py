@@ -25,7 +25,8 @@ class Object(MappedClass):
     def __init__(self, name='DummyObject', type='Object', fname=None, action=None, pose=None, 
         pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), n_faces=None, n_vertices=None, n_poses=0,
         basic_category=None, semantic_category=None, wordnet_label=None, armature=None, 
-        constraints=None, real_world_size=None, _id=None, _rev=None, dbi=None):
+        constraints=None, real_world_size=None, _id=None, _rev=None, dbi=None, is_cycles=False, 
+        is_realistic=False):
         """ Class to store an abstraction of an object in a BVP scene. 
 
         Stores all necessary information to define an object in a scene: identifying information for
@@ -74,7 +75,8 @@ class Object(MappedClass):
                 else:
                     setattr(self, k, v)
 
-        self._temp_fields = []
+        self._temp_fields = ['min_xyz_pos', 'max_xyz_pos', 'bounding_box_center', 
+                             'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory']
         self._data_fields = ['pos2D', 'pos3D','rot3D', 'size3D', 'action', 'pose']
         self._db_fields = []
         # What to do here?

@@ -34,7 +34,7 @@ for bg in ToRender:
 	BG = bvp.Background(bgID=bg['name'],Lib=Lib)
 	for p in range(nCamLoc):
 		cNum = p+1
-		Cam = bvp.Camera(location=BG.CamConstraint.sampleCamPos(frames),fixPos=BG.CamConstraint.sampleFixPos(frames),frames=frames)
+		Cam = bvp.Camera(location=BG.CamConstraint.sample_cam_pos(frames),fixPos=BG.CamConstraint.sampleFixPos(frames),frames=frames)
 		S = bvp.Scene(Num=BGCt,BG=BG,Sky=Sky,Obj=None,
 							Shadow=None,Cam=Cam,FrameRange=(1,1),
 							fpath='%s_%s_cp%d_fr##'%(BG.semantic_category[0],BG.name,cNum),

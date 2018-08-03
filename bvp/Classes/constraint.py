@@ -2,16 +2,11 @@
 Class for general constraints on random distributions. 
 """
 # Imports
-import random
+import sys
 import copy
-import sys # perhaps not necessary... see below
 import numpy as np
 import bvp.utils as bvpu
 from bvp.Classes.object import Object # Should this be here...? Unclear. 
-
-# TODO: Remove. Rely on numpy. 
-randn = random.gauss # Takes inputs Mean, Std
-rand = random.random
 
 verbosity_level = 3
 
@@ -64,7 +59,7 @@ class Constraint(object):
                     return None
             if not mn:
                 mn=0
-            n = rand()*(mx-mn)+mn
+            n = np.random.rand()*(mx-mn)+mn
         return n
 
 class PosConstraint(Constraint):
@@ -100,7 +95,7 @@ class PosConstraint(Constraint):
             theta_offset = 270 # To make angles in Blender more interpretable
             # Use spherical constraints  ## THETA AND PHI MAY BE BACKWARDS FROM CONVENTION!! as is its, theta is Azimuth, phi is elevation
             if not self.theta:
-                theta = random.random()*360.
+                theta = np.random.rand()*360.
             else:
                 theta = self.sample_w_constr(self.theta)+theta_offset
             phi = self.sample_w_constr(self.phi)
@@ -537,11 +532,11 @@ class ObConstraint(PosConstraint):
             cVec = VectorFn(Cam.fix_location[0])-VectorFn(Cam.location[0])
             # Convert to X, Y, Z Euler angles
             x, y, z = bvpu.math.vec2eulerXYZ(cVec)
-            if round(random.random()):
+            if round(np.random.rand()):
                 posNeg=1
             else:
                 posNeg=-1
-            zRot = z + random.random()*90.*posNeg
+            zRot = z + np.random.rand()*90.*posNeg
             zRot = bvpu.math.bnp.radians(zRot)
         else:
             zRot = self.sample_w_constr(self.zRot)
@@ -592,8 +587,6 @@ class CamConstraint(PosConstraint):
 
         TO DO: 
         More constraints? max angle to change wrt camera? fixation change speed constraints?
-
-        ML 2012.01.31
         """
         #TODO : Why did this break?
         method = 'mean'
@@ -620,7 +613,7 @@ class CamConstraint(PosConstraint):
             fix_location.append(Tmpfix_location)
         return fix_location
 
-    def sampleCamPos(self, frames=None):
+    def sample_cam_pos(self, frames=None):
         """
         Sample nFrames positions (X, Y, Z) from position distribution given spherical / XYZ position constraints, 
         as well as camera motion constraints (speed, pan/zoom, nFrames)
@@ -706,7 +699,7 @@ class CamConstraint(PosConstraint):
                         break
                     else:
                         # Sample pPos (spherical coordinates for all possible new positions)    
-                        TmpPosSph = pPosSphCs[random.randint(0, len(pPosSphCs)-1)]
+                        TmpPosSph = pPosSphCs[np.random.randint(0, len(pPosSphCs)-1)]
                         r1, theta1, phi1 = TmpPosSph;
                         TmpPos = bvpu.math.sph2cart(r1, theta1+theta_offset, phi1)
                         TmpPos = [aa+bb for (aa, bb) in zip(TmpPos, self.origin)]
@@ -858,13 +851,12 @@ class SLConstraint(Constraint):
     """
     Class to contain constraints for properties of a scene list
     
-    Necessary??
-    WTF, let's see (2012.03.06)
+    WIP
     """
     def __init__(self):
-                ### def SetScenes():
-        """
-        Computes concretely what will be in each scene and where. Commits probabilities into instances.
+        """Computes concretely what will be in each scene and where. 
+
+        Commits probabilities into instances.
         """
         pass
         '''

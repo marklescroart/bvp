@@ -245,7 +245,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                     print('Found it!')
                     # Only append scenes to render that DO NOT have previews already rendered!
                     continue                
-                Cam = Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+                Cam = Camera(location=BG.CamConstraint.sample_cam_pos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
                 Sky = Sky('*'+BG.sky_semantic_category[0], Lib=self)
                 if Sky.semantic_category:
                     if 'dome' in Sky.semantic_category:
@@ -314,7 +314,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                     print('Found it!')
                     # Only append scenes to render that DO NOT have previews already rendered!
                     continue                
-                Cam = Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+                Cam = Camera(location=BG.CamConstraint.sample_cam_pos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
                 S = Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
                                     Shadow=None, Cam=Cam, FrameRange=(1, 1), 
                                     fpath=fpath, 
@@ -415,6 +415,8 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         dbi.set_up_db()
         if fname is not None:
             docs = json.load(open(fname))
+            # Exclude config file, we did that already. Shouldn't be here anyway...
+            docs = [d for d in docs if not d['_id'] == 'config']
             print("Uploading documents...")
             dbi.put_documents(docs)
         print("Done!")

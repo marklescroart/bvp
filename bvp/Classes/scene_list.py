@@ -715,3 +715,21 @@ class SceneList(object):
         plt.ylabel('Scene')
         plt.title('Render progress: %s'%self.Name)
         plt.show()
+
+
+# def get_scenes_to_render(SL):
+#     """Check on which scenes within a scene list have already been rendered.
+
+#     DEPRECATED?? Overlapping in function with something else? 
+#     """
+#     # Get number of scenes to render in one job:
+#     RenderGrpSize = SL.RenderOptions.BVPopts['RenderGrpSize']
+#     # Check on which scenes have been rendered:
+#     fpath, PathEnd = os.path.split(SL.RenderOptions.filepath[:-1]) # Leave out ending "/"
+#     # Modify PathEnd to accomodate all render types
+    
+#     for iChk in range(1, SL.nScenes, RenderGrpSize):
+#         # For now: Only check images. Need to check masks, zdepth, etc...
+#         if not os.path.exists(os.path.join(fpath, PathEnd, 'Sc%04d_01.png'%(iChk))):
+#             ScnToRender = range(iChk-1, iChk+RenderGrpSize-1)
+#             return ScnToRender

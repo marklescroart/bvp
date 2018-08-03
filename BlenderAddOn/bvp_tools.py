@@ -45,9 +45,8 @@ bl_info = {
 
 ### --- Misc parameters --- ###
 bb_types = ['MESH','LATTICE','ARMATURE'] # Types allowable for computing bounding box of object groups. Add more?
-#dbport = bvp.Settings['db']['port']
-
-dbname = bvp.config.get('db', 'dbname')
+#dbname = bvp.config.get('db', 'dbname')
+#dbhost = bvp.config.get('db', 'dbhost')
 dbi = bvp.DBInterface()
 dbpath = dbi.db_dir # only necessary for creating client instances...
 to_save = {}
@@ -141,31 +140,31 @@ class DBprop(bpy.types.PropertyGroup):
 '''
 
 ## -- For dynamic EnumProperties -- ##
-def enum_groups(self,context):
+def enum_groups(self, context):
 	ob = context.object
 	if len(ob.users_group)==0:
 		return [("","No Group",""),]
 	else:
 		return [(g.name,g.name,"") for g in ob.users_group]
 
-def enum_db_results(self,context):
+def enum_db_results(self, context):
 	"""Enumerate all objects (group names) returned from a database query"""
 	global db_results
 	out = [("","","")]+[(o['name'],o['name'],','.join(o['semantic_cat'])) for o in db_results]
 	return out
 
-def enum_wn_results(self,context):
+def enum_wn_results(self, context):
 	"""Enumerate all WordNet synsets (WordNet labels) returned from the most recent lemma query"""
 	global wn_results
 	out = [("","","")]+[(o['synset'],o['synset']+': '+o['definition'],o['hypernyms']) for o in wn_results]
 	return out
 
-def enum_dbs(self,context):
+def enum_dbs(self, context):
 	"""Enumerate all active databases for couchdb server (if running)"""
 	try:
 		# TO DO: Add ShapeNet / ModelNet to this list?
 		dbi = bvp.DBInterface()
-		dbnm = [(d,d,'') for d in dbi.dbi.connection.database_names() if not d in ['local','admin']]
+		dbnm = [(d, d, '') for d in dbi.dbconn if not d in ['_replicator', '_users', 'test']]
 	except:
 		dbnm = [('(none)','(none)','')]
 	return dbnm
@@ -240,7 +239,7 @@ class NextScene(bpy.types.Operator):
 	bl_label = "Skip to next scene"
 	bl_options = {'REGISTER','UNDO'}
 	
-	def execute(self,context):
+	def execute(self, context):
 		ScnList = list(bpy.data.scenes)
 		ScnIdx = ScnList.index(context.scene)
 		if ScnIdx<len(ScnList)-1:
@@ -253,7 +252,7 @@ class PrevScene(bpy.types.Operator):
 	bl_label = "Skip to previous scene"
 	bl_options = {'REGISTER','UNDO'}
 	
-	def execute(self,context):
+	def execute(self, context):
 		ScnList = list(bpy.data.scenes)
 		ScnIdx = ScnList.index(context.scene)
 		if ScnIdx>0:
@@ -278,7 +277,7 @@ class RescaleGroup(bpy.types.Operator):
 	bl_idname = "bvp.rescale_group"
 	bl_label = "Set up group of objects"
 	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context):
+	def execute(self, context):
 		scn = context.scene
 		ob_list = [o for o in scn.objects if o.select and not o.type in ['CAMERA']]
 		ToSet_Size = 10.0
@@ -358,8 +357,8 @@ class RescaleGroup(bpy.types.Operator):
 class DBSaveObject(bpy.types.Operator):
 	bl_idname = "bvp.db_save_object"
 	bl_label = "Save the active object to the active database"
-	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context):
+	bl_options = {'REGISTER', 'UNDO'}
+	def execute(self, context):
 		wm = context.window_manager
 		ob = context.object
 		grp = bpy.data.groups[wm.active_group]
@@ -404,7 +403,7 @@ class DBSaveObject(bpy.types.Operator):
 			# Edited through UI
 			name=wm.active_group, # also not great.
 			type='Object',
-			fname=pfile, # hacky. ugly. 
+			fname=pfile + '.blend', # hacky. ugly. 
 			wordnet_label=wordnet,
 			semantic_category=semcat,
 			basic_category=grp.Object.basic_cat,
@@ -421,7 +420,7 @@ class DBSaveObject(bpy.types.Operator):
 			)
 		# Create object instance instead, call save method? NEED ID...
 		dbi.put_document(to_save)
-		save_path = os.path.join(dbpath, 'Object', pfile+'.blend')
+		save_path = os.path.join(dbpath, 'Object', pfile + '.blend')
 		if save_path==thisfile:
 			bpy.ops.wm.save_as_mainfile(filepath=save_path)
 		else:
@@ -444,7 +443,7 @@ class DBSaveAction(bpy.types.Operator):
 	# Properties
 	do_save = bpy.props.BoolProperty(name='overwrite',default=True)
 	# Methods
-	def execute(self,context):
+	def execute(self, context):
 		global to_save
 		wm = context.window_manager
 		# Create database instance
@@ -472,7 +471,7 @@ class DBSaveAction(bpy.types.Operator):
 		#	bvp.blend(script,pfile)
 		return {'FINISHED'}
 		
-	def invoke(self,context,event):
+	def invoke(self, context,event):
 		global bvpact
 		bvpact = Action.from_blender(context, dbi)
 		# (get docdict)
@@ -480,7 +479,7 @@ class DBSaveAction(bpy.types.Operator):
 
 		## OLD
 		# Create database instance
-		dbi = bvp.bvpDB(port=dbport,dbname=wm.active_db)
+		dbi = bvp.DBInterface(port=dbport,dbname=wm.active_db)
 		# Check for existence of to_save in database
 		chk = dbi.dbi.Action.find_one(dict(name=to_save['name']))
 		print("chk is: ")
@@ -497,7 +496,7 @@ class DBSaveAction(bpy.types.Operator):
 # Look into SQLite!
 # class DBStartup(bpy.types.Operator):
 # 	try:
-#  		dbi = bvp.bvpDB(dbname=dbname)
+#  		dbi = bvp.DBInterface(dbname=dbname)
 #  		del dbi
 # 	except pymongo.errors.ConnectionError:
 # 		import warnings
@@ -525,7 +524,7 @@ class DBSearchDialog(bpy.types.Operator):
 		global db_results
 		global last_import
 		wm = context.window_manager # Not necessary??
-		dbi = bvp.bvpDB(dbname=self.active_db)
+		dbi = bvp.DBInterface(dbname=self.active_db)
 		props = ['semantic_cat','wordnet_label','ename']
 		query = dict((p,getattr(self,p)) for p in props if getattr(self,p))
 		print(query) # unnecessary
@@ -582,7 +581,7 @@ class WordNetAddLabel(bpy.types.Operator):
 	bl_idname = "bvp.wn_addlabel"
 	bl_label = "Add current wordnet result as a label for group/action"
 	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context): 
+	def execute(self, context): 
 		# Add current label at current frame
 		wm = context.window_manager
 		act = context.object.animation_data.action
@@ -595,7 +594,7 @@ class WordNetRemoveLabel(bpy.types.Operator):
 	bl_idname = 'bvp.wn_removelabel'
 	bl_label = "remove currently highlighted label"
 	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context): 
+	def execute(self, context): 
 		wm = context.window_manager
 		act = context.object.animation_data.action
 		act.Action.wordnet_label.remove(wm.wn_label_index)
@@ -606,7 +605,7 @@ class DBImport(bpy.types.Operator):
 	bl_label = "Import scene element from database"
 	bl_options = {'REGISTER','UNDO'}
 	proxy_import = False
-	def execute(self,context): 
+	def execute(self, context): 
 		global db_results
 		global last_import
 		
@@ -632,7 +631,7 @@ class ClipFrames(bpy.types.Operator):
 	bl_idname = "bvp.clip_to_action"
 	bl_label = "Clip scene frames to begin/end of action"
 	bl_options = {'REGISTER','UNDO'}
-	def execute(self,context): 		
+	def execute(self, context): 		
 		scn = bpy.context.scene
 		act = bpy.context.object.animation_data.action
 		scn.frame_start = np.floor(act.frame_range[0])
@@ -757,7 +756,7 @@ class BVP_PANEL_action_tools(View3DPanel,Panel):
 
 	# Don't display this dialog if there isn't an action available.
 	@classmethod
-	def poll(self,context):
+	def poll(self, context):
 		if context.object:
 			if context.object.animation_data:
 				return True

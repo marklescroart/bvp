@@ -73,7 +73,8 @@ class Scene(MappedClass):
                  shadow=None, 
                  camera=None, 
                  frame_range=(1, 1), 
-                 frame_rate=DEFAULT_FRAME_RATE): 
+                 frame_rate=DEFAULT_FRAME_RATE,
+                 fname=None): # HRM...
         """Class to store scene information in Blender.
 
         Holds all information regarding background, sky (lighting), shadows, and objects (identity, size, 
@@ -262,7 +263,7 @@ class Scene(MappedClass):
             #    print('### --- Running populate_scene, attempt %d --- ###'%attempt)
             if ResetCam:
                 # Start w/ random camera, fixation position
-                cPos = self.background.CamConstraint.sampleCamPos(self.frame_range) #TODO fix
+                cPos = self.background.CamConstraint.sample_cam_pos(self.frame_range) #TODO fix
                 fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=objects_to_add)
             # Multiple object constraints for moving objects
             OC = []

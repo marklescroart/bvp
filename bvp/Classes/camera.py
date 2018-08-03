@@ -1,8 +1,21 @@
 # Imports
-import math as bnp
+import numpy as np
+
 from .constraint import CamConstraint
 from .. import utils as bvpu
-import numpy as np
+from ..options import config
+
+def parse_config_str(s, fn=float, to_array=False, marker=','):
+    s = [fn(x) for x in s.split(marker)]
+    if to_array:
+        s = np.array(s)
+    return s
+
+# Defaults
+LOCATION = parse_config_str(config.get('camera','location'))
+FIX_LOCATION = parse_config_str(config.get('camera','fix_location'))
+LENS = float(config.get('camera','lens'))
+CLIP = parse_config_str(config.get('camera', 'clip'))
 
 try:
     import bpy
@@ -13,8 +26,14 @@ except ImportError:
 
 class Camera(object):
     """Class to handle placement of camera and camera fixation target for a scene."""
-    def __init__(self, location=((17.5, -17.5, 8), ), fix_location=((0, 0, 3.5), ), frames=(1, ), lens=50., clip=(.1, 500.)): 
-        """Class to handle placement of camera and camera fixation target for a scene.
+    def __init__(self, 
+                 location=LOCATION, 
+                 fix_location=FIX_LOCATION, 
+                 euler=None, 
+                 frames=None, 
+                 lens=LENS, 
+                 clip=CLIP):
+        """Class to handle placement of camera and fixation target for a scene.
 
         Parameters
         ----------
@@ -42,11 +61,13 @@ class Camera(object):
             if not k in ('self', 'type'):
                 setattr(self, k, v)
         constr = CamConstraint() # Initialize w/ default parameters 
+        if self.frames is None:
+
         if all([x==1 for x in self.frames]):
             self.frames = (1, )
         if location is None:
-            self.location = constr.sampleCamPos(self.frames)
-        if fix_location is None:
+            self.location = constr.sample_cam_pos(self.frames)
+        if fix_location is True:
             self.fix_location = constr.sample_fix_location(self.frames)
 
     @property
@@ -88,22 +109,17 @@ class Camera(object):
             raise Exception("Cannot call place() while operating outside Blender!") # !!! TODO: general exception class for trying to call blender (bpy) functions while operating outside of blender
         if scn is None:
             scn = bpy.context.scene
-        # This looks like idiocy to me, but it might be idiocy caused by a stupid Blender bug Comment back in if something crops up here. 
-        # try:
-        #     self.clip
-        # except:
-        #     print('setting lens - this is some dumb shit!')
-        #     self.clip = (.1, 500.)
-        #     self.lens = 50.
-        # add_camera_with_target(scn, name='cam_'+id_name, location=self.location[0], 
-        #                             fix_name='camtarget_'+id_name, fix_location=self.fix_location[0], clip=self.clip, lens=self.lens)
 
         # Add camera
         cam_data = bpy.data.cameras.new('cam_{}'.format(name))
         cam = bpy.data.objects.new('cam_{}'.format(name), cam_data)
-        scn.objects.link(cam) # Make camera object present in scene
-        scn.camera = cam # Set as active camera
+        # Make camera object present in scene
+        scn.objects.link(cam) 
+        # Set as active camera
+        scn.camera = cam 
         cam.location = self.location[0]
+        if self.fix_location is None and self.euler is not None:
+            # Set camera rotation
         # Add fixation target
         fix = bpy.data.objects.new('camtarget_{}'.format(name), None)
         fix.location = self.fix_location[0]

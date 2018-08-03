@@ -1,19 +1,9 @@
-# General database class for all bvp
-# 
-# NOTE: this function should be a part of the database (docdb_lite) module. 
-# It should be general to every other module to which it is imported. 
-# 
-# OR: Having considered a little more, there should be a parent class for the docs-based classes for 
-# each module. This function can't hope to be general enough to encompass all projects. Thus this fn 
-# should inherit from a general MappedClass function in docdb_lite, and all classes in this module 
-# should inherit from this.
+# Parent class for ORM for all bvp classes
 
 import os
 import json
-#from .. import file_io as fio
 from ..options import config
 
-### --- NOTE --- ###
 """
 The functions below seem complex, but I haven't been able to come up with 
 a better way of switching between docdb _ids (to store in the database) and the
@@ -116,12 +106,6 @@ class MappedClass(object):
                 return os.path.join(self.path, self.fname)
         else:
             return None
-    # @property
-    # def is_local(self):
-    #     return os.path.exists(self.path)
-
-    # @property
-    # def temp_local(self):
 
     # move me to just a property
     def get_docdict(self, rm_fields=()): #('is_verbose', 'fpath', 'datadict')): # remove is_verbose?
