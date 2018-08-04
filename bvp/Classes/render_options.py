@@ -1,8 +1,8 @@
 """
-TODO: 
+TODO:
 
-Might be nice to store specific presets of RenderOptions, for specific final choices for rendering stimuli
-for a given experiment. 
+Might be nice to store specific presets of RenderOptions, for specific final
+choices for rendering stimuli for a given experiment.
 
 FOR NOW, this is not going to be a mapped class...
 
@@ -21,51 +21,49 @@ try:
 except ImportError:
     is_blender = False
 
-bvp_basedir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../','../'))
-render_dir = os.path.expanduser(config.get('path','render_dir'))
-render_file = os.path.abspath(os.path.join(bvp_basedir, 'Scripts', 'BlenderRender.py'))
+bvp_basedir = os.path.abspath(os.path.join(os.path.dirname(__file__),
+                                           '../', '../'))
+render_dir = os.path.expanduser(config.get('path', 'render_dir'))
+render_file = os.path.abspath(os.path.join(bvp_basedir, 'Scripts',
+                                           'BlenderRender.py'))
 
-# The "type" input for compositor node creation has been arbitrarily changed 
-# numerous times throughout Blender API development. This is EXTREMELY 
+# The "type" input for compositor node creation has been arbitrarily changed
+# numerous times throughout Blender API development. This is EXTREMELY
 # IRRITATING. Nonetheless, the format may change again, so I've collected
 # all the node type IDs here and use the variables below
 
-#['R_LAYERS', 'COMPOSITE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE', 'R_LAYERS', 'VIEWER', 'ID_MASK', 'OUTPUT_FILE']
 if sys.platform == 'darwin':
-    print('Mac computer node names!')
-    RLayerNodeX = 'R_LAYERS' 
-    CompositorNodeX = 'COMPOSITE'
-    OutputFileNodeX = 'OUTPUT_FILE'
-    ViewerNodeX = 'VIEWER'
-    SepRGBANodeX = 'CompositorNodeSepRGBA'
-    CombRGBANodeX = 'CompositorNodeCombRGBA'
-    IDmaskNodeX = 'ID_MASK'
-    MathNodeX = 'CompositorNodeMath'
-else:
-    RLayerNodeX = 'CompositorNodeRLayers' 
-    CompositorNodeX = 'CompositorNodeComposite'
-    OutputFileNodeX = 'CompositorNodeOutputFile'
-    ViewerNodeX = 'CompositorNodeViewer'
-    SepRGBANodeX = 'CompositorNodeSepRGBA'
-    CombRGBANodeX = 'CompositorNodeCombRGBA'
-    IDmaskNodeX = 'CompositorNodeIDMask'
-    MathNodeX = 'CompositorNodeMath'
+    # print('Mac computer node names!')
+    # RLayerNodeX = 'R_LAYERS'
+    # CompositorNodeX = 'COMPOSITE'
+    # OutputFileNodeX = 'OUTPUT_FILE'
+    # ViewerNodeX = 'VIEWER'
+    # SepRGBANodeX = 'CompositorNodeSepRGBA'
+    # CombRGBANodeX = 'CompositorNodeCombRGBA'
+    # IDmaskNodeX = 'ID_MASK'
+    # MathNodeX = 'CompositorNodeMath'
+    RLayerNode = 'CompositorNodeRLayers'
+    CompositorNode = 'CompositorNodeComposite'
+    OutputFileNode = 'CompositorNodeOutputFile'
+    ViewerNode = 'CompositorNodeViewer'
+    SepRGBANode = 'CompositorNodeSepRGBA'
+    CombRGBANode = 'CompositorNodeCombRGBA'
+    IDmaskNode = 'CompositorNodeIDMask'
+    MathNode = 'CompositorNodeMath'
 
-# else:
-RLayerNode = 'CompositorNodeRLayers' 
-CompositorNode = 'CompositorNodeComposite'
-OutputFileNode = 'CompositorNodeOutputFile'
-ViewerNode = 'CompositorNodeViewer'
-SepRGBANode = 'CompositorNodeSepRGBA'
-CombRGBANode = 'CompositorNodeCombRGBA'
-IDmaskNode = 'CompositorNodeIDMask'
-MathNode = 'CompositorNodeMath'
+else:
+    RLayerNode = 'CompositorNodeRLayers'
+    CompositorNode = 'CompositorNodeComposite'
+    OutputFileNode = 'CompositorNodeOutputFile'
+    ViewerNode = 'CompositorNodeViewer'
+    SepRGBANode = 'CompositorNodeSepRGBA'
+    CombRGBANode = 'CompositorNodeCombRGBA'
+    IDmaskNode = 'CompositorNodeIDMask'
+    MathNode = 'CompositorNodeMath'
 
 
 class RenderOptions(object):
-    """Class for storing render options for a scene. 
-        
-    """
+    """Class for storing render options for a scene."""
     def __init__(self, blender_params=None, bvp_params=None):
         """Initialize rendering options for scenes in BVP framework.
 
