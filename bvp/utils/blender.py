@@ -309,15 +309,14 @@ def get_mesh_objects(scn=None, select=True):
     return MeOb
 
 def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
-    """
-    Commits mirror / subsurf / other modifiers to meshes (use before joining meshes)
+    """Commits modifiers to meshes (use before joining meshes)
     
     Modifier types to commit are specified in "mTypes"
 
     NOTE: This is shitty and probably broken. Fix me.
     ALSO: deprecated. The point here should be to get a pointwise mesh, and
     there are better ways to do that than this. Leaving here temporarily, will
-    delete or replace soon.
+    eventually delete or replace.
     """
     Flag = {'Verbose':False}
     print('Committing modifiers...')
