@@ -44,12 +44,61 @@ def xyz2constr(xyz, constraint_type, origin_xyz=(0., 0., 0.)):
         out = (X**2 + Y**2 + Z**2)**0.5
     return out
 
-def make_location_animation(location_list, frames, action_name='ObjectMotion', handle_type='VECTOR'):
-    """Create a location-changing action in Blender from a list of frames and XYZ coordinates.
-    
+
+def make_locrotscale_animation(frames, action_name='ObjectMotion',
+                               handle_type='VECTOR', **kwargs):
+    """Create an action in Blender from a list of frames and values
+
     Parameters
     ----------
-    location_list : list 
+    frames : list of ints
+        Keyframes at which to fix locations
+    action_name : string
+        Name for action
+    handle_type : string | list
+        string name to specify the types of handles on the Bezier splines
+        that govern how animation interpolation is accomplished. One of:
+        'VECTOR', ... [[TODO LOOK THIS UP IN BLENDER]]. A list can be
+        provided if you want different handles for different frames (must
+        be on handle type per frame)
+    kwargs : animation_type = values pairs
+        list of which values to set for animation. Keys should be
+        locrotscale type keys, e.g. `location=...` ,
+        `rotation_euler=...`, `scale=...` etc
+        For example: location=[(x1,y1,z1), (x2, y2, z2), ...]
+    """
+
+    # Make handle_type input into a list of lists for use below
+    if isinstance(handle_type, string_types):
+        handle_type = [handle_type] * len(frames)
+    for ih, h in enumerate(handle_type):
+        if isinstance(h, string_types):
+            handle_type[ih] = [h] * 2
+        elif isinstance(h, (list, tuple)):
+            if len(h) == 1:
+                handle_type[ih] = h * 2
+
+    # Create new action
+    a = bpy.data.actions.new(action_name)
+    for k, v in kwargs.items():
+        n_curves = len(a.fcurves)
+        for iXYZ in range(3):
+            a.fcurves.new(k, index=iXYZ, action_group="LocRotScale")
+            a.fcurves[iXYZ].extrapolation = 'LINEAR'
+            for ifr, fr in enumerate(frames):
+                ii = iXYZ + n_curves
+                a.fcurves[ii].keyframe_points.insert(fr, v[ifr][iXYZ])
+                a.fcurves[ii].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
+                a.fcurves[ii].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
+            a.fcurves[iXYZ].extrapolation = 'CONSTANT'
+    return a
+
+def make_location_animation(location_list, frames, action_name='ObjectMotion', handle_type='VECTOR'):
+    """Create a location-changing action in Blender from a list of frames and XYZ coordinates.
+
+    Parameters
+    ----------
+    location_list : list
         List of [x, y, z] coordinates for each frames
     frames : list of ints
         Keyframes at which to fix locations
@@ -240,9 +289,11 @@ def get_cursor():
     location : blender Vector
         X, Y, Z location of 3D cursor
     """
-    # Now this is some serious bullshit. Look where Blender hides the cursor information. Just look.
-    V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
-    return V.spaces[0].cursor_location
+    # Now this is some serious bullshit. Look where Blender hides the cursor 
+    # information. Just look.
+    vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+    vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+    return vw_area.spaces[0].cursor_location
 
 def set_cursor(location):
     """Sets 3D cursor to specified location in VIEW_3D window
@@ -255,8 +306,9 @@ def set_cursor(location):
     location : list or bpy Vector
         Desired position of the cursor
     """
-    V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
-    V.spaces[0].cursor_location = location
+    vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+    vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+    vw_area.spaces[0].cursor_location = location
 
 def grab_only(ob):
     """Selects the input object `ob` and and deselects everything else
