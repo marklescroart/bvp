@@ -15,17 +15,17 @@ name :: NewGrpName :: real_world_size :: semanticCatString
 
 name = the name of the group in the .blend file
 NewGrpName = "x" by default. If it is changed from "x", 
-	then "SetGroupProps" will change the name of the group 
-	to the NewGrpName
+    then "SetGroupProps" will change the name of the group 
+    to the NewGrpName
 real_world_size = size in meters (floating point value)
 semanticCatString = hierarchical list of categories to which the object 
-	belongs, from most general to most specific. The (best guess for the)
-	basic-level category of the object should be marked with a *
+    belongs, from most general to most specific. The (best guess for the)
+    basic-level category of the object should be marked with a *
 
 Other related files:
 SetGroupProps.py - 
 GetGroupProps.py - creates a list of property dicts for each group in a file, 
-	stored in a .pik file (Category_Blah.blend -> Category_Blah.pik)
+    stored in a .pik file (Category_Blah.blend -> Category_Blah.pik)
 
 ML 2012.02.11
 """
@@ -37,23 +37,23 @@ import bpy,re,os,sys
 # sName = bvp.settings.files.ObListFile
 # sName = '/auto/k6/mark/BlenderFiles/objectProps.txt'
 if len(sys.argv)>1:
-	LibDir = sys.argv[-1]
+    LibDir = sys.argv[-1]
 else:
-	LibDir = bvp.Settings['Paths'][LibDir]
+    LibDir = bvp.Settings['Paths'][LibDir]
 sName = os.path.join(LibDir,'objectProps.txt')
 ###--- Change to here ---###
 fName = os.path.split(bpy.data.filepath)[-1]
 with open(sName,'a') as fid:
-	fid.write('<%s>\n'%(fName))
-	BaseCat = re.search('(?<=Category_)[A-Z,a-z,0-9]*',fName).group()
-	for G in bpy.data.groups:
-		try:
-			Sz = G.objects[0]['RealWorldSize']
-		except:
-			Sz = 1.000
-		try:
-			SemStr = G.objects[0]['semantic_category']
-		except:
-			SemStr = BaseCat.lower()
-		S = '%s:: x :: %.3f :: %s\n'%(G.name,Sz,SemStr)
-		fid.write(S)
+    fid.write('<%s>\n'%(fName))
+    BaseCat = re.search('(?<=Category_)[A-Z,a-z,0-9]*',fName).group()
+    for G in bpy.data.groups:
+        try:
+            Sz = G.objects[0]['RealWorldSize']
+        except:
+            Sz = 1.000
+        try:
+            SemStr = G.objects[0]['semantic_category']
+        except:
+            SemStr = BaseCat.lower()
+        S = '%s:: x :: %.3f :: %s\n'%(G.name,Sz,SemStr)
+        fid.write(S)

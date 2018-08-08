@@ -31,18 +31,18 @@ bvp.utils.blender.SetNoMemoryMode(nThreads=2,nPartsXY=4)
 # Specify type of render *(??) This should be specified by SL.RenderOptions.
 #fpath = copy.copy(SL.RenderOptions.filepath)
 for ii in ScnToRender:
-	Scn = SL.ScnList[ii]
-	# Create scene in Blender (load all objects)
-	Scn.Create(SL.RenderOptions)
-	## include scene number in file path
-	#SL.RenderOptions.filepath = fpath%Scn.fpath
-	# Render (animate)
-	Scn.Render(SL.RenderOptions)
-	# Clear all objects to prep for next render
-	Scn.Clear()
+    Scn = SL.ScnList[ii]
+    # Create scene in Blender (load all objects)
+    Scn.Create(SL.RenderOptions)
+    ## include scene number in file path
+    #SL.RenderOptions.filepath = fpath%Scn.fpath
+    # Render (animate)
+    Scn.Render(SL.RenderOptions)
+    # Clear all objects to prep for next render
+    Scn.Clear()
 
 # Remove temp files?
 #if ii==len(SL.ScnList):
-#	os.remove(TempFile)
+#   os.remove(TempFile)
 # Display final info? Log time taken, etc?
 #print('Finished rendering!') 

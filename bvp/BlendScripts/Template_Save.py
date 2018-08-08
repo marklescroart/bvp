@@ -11,7 +11,7 @@ tmpf = "{tmpf}"
 
 # Check for existence of group/action
 if name in getattr(bpy.data,grp_act):
-	# Delete group / action (to be replaced with this one)
+    # Delete group / action (to be replaced with this one)
 
 # Import group/action
 bpy.ops.wm.import

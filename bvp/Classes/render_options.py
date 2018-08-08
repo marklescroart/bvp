@@ -436,7 +436,7 @@ class RenderOptions(object):
         # Mask out sky by multiplying with inverted sky mask
         NodeMult = nt.nodes.new(MathNode)
         NodeMult.operation = 'MULTIPLY'
-        nt.links.new(node_rl.outputs['Z'], NodeMult.inputs[0])
+        nt.links.new(node_rl.outputs['Depth'], NodeMult.inputs[0])
         nt.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
         # Add 1000 to the sky:
         NodeMult1000 = nt.nodes.new(MathNode)
@@ -649,7 +649,7 @@ class RenderOptions(object):
         # Depth output node
         MotionOut = nt.nodes.new(OutputFileNode)
         MotionOut.location =  bmu.Vector((0., 300.))
-        MotionOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
+        MotionOut.format.file_format = 'OPEN_EXR'
         if '/Masks/' in scn.render.filepath: 
             MotionOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
             MotionOut.base_path = DepthOut.base_path.replace('/Masks/', '/Motion/')+'_mot'

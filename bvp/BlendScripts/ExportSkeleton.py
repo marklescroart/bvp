@@ -31,7 +31,7 @@ Res = sk.Settings['VolRes'] # Default (2012.08.13) = 96
 
 #LibDir = bvp.Settings['Paths']['LibDir']
 #if not LibDir==sk.Settings['LibDir']:
-#	raise Exception('Path problem! pfSkel settings "LibDir" does not match bvp settings "LibDir". GAAAAAA!')
+#    raise Exception('Path problem! pfSkel settings "LibDir" does not match bvp settings "LibDir". GAAAAAA!')
 
 Lib = bvp.bvpLibrary()
 name = 'Reptile_005_Frog' #'Mammal_005_Cat'
@@ -44,20 +44,20 @@ G = bpy.context.object
 ObList = []
 scn = bpy.context.scene
 for o in G.dupli_group.objects:
-	bvp.utils.blender.grab_only(G)
-	bpy.ops.object.proxy_make(object=G.name,type=o.name)
-	NewOb = bpy.context.object
-	if NewOb.type=='MESH':
-		me = NewOb.to_mesh(scn, True, 'RENDER')
-		NewOb.data = me
-	else:
-		continue
-	ObList.append(NewOb)
+    bvp.utils.blender.grab_only(G)
+    bpy.ops.object.proxy_make(object=G.name,type=o.name)
+    NewOb = bpy.context.object
+    if NewOb.type=='MESH':
+        me = NewOb.to_mesh(scn, True, 'RENDER')
+        NewOb.data = me
+    else:
+        continue
+    ObList.append(NewOb)
 # Get rid of 
 scn.objects.unlink(G)
 # Join objects
 for o in ObList:
-	o.select = True
+    o.select = True
 bpy.ops.object.join()
 Ob = bpy.context.object
 bvp.utils.blender.grab_only(Ob)
@@ -69,7 +69,7 @@ sk.preproc.Voxelize(OFFf,Res=Res)
 # (No way to know what file name will be without more info; so check directory for a file with the right name / max resolution:
 VOLfList = [f for f in os.listdir(sk.OFFdir) if '.vol' in f and not 'SOLID' in f and sk.utils.GetMaxDim(f)==Res]
 if len(VOLfList)>1:
-	raise Exception("WTF! too many files!")
+    raise Exception("WTF! too many files!")
 DimStr = re.search('(?<=.)[\d]*x[\d]*x[\d]*(?=.)',VOLfList[0]).group()
 # Make into solid volume 
 VOLf = os.path.join(sk.OFFdir,VOLfList[0])
@@ -83,8 +83,8 @@ print(VOLfs)
 print(SKELf)
 print('Trying to run pfSkel...')
 sk.MakeSkel(VOLfs,SKELf, # resolution is automatically read??
-				ft='PF', # Potential field (vs. Gradient Diffusion Field, "GDF")
-				fs=6, # Field strength, from 3 to 10. 6 seems to work OK
-				phd=50, # % high divergence points. 50% = mid range
-				dc=1, # number of voxels to expand (attempts to prevent wacky shit from thin protrusions)
-				hds='all')  #high divergence points selected - 'all' or 'locmin' (local minima only)
+                ft='PF', # Potential field (vs. Gradient Diffusion Field, "GDF")
+                fs=6, # Field strength, from 3 to 10. 6 seems to work OK
+                phd=50, # % high divergence points. 50% = mid range
+                dc=1, # number of voxels to expand (attempts to prevent wacky shit from thin protrusions)
+                hds='all')  #high divergence points selected - 'all' or 'locmin' (local minima only)

@@ -31,8 +31,8 @@ act_dir = os.path.join(libdir,'Actions')
 
 ### --- Assure that sub-directories of libdir exist --- ###
 for fd in [obj_dir,act_dir]:
-	if not os.path.exists(fd):
-		os.mkdir(fd)
+    if not os.path.exists(fd):
+        os.mkdir(fd)
 # All had better be directories, not zip files. (stand-alone *daes do not appear to work, FOR CHARACTERS)
 obj = sorted([os.path.join(char_dir,f) for f in os.listdir(char_dir) if ((not '.zip' in f) and os.path.isdir(os.path.join(char_dir,f)))])
 
@@ -46,7 +46,7 @@ import sys
 import re 
 
 ### --- add to bpy.utils.blender --- ###
-	
+    
 if __name__=='__main__':
-	fnm,act_name,new_fname = sys.argv[1:]
-	bvp.utils.blender.get_collada_action(fnm,act_name,new_fname) 
+    fnm,act_name,new_fname = sys.argv[1:]
+    bvp.utils.blender.get_collada_action(fnm,act_name,new_fname) 
