@@ -27,7 +27,7 @@ x,y = [p.flatten() for p in np.meshgrid(np.linspace(-5,5,nPos),np.linspace(-5,5,
 oPos = [(float(xx),float(yy),0) for xx,yy in zip(x,y)]
 
 # Cameras w/ motion (currently (2012.09.29) there are *8*)
-SLc = bvp.utils.basics.loadPik('/auto/k6/mark/SilhouettePrior/CamList.pik')
+SLc = bvp.utils.basics.load_pik('/auto/k6/mark/SilhouettePrior/CamList.pik')
 SceneCam = [s.Cam for s in SLc.ScnList]
 
 sPath = '/auto/k6/mark/SilhouettePrior/Scenes/' # Must have "Scenes/" at the end

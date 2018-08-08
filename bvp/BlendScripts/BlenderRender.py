@@ -19,7 +19,7 @@ TempFile = os.path.join(bvp.__path__[0],'Scripts','CurrentRender.pik')
 # Jitter read time to avoid stupid NFS bugs:
 time.sleep(random.random())
 if bvp.Verbosity_Level > 3: print('Attempting to load: %s'%TempFile)
-SL = bvp.utils.basics.loadPik(TempFile)
+SL = bvp.utils.basics.load_pik(TempFile)
 
 ### --- REPLACE 2 --- ###
 ScnToRender = range(len(SL.ScnList))

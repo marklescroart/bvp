@@ -163,7 +163,7 @@ class SceneList(object):
         """
         if not fName:
             fName = self.RenderOptions.BVPopts['BasePath'].replace('Scenes/%s', 'SceneList.pik')
-        bvpu.basics.savePik(self, fName)
+        bvpu.basics.save_pik(self, fName)
     
     def getCamVector(self):
         """
@@ -606,7 +606,7 @@ class SceneList(object):
         # Save scene list as a temporary pickle file to be loaded by the RenderFile
         rName = 'ScnListRender_%s%s_%s'%(self.Name, LogAdd, time.strftime('%Y%m%d_%H%M%S'))
         SLpickleFile = os.path.join(BaseDir, 'Log', rName+'.pik') 
-        bvpu.basics.savePik(self, SLpickleFile)
+        bvpu.basics.save_pik(self, SLpickleFile)
         # Set up text files to be loaded in the render process 
         BlenderPyFileBase = self.RenderOptions.BVPopts['RenderFile']
         # Get this file into a list: 

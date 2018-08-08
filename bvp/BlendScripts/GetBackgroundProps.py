@@ -31,7 +31,7 @@ ML 2012.02
 
 # Imports
 import bpy,bvp,os,re
-from bvp.utils.basics import savePik
+from bvp.utils.basics import save_pik
 from bvp.utils.blender import GetConstr
 
 d = []
@@ -103,4 +103,4 @@ for G in Grp:
 			obstacles=[bvp.Object(pos3D=list(o.location),size3D=max(o.dimensions)) for o in Obst], ## To come! ##
 			))
 sName = bpy.data.filepath.replace('.blend','.pik')
-savePik(d,sName)
+save_pik(d,sName)

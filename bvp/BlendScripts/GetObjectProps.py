@@ -30,7 +30,7 @@ ML 2012.02
 
 # Imports
 import bpy,bvp,os,re,copy
-from bvp.utils.basics import savePik
+from bvp.utils.basics import save_pik
 
 d = []
 fName = os.path.split(bpy.data.filepath)[-1]
@@ -83,4 +83,4 @@ for G in bpy.data.groups:
 			constraints=None, ## TO COME! ##
 			))
 sName = bpy.data.filepath.replace('.blend','.pik')
-savePik(d,sName)
+save_pik(d,sName)

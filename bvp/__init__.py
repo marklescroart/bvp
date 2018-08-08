@@ -18,15 +18,6 @@ archival hf5 files*.
 
 *Still to come 2014.10.23
 
-Dependencies - non python:
-mongodb server (binaries avialable for *nix, OSX, and windows at )
-
-Dependencies - python 3.X (X depends on your version of blender):
-numpy 
-matplotlib 
-scipy
-pymongo # MOVE to optional dependency...
-
 #?# blenrig add-on scripts (available at jpbouza.com.ar/wp/downloads/blenrig/current-release/blenrig-4-0) for some models
 #?# OpenEXR for handling Z depth / normal images
 

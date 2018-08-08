@@ -716,7 +716,7 @@ class RenderOptions(object):
             for m in nOb.material_slots:
                 m.material = bpy.data.materials['CycWhite']
 
-    @class_method
+    @classmethod
     def from_blend(cls, scn=None, bvp_params=None, blender_params=None):
         """Initialize render options from a given blend file
 
