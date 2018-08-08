@@ -158,7 +158,7 @@ class Camera(object):
             fix.animation_data_create()
             fix.animation_data.action = f
         else:
-            raise ValueError(('To place a camera, either fix_location or'
+            raise ValueError(('To place a camera, either property `fix_location` or'
                               '`rotation_euler` must be specified!'))
 
         # Set camera animation action

@@ -17,6 +17,7 @@ from ..options import config
 
 try:
     import bpy
+    import mathutils as bmu
     is_blender = True
 except ImportError:
     is_blender = False
@@ -159,13 +160,13 @@ class RenderOptions(object):
         self.BVPopts = {
             # BVP specific rendering options
             "Image":True, 
-            "Voxels":False, 
+            "Voxels":False, # Not yet implemented reliably. 
             "ObjectMasks":False, 
-            "Motion":False, 
+            "Motion":False, # Not yet implemented reliably. Buggy AF
             "Zdepth":False, 
             "Contours":False, #Freestyle, yet to be implemented
             "Axes":False, # based on N.Cornea code, for now - still unfinished
-            "Normals":False, # Not yet implemented
+            "Normals":False,
             "Clay":False, # Not yet implemented - All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
             "Type":'FirstFrame', # other options: "All", "FirstAndLastFrame", 'every4th'
             "RenderFile":render_file, 
@@ -281,7 +282,7 @@ class RenderOptions(object):
     Notes on nodes: The following functions add various types of compositor nodes to a scene in Blender.
     These allow output of other image files that represent other "meta-information" (e.g. Z depth, 
     normals, etc) that is separate from the pixel-by-pixel color / luminance information in standard images. 
-    To add nodes: NewNode = NT.nodes.new(type=NodeType) 
+    To add nodes: NewNode = nt.nodes.new(type=NodeType) 
     See top of code for list of node types used.
     """
     def add_object_masks(self, scn=None, single_output=False):
@@ -335,59 +336,54 @@ class RenderOptions(object):
         #####################################################################
         RL = scn.render.layers.keys()
         if not 'ObjectMasks1' in RL:
-            for iOb in range(PassCt-1):
-                ObLayer =scn.render.layers.new('ObjectMasks%d'%(iOb+1))
-                #bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-                #ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
-                #ObLayer = scn.render.layers[ObLayer[0]]
+            for iob in range(PassCt-1):
+                ob_layer = scn.render.layers.new('ObjectMasks%d'%(iob + 1))
                 for k, v in self.DefaultLayerOpts.items():
-                    ObLayer.__setattr__(k, v)
-                #ObLayer.name = 'ObjectMasks%d'%(iOb+1)
-                #RL.append('ObjectMasks%d'%(iOb+1))
-                Lay = [False for x in range(20)];
-                Lay[iOb+1] = True 
-                ObLayer.layers = tuple(Lay)
-                ObLayer.use_ztransp = True # Necessary for object indices to work for transparent materials
-                ObLayer.use_pass_object_index = True # This one only
+                    ob_layer.__setattr__(k, v)
+                layers = [False for x in range(20)];
+                layers[iob+1] = True 
+                ob_layer.layers = tuple(layers)
+                ob_layer.use_ztransp = True # Necessary for object indices to work for transparent materials
+                ob_layer.use_pass_object_index = True # This one only
         else:
             raise Exception('ObjectMasks layers already exist!')
         ########################################################################
         ### ---            Third: Set up compositor nodes:               --- ### 
         ########################################################################
-        NT = scn.node_tree
-        # Object index nodes:
-        PassIdx = [o.pass_index for o in scn.objects if o.pass_index < 100] # 100 is for skies!
-        MaxPI = max(PassIdx)
-        print('I think there are %d pass indices'%(MaxPI))
-        for iObIdx in range(MaxPI):
-            NodeRL = NT.nodes.new(type=RLayerNode)
-            NodeRL.layer = 'ObjectMasks%d'%(iObIdx+1)
+        nt = scn.node_tree
+        # Object index nodes (pass_index=100 is for skies!)
+        pass_idx = [o.pass_index for o in scn.objects if o.pass_index < 100]
+        max_pi = max(pass_idx)
+        print('Found %d pass indices'%(max_pi))
+        for iob in range(max_pi):
+            node_rl = nt.nodes.new(type=RLayerNode)
+            node_rl.layer = 'ObjectMasks%d'%(iob + 1)
 
-            NewVwNode = NT.nodes.new(ViewerNode)
-            NewIDNode = NT.nodes.new(IDmaskNode)
-            NewIDOut = NT.nodes.new(OutputFileNode)
+            NewVwNode = nt.nodes.new(ViewerNode)
+            NewIDNode = nt.nodes.new(IDmaskNode)
+            NewIDOut = nt.nodes.new(OutputFileNode)
             
-            VwNm = 'ID Mask %d View'%(iObIdx+1)
+            VwNm = 'ID Mask %d View'%(iob+1)
             NewVwNode.name = VwNm
             
-            IDNm = 'ID Mask %d'%(iObIdx+1)
+            IDNm = 'ID Mask %d'%(iob+1)
             NewIDNode.name = IDNm
-            NewIDNode.index = iObIdx+1
+            NewIDNode.index = iob+1
             # Link nodes
-            NT.links.new(NodeRL.outputs['IndexOB'], NewIDNode.inputs['ID value'])
-            NT.links.new(NewIDNode.outputs['Alpha'], NewIDOut.inputs[0])
-            NT.links.new(NewIDNode.outputs['Alpha'], NewVwNode.inputs['Image'])
+            nt.links.new(node_rl.outputs['IndexOB'], NewIDNode.inputs['ID value'])
+            nt.links.new(NewIDNode.outputs['Alpha'], NewIDOut.inputs[0])
+            nt.links.new(NewIDNode.outputs['Alpha'], NewVwNode.inputs['Image'])
             NewIDOut.format.file_format = 'PNG'
             NewIDOut.base_path = scn.render.filepath.replace('/Scenes/', '/Masks/')
             endCut = NewIDOut.base_path.index('Masks/')+len('Masks/')
             # Set unique name per frame
-            NewIDOut.file_slots[0].path = NewIDOut.base_path[endCut:]+'_m%02d'%(iObIdx+1)
-            NewIDOut.name = 'Object %d'%(iObIdx)
+            NewIDOut.file_slots[0].path = NewIDOut.base_path[endCut:]+'_m%02d'%(iob+1)
+            NewIDOut.name = 'Object %d'%(iob)
             # Set base path
             NewIDOut.base_path = NewIDOut.base_path[:endCut]
             # Set location with NewIdNode.location = ((x, y))
             nPerRow = 8.
-            Loc = bmu.Vector((bnp.modf(iObIdx/nPerRow)[0]*nPerRow, -bnp.modf(iObIdx/nPerRow)[1]))
+            Loc = bmu.Vector((bnp.modf(iob/nPerRow)[0]*nPerRow, -bnp.modf(iob/nPerRow)[1]))
             Offset = 250.
             Loc = Loc*Offset - bmu.Vector((nPerRow/2. * Offset - 300., 100.))  # hard-coded to be below RL node
             NewIDNode.location = Loc
@@ -407,54 +403,54 @@ class RenderOptions(object):
         RL = scn.render.layers.keys()
         if not 'Zdepth' in RL:
             #bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            #ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
-            #ObLayer = scn.render.layers[ObLayer[0]]
-            ObLayer = scn.render.layers.new('Zdepth')
+            #ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
+            #ob_layer = scn.render.layers[ob_layer[0]]
+            ob_layer = scn.render.layers.new('Zdepth')
             for k in self.DefaultLayerOpts.keys():
-                ObLayer.__setattr__(k, self.DefaultLayerOpts[k])
-            #ObLayer.name = 'Zdepth'
+                ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
+            #ob_layer.name = 'Zdepth'
             #RL.append('Zdepth')
-            ObLayer.use_ztransp = True # Necessary for z depth to work for transparent materials ?
-            ObLayer.use_pass_z = True # Principal interest
-            ObLayer.use_pass_object_index = True # for masking out depth of sky dome 
+            ob_layer.use_ztransp = True # Necessary for z depth to work for transparent materials ?
+            ob_layer.use_pass_z = True # Principal interest
+            ob_layer.use_pass_object_index = True # for masking out depth of sky dome 
         else:
             raise Exception('Zdepth layer already exists!')
         ########################################################################
         ### ---                Set up compositor nodes:                  --- ### 
         ########################################################################
-        NT = scn.node_tree
+        nt = scn.node_tree
         # Get all node names (keys)
-        NodeRL = NT.nodes.new(type=RLayerNode)
-        NodeRL.layer = 'Zdepth'
+        node_rl = nt.nodes.new(type=RLayerNode)
+        node_rl.layer = 'Zdepth'
 
         # Zero out all depth info from the sky dome (the sky doesn't have any depth!)
-        NodeSky = NT.nodes.new(IDmaskNode)
+        NodeSky = nt.nodes.new(IDmaskNode)
         NodeSky.use_antialiasing = False  #No AA for z depth! doesn't work to combine non-AA node w/ AA node!
         NodeSky.index = 100
-        NT.links.new(NodeRL.outputs['IndexOB'], NodeSky.inputs['ID value'])
-        NodeInv = NT.nodes.new(MathNode)
+        nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
+        NodeInv = nt.nodes.new(MathNode)
         NodeInv.operation = 'SUBTRACT'
         # Invert (ID) alpha layer, so sky values are zero, objects/bg are 1
         NodeInv.inputs[0].default_value = 1.0
-        NT.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+        nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
         # Mask out sky by multiplying with inverted sky mask
-        NodeMult = NT.nodes.new(MathNode)
+        NodeMult = nt.nodes.new(MathNode)
         NodeMult.operation = 'MULTIPLY'
-        NT.links.new(NodeRL.outputs['Z'], NodeMult.inputs[0])
-        NT.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
+        nt.links.new(node_rl.outputs['Z'], NodeMult.inputs[0])
+        nt.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
         # Add 1000 to the sky:
-        NodeMult1000 = NT.nodes.new(MathNode)
+        NodeMult1000 = nt.nodes.new(MathNode)
         NodeMult1000.operation = 'MULTIPLY'
         NodeMult1000.inputs[0].default_value = 1000.0
-        NT.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
-        NodeAdd1000 = NT.nodes.new(MathNode)
+        nt.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
+        NodeAdd1000 = nt.nodes.new(MathNode)
         NodeAdd1000.operation = 'ADD'
         NodeAdd1000.inputs[0].default_value = 1000.0
-        NT.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
-        NT.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
+        nt.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
+        nt.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
 
         # Depth output node
-        DepthOut = NT.nodes.new(OutputFileNode)
+        DepthOut = nt.nodes.new(OutputFileNode)
         DepthOut.location =  bmu.Vector((900., 300.))
         DepthOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
         if '/Masks/' in scn.render.filepath: 
@@ -474,15 +470,17 @@ class RenderOptions(object):
             # Set base path
             DepthOut.base_path = DepthOut.base_path[:endCut]
 
-        NT.links.new(NodeAdd1000.outputs[0], DepthOut.inputs[0])
+        nt.links.new(NodeAdd1000.outputs[0], DepthOut.inputs[0])
             
     def add_normals(self, scn=None, single_output=False):
-        """
-        Usage: add_normals(scn=None, single_output=False)
-
-        Adds compositor nodes to render out Normals
-
-        ML 2012.01
+        """Adds compositor nodes to render out surface normals
+        
+        Parameters
+        ----------
+        scn : blender scene instance
+            scene to which to add normals. Defaults to current scene.
+        single_output : bool
+            Whether normals will be the only rendered output from the scene
         """
         if not scn:
             scn = bpy.context.scene
@@ -494,67 +492,67 @@ class RenderOptions(object):
         RL = scn.render.layers.keys()
         if not 'Normals' in RL:
             bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
-            ObLayer = scn.render.layers[ObLayer[0]]
+            ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
+            ob_layer = scn.render.layers[ob_layer[0]]
             for k in self.DefaultLayerOpts.keys():
-                ObLayer.__setattr__(k, self.DefaultLayerOpts[k])
-            ObLayer.name = 'Normals'
+                ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
+            ob_layer.name = 'Normals'
             RL.append('Normals')
-            ObLayer.use_ztransp = True # Necessary for Normals to work for transparent materials ?
-            ObLayer.use_pass_normal = True # Principal interest
-            ObLayer.use_pass_object_index = True # for masking out sky dome normals
+            ob_layer.use_ztransp = True # Necessary for Normals to work for transparent materials ?
+            ob_layer.use_pass_normal = True # Principal interest
+            ob_layer.use_pass_object_index = True # for masking out sky dome normals
         else:
             raise Exception('Normal layer already exists!')
         ########################################################################
         ### ---                 Set up compositor nodes:                 --- ### 
         ########################################################################
         # TO DO: Make a sensible layout for these, i.e. set .location field for all nodes (not urgent...)
-        NT = scn.node_tree
-        NodeRL = NT.nodes.new(type=RLayerNode)
-        NodeRL.layer = 'Normals'
+        nt = scn.node_tree
+        node_rl = nt.nodes.new(type=RLayerNode)
+        node_rl.layer = 'Normals'
         # Normal output nodes
         # (1) Split normal channels
-        NorSpl = NT.nodes.new(type=SepRGBANode)
-        NT.links.new(NodeRL.outputs['Normal'], NorSpl.inputs['Image'])
-        NorSpl.location = NodeRL.location + bmu.Vector((600., 0))
+        NorSpl = nt.nodes.new(type=SepRGBANode)
+        nt.links.new(node_rl.outputs['Normal'], NorSpl.inputs['Image'])
+        NorSpl.location = node_rl.location + bmu.Vector((600., 0))
         UpDown = [75., 0., -75.]
         # (2) Zero out all normals on the sky dome (the sky doesn't really curve!)
-        NodeSky = NT.nodes.new(IDmaskNode)
+        NodeSky = nt.nodes.new(IDmaskNode)
         NodeSky.use_antialiasing = True
         NodeSky.index = 100
-        NT.links.new(NodeRL.outputs['IndexOB'], NodeSky.inputs['ID value'])
-        NodeInv = NT.nodes.new(MathNode)
+        nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
+        NodeInv = nt.nodes.new(MathNode)
         NodeInv.operation = 'SUBTRACT'
         # Invert alpha layer, so sky values are zero
         NodeInv.inputs[0].default_value = 1.0
-        NT.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+        nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
         # (3) re-combine to RGB image
-        NorCom = NT.nodes.new(type=CombRGBANode)
-        NorCom.location = NodeRL.location + bmu.Vector((1050., 0.))
+        NorCom = nt.nodes.new(type=CombRGBANode)
+        NorCom.location = node_rl.location + bmu.Vector((1050., 0.))
         # Normal values go from -1 to 1, but image formats won't support that, so we will add 1 
         # and store a floating-point value from to 0-2 in an .hdr file
         for iMap in range(3):
             # For masking out sky:
-            NodeMult = NT.nodes.new(MathNode)
+            NodeMult = nt.nodes.new(MathNode)
             NodeMult.operation = 'MULTIPLY'
             # For adding 1 to normal values:
-            NodeAdd1 = NT.nodes.new(MathNode)
+            NodeAdd1 = nt.nodes.new(MathNode)
             NodeAdd1.operation = 'ADD'
             NodeAdd1.inputs[1].default_value = 1.0
             # Link nodes for order of computation:
             # multiply by inverse of sky alpha: 
-            NT.links.new(NorSpl.outputs['RGB'[iMap]], NodeMult.inputs[0])
-            NT.links.new(NodeInv.outputs['Value'], NodeMult.inputs[1])
+            nt.links.new(NorSpl.outputs['RGB'[iMap]], NodeMult.inputs[0])
+            nt.links.new(NodeInv.outputs['Value'], NodeMult.inputs[1])
             # Add 1:
-            NT.links.new(NodeMult.outputs['Value'], NodeAdd1.inputs[0])
+            nt.links.new(NodeMult.outputs['Value'], NodeAdd1.inputs[0])
             # Re-combine:
-            NT.links.new(NodeAdd1.outputs['Value'], NorCom.inputs['RGB'[iMap]])
+            nt.links.new(NodeAdd1.outputs['Value'], NorCom.inputs['RGB'[iMap]])
         # Normal output node
-        NorOut = NT.nodes.new(OutputFileNode)
-        NorOut.location = NodeRL.location + bmu.Vector((1200., 0.))
+        NorOut = nt.nodes.new(OutputFileNode)
+        NorOut.location = node_rl.location + bmu.Vector((1200., 0.))
         NorOut.format.file_format = 'OPEN_EXR' #'PNG'
         NorOut.name = 'fOutput Normals'
-        NT.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
+        nt.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
         # If any other node is the principal node, replace (output folder) with /Normals/:
         if '/Masks/' in scn.render.filepath:
             NorOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
@@ -573,7 +571,7 @@ class RenderOptions(object):
             NorOut.file_slots[0].path = NorOut.base_path[endCut:]+'_nor'
             # Set base path
             NorOut.base_path = NorOut.base_path[:endCut]
-        NT.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
+        nt.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
         
     def add_motion(self, scn=None, single_output=False):
         """Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
@@ -583,7 +581,7 @@ class RenderOptions(object):
         scn : bpy scene instance | None. default = None
             Leave as default (None) for now. For potential future code upgrades
         single_output : bool
-            Set True if optical flow is the only desired output of the render
+            Whether optical flow will be the only rendered output from the scene
         """
         if not scn:
             scn = bpy.context.scene
@@ -596,60 +594,60 @@ class RenderOptions(object):
         if not 'Motion' in RL:
             bpy.ops.scene.render_layer_add() 
             # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            ObLayer = [x for x in scn.render.layers.keys() if not x in RL]
-            ObLayer = scn.render.layers[ObLayer[0]]
+            ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
+            ob_layer = scn.render.layers[ob_layer[0]]
             # /Hacky
             # Set default layer options
             for k in self.DefaultLayerOpts.keys():
-                ObLayer.__setattr__(k, self.DefaultLayerOpts[k])
+                ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
             # And set motion-specific layer options
-            ObLayer.name = 'Motion'
-            ObLayer.use_pass_vector = True # Motion layer
-            ObLayer.use_ztransp = True # Necessary (?) for motion to work for transparent materials
-            ObLayer.use_pass_z = True # Necessary (?)
-            #ObLayer.use_pass_object_index = True # for masking out depth of sky dome 
+            ob_layer.name = 'Motion'
+            ob_layer.use_pass_vector = True # Motion layer
+            ob_layer.use_ztransp = True # Necessary (?) for motion to work for transparent materials
+            ob_layer.use_pass_z = True # Necessary (?)
+            #ob_layer.use_pass_object_index = True # for masking out depth of sky dome 
             RL.append('Motion')
         else:
             raise Exception('Motion layer already exists!')
         ########################################################################
         ### ---                Set up compositor nodes:                  --- ### 
         ########################################################################
-        NT = scn.node_tree
+        nt = scn.node_tree
         # Get all node names (keys)
-        NodeRL = NT.nodes.new(type=RLayerNode)
-        NodeRL.layer = 'Motion'
+        node_rl = nt.nodes.new(type=RLayerNode)
+        node_rl.layer = 'Motion'
 
         # QUESTION: Better to zero out motion in sky?? NO for now, 
         # but leave here in case we want the option later...
         if False:
             # Zero out all depth info from the sky dome (the sky doesn't have any depth!)
-            NodeSky = NT.nodes.new(IDmaskNode)
+            NodeSky = nt.nodes.new(IDmaskNode)
             NodeSky.use_antialiasing = False  #No AA for z depth! doesn't work to combine non-AA node w/ AA node!
             NodeSky.index = 100
-            NT.links.new(NodeRL.outputs['IndexOB'], NodeSky.inputs['ID value'])
-            NodeInv = NT.nodes.new(MathNode)
+            nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
+            NodeInv = nt.nodes.new(MathNode)
             NodeInv.operation = 'SUBTRACT'
             # Invert (ID) alpha layer, so sky values are zero, objects/bg are 1
             NodeInv.inputs[0].default_value = 1.0
-            NT.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+            nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
             # Mask out sky by multiplying with inverted sky mask
-            NodeMult = NT.nodes.new(MathNode)
+            NodeMult = nt.nodes.new(MathNode)
             NodeMult.operation = 'MULTIPLY'
-            NT.links.new(NodeRL.outputs['Speed'], NodeMult.inputs[0])
-            NT.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
+            nt.links.new(node_rl.outputs['Speed'], NodeMult.inputs[0])
+            nt.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
             # Add 1000 to the sky:
-            NodeMult1000 = NT.nodes.new(MathNode)
+            NodeMult1000 = nt.nodes.new(MathNode)
             NodeMult1000.operation = 'MULTIPLY'
             NodeMult1000.inputs[0].default_value = 1000.0
-            NT.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
-            NodeAdd1000 = NT.nodes.new(MathNode)
+            nt.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
+            NodeAdd1000 = nt.nodes.new(MathNode)
             NodeAdd1000.operation = 'ADD'
             NodeAdd1000.inputs[0].default_value = 1000.0
-            NT.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
-            NT.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
+            nt.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
+            nt.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
 
         # Depth output node
-        MotionOut = NT.nodes.new(OutputFileNode)
+        MotionOut = nt.nodes.new(OutputFileNode)
         MotionOut.location =  bmu.Vector((0., 300.))
         MotionOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
         if '/Masks/' in scn.render.filepath: 
@@ -669,7 +667,7 @@ class RenderOptions(object):
             # Set base path
             MotionOut.base_path = MotionOut.base_path[:endCut]
 
-        NT.links.new(NodeRL.outputs['Speed'], MotionOut.inputs[0])
+        nt.links.new(node_rl.outputs['Speed'], MotionOut.inputs[0])
 
     def SetUpVoxelization(self, scn=None):
         """
@@ -718,3 +716,13 @@ class RenderOptions(object):
             for m in nOb.material_slots:
                 m.material = bpy.data.materials['CycWhite']
 
+    @class_method
+    def from_blend(cls, scn=None, bvp_params=None, blender_params=None):
+        """Initialize render options from a given blend file
+
+        bvp_params : dict
+            bvp_params to override defaults
+        blender_params : dict
+            dict to override any params found in file
+        """
+        pass

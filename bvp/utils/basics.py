@@ -186,6 +186,33 @@ def readEXR(fNm, isZ=True):
 		Im = Im.T
 	return Im
 
+def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
+	"""Load exr file with assumptions to map to surface normals
+	
+	clip : bool
+		Whether to clip normals to range 0-1
+	"""
+	try:
+		import cv2
+	except:
+		raise ImportError('Need cv2 package to import exr files!')
+    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
+    imc = img-1
+    y, z, x = imc.T
+    rev_x = xflip
+    rev_y = yflip
+    rev_z = zflip
+    if rev_x: 
+        x = -x
+    if rev_y:
+        y = -y
+    if rev_z:
+        z = -z
+    imc = np.dstack([x.T,y.T,z.T])
+    if clip:
+        imc = np.clip(imc, 0, 1)
+    return imc
+
 class fixedKeyDict(dict):
 	"""
 	Class definition for a dictionary with a fixed set of keys. Works just like a normal python dictionary, 
