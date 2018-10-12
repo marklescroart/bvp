@@ -10,17 +10,20 @@ def VectorFn(a):
     b = np.array(a)
     b.shape = (len(a), 1)
     return b
+
+
 def lst(a):
     a = np.array(a)
     return list(a.flatten())
 
+
 def circ_avg(a, b):
+    """Circular average of two values (in DEGREES)
     """
-    Circular average of two values (in DEGREES)
-    """
-    Tmp = np.e**(1j*a/180.*np.pi)+np.e**(1j*b/180.*np.pi)
-    Mean = np.arctan2(Tmp.imag, Tmp.real)/np.pi*180.
-    return Mean
+    tmp = np.e**(1j * a/180. * np.pi) + np.e**(1j * b / 180. * np.pi)
+    m = np.arctan2(tmp.imag, tmp.real) / np.pi * 180.
+    return m
+
 
 def circ_dist(a, b, degrees=True):
     """Compute angle between two angles w/ circular statistics
@@ -31,23 +34,29 @@ def circ_dist(a, b, degrees=True):
     dist = np.degrees(np.arctan2(phase.imag, phase.real))
     return dist
 
+
 def vecDist(a, b):
     d = np.linalg.norm(np.array(a)-np.array(b))
     d = make_blender_safe(d, 'float')
     return d
 
-# Lazy man functions
+
+# Convenience functions
 def sind(theta):
     return np.sin(np.radians(theta))
+
 
 def cosd(theta):
     return np.cos(np.radians(theta))
 
+
 def tand(theta):
     return np.tan(np.radians(theta))
 
+
 def atand(theta):
     return np.degrees(np.arctan(theta))
+
 
 def sph2cart(r, az, elev):
     """Convert spherical to cartesian coordinates
@@ -159,12 +168,9 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
     frame_index : Int
         Which frame in camera's frame list to compute the projection for
 
-    Created by ML 2011.10.06
-    """
-
-    """
-    NOTE: 
-    Note: Blender seems to convert focal length in mm to FOV by assuming a particular
+    Notes
+    -----
+    Blender seems to convert focal length in mm to FOV by assuming a particular
     (horizontal/diagonal) distance, in mm, across an image. This is not
     exactly correct, i.e. the rendering effects will not necessarily match
     with real rectilinear lenses, etc... See
@@ -178,7 +184,6 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
     FOVcomputed = 2*atand(ImDist./(2*fL)); # Focal length equation, from
     # http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
     plot(fL, FOV, 'bo', fL, FOVcomputed, 'r')
-    
     """
     ImDist = 32. # Blender assumption - see above!
     if cam_lens is not None:
@@ -286,22 +291,20 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
     imPos_R = [ImX_R, ImY_R]
 
     mbs = lambda x: make_blender_safe(x, 'float')
-    return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R) #, d, CamMat
+    return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
+
 
 def PerspectiveProj_Inv(ImPos, bvpCam, Z):
     """
-    Usage: oPos = PerspProj_Inv(ImPos, bvpCam, Z)
     
-    Inputs:
-        ImPos = x, y image position as a pct of the image (in range 0-1)
-        bvpCam = Camera class, which contains all camera info (position, lens/FOV, angle)
-        Z = distance from camera for inverse computation
-    
-    Created by ML 2011.10.06
-    """
+    Parameters
+    ----------
+    ImPos = x, y image position as a pct of the image (in range 0-1)
+    bvpCam = Camera class, which contains all camera info (position, lens/FOV, angle)
+    Z = distance from camera for inverse computation
 
-    """
-    NOTES: 
+    Notes
+    -----
 
     Blender seems to convert focal length(in mm) to FOV by assuming a particular
     (horizontal/diagonal) distance, in mm, across an image. This is not
@@ -376,6 +379,7 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
     oPos = CamMatInv*d+cPos
     return lst(oPos)
 
+
 def concatVoxels(fDir, mode='sum'):
     """
     Aggregate all 360 degree fisheye rendered images to a voxelization of an object
@@ -416,6 +420,7 @@ def concatVoxels(fDir, mode='sum'):
             elif mode=='sum':
                 vox[idx] = np.sum(tmp)
     return make_blender_safe(vox, 'float')
+
 
 class ImPosCount(object):
     """
@@ -561,8 +566,6 @@ def linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
 
     For formulas / more description, see:
     http://en.wikipedia.org/wiki/Line-plane_intersection
-
-    ML 2012.02.21
     """
     L0 = np.matrix(L0).T
     L1 = np.matrix(L1).T
@@ -580,18 +583,17 @@ def linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
 def mat2eulerXYZ(mat):
     """
     Conversion from matrix to euler
-    from wikipedia page: 
-    
+    from wikipedia page:
+
     cosYcosZ, -cosYsinZ,   sinY
     ...     , ...      ,   -cosYsinX
     ...     , ...      ,   ...
-
-    ML 2012.01
     """
     yR = np.arcsin(mat[0, 2])
     zR = np.arccos(mat[0, 0]/np.cos(yR))
     xR = np.arcsin(mat[1, 2]/-np.cos(yR))
     return np.array([xR, yR, zR])
+
 
 def mat2eulerZYX(mat):
     """
@@ -608,7 +610,8 @@ def mat2eulerZYX(mat):
     zR = np.arcsin(mat[2, 1]/np.cos(yR))
     xR = np.arcsin(mat[0, 0]/-np.cos(yR))
     return np.array([zR, yR, xR])   
-    
+
+
 def vec2eulerXYZ(vec):
     """Converts vector from CAMERA to ORIGIN to euler angles of rotation
     Parameters
@@ -622,6 +625,7 @@ def vec2eulerXYZ(vec):
     yR = 0. # ASSUMED - no roll of camera
     xR = np.degrees(np.arctan(-np.linalg.norm([X, Y])/Z))
     return xR, yR, zR
+
 
 def mnrnd(d, p, n=1):
     """
