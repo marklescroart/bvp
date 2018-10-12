@@ -35,14 +35,3 @@ def plot_cam_location(camera_list, n, fig=None, ax=None):
     #   fig.savefig(fName)
     return ax, fig
 
-### --- Many of these may go to a preprocessing library instead... --- ###
-def tilt_slant(img):
-    sky = np.all(img==0, axis=2)
-    # Tilt
-    tau = np.arctan2(img[:,:,2], img[:,:,0])
-    # Slant
-    sig = np.arccos(img[:,:,1])
-    tau[sky] = np.nan
-    sig[sky] = np.nan
-    return tau, sig
-

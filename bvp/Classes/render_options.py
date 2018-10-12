@@ -118,6 +118,7 @@ class RenderOptions(object):
         self.use_shadows = True
         self.use_envmaps = False
         # File size
+        self.engine='BLENDER_RENDER'
         self.resolution_x = 512
         self.resolution_y = 512
         self.resolution_percentage = 100
@@ -254,14 +255,14 @@ class RenderOptions(object):
         if not self.BVPopts['Image']:
             # Switch all properties from one of the file output nodes to the composite output
             # Grab a node
-            aa = [N for N in scn.node_tree.nodes if N.type==OutputFileNodeX]
+            aa = [N for N in scn.node_tree.nodes if N.type=='OUTPUT_FILE']
             print([a.type for a in scn.node_tree.nodes])
             output = aa[0]
             # Find input to this node
             Lnk = [L for L in scn.node_tree.links if L.to_node == output][0]
             Input = Lnk.from_socket
             # Remove all input to composite node:
-            NodeComposite = [N for N in scn.node_tree.nodes if N.type==CompositorNodeX][0]
+            NodeComposite = [N for N in scn.node_tree.nodes if N.type=='COMPOSITE'][0]
             L = [L for L in scn.node_tree.links if L.to_node==NodeComposite]
             for ll in L:
                 scn.node_tree.links.remove(ll)

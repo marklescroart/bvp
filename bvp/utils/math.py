@@ -15,8 +15,7 @@ def lst(a):
     return list(a.flatten())
 
 def circ_avg(a, b):
-    """
-    Circular average of two values (in DEGREES)
+    """Circular average of two values (in DEGREES)
     """
     Tmp = np.e**(1j*a/180.*np.pi)+np.e**(1j*b/180.*np.pi)
     Mean = np.arctan2(Tmp.imag, Tmp.real)/np.pi*180.
@@ -24,15 +23,13 @@ def circ_avg(a, b):
 
 def circ_dist(a, b, degrees=True):
     """Compute angle between two angles w/ circular statistics
-
-    
     """
     phase = np.e**(1j*a/180*np.pi) / np.e**(1j*b/180*np.pi)
     dist = np.degrees(np.arctan2(phase.imag, phase.real))
     return dist
 
 def vecDist(a, b):
-    d = np.linalg.norm(np.array(a)-np.array(b))
+    d = np.linalg.norm(np.array(a) - np.array(b))
     d = make_blender_safe(d, 'float')
     return d
 
@@ -85,19 +82,6 @@ def cart2sph(x, y, z, degrees=True):
     else:
         return r, theta, phi
 
-# def AddLists(a, b):
-#     """element-wise addition of two lists. 
-#     """
-#     if len(b) != len(a):
-#         if len(a[0]==len(b)):
-#             b = [b]*len(a)
-#         elif len(b[0]==len(a)):
-#             a = [a]*len(b)
-#         else:
-#             raise Exception('Incompatible list sizes!')
-#     c = [(np.array(aa)+np.array(bb)).tolist() for aa, bb in zip(a, b)]
-#     return c
-
 def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
     '''Return points in a circle. 
     
@@ -144,92 +128,82 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
     return circ_pos
 
 
-def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
+def perspective_projection(bvp_object, camera, image_size=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
     Parameters
     ----------
-    bvpObj : Object class
+    bvp_object : Object class
         Should contain object position (x, y, z) and size
-    bvpCam : Camera class
+    camera : Camera class
         Should contain a list of (x, y, z) camera and fixation positions for n frames
-    ImSz : tuple or list
+    image_size : tuple or list
         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
     frame_index : Int
         Which frame in camera's frame list to compute the projection for
 
-    Created by ML 2011.10.06
-    """
-
-    """
-    NOTE: 
-    Note: Blender seems to convert focal length in mm to FOV by assuming a particular
-    (horizontal/diagonal) distance, in mm, across an image. This is not
-    exactly correct, i.e. the rendering effects will not necessarily match
-    with real rectilinear lenses, etc... See
-    http://www.metrocast.net/~chipartist/BlensesSite/index.html
+    Notes
+    -----
+    Blender seems to convert focal length in mm to FOV by assuming 
+    a particular (horizontal/diagonal) distance, in mm, across an 
+    image. This is not exactly correct, i.e. the rendering effects 
+    will not necessarily match with real rectilinear lenses, etc... 
+    See http://www.metrocast.net/~chipartist/BlensesSite/index.html
     for more discussion.
 
-    Test run:
-    fL  = [10 15 25 35 50 100 182.881]; # different settings for focal length in Blender
-    FOV = [115.989 93.695 65.232 49.134 35.489 18.181 10] # corresponding values for FOV (computed by Blender)
-    ImDist = 32.; # 
-    FOVcomputed = 2*atand(ImDist./(2*fL)); # Focal length equation, from
-    # http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
-    plot(fL, FOV, 'bo', fL, FOVcomputed, 'r')
-    
+    # Code testing the above:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # different settings for focal length in Blender
+    focal_len  = [10 15 25 35 50 100 182.881]; 
+    # corresponding values for fov (computed by Blender)
+    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
+    # Assumed by Blender
+    image_dist = 32.
+    # Focal length equation, from:
+    # http://kmp.bdimitrov.de/technology/fov.html
+    # http://www.bobatkins.com/photography/technical/field_of_view.html
+    fov_computed = 2 * atand(image_dist. / (2 * focal_len)) 
+    plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
     """
-    ImDist = 32. # Blender assumption - see above!
+    image_dist = 32. # Blender assumption - see above!
     if cam_lens is not None:
-        FOV = 2*atand(ImDist/(2*cam_lens))
+        fov = 2*atand(image_dist/(2*cam_lens))
     else:
-        FOV = 2*atand(ImDist/(2*bvpCam.lens))
+        fov = 2*atand(image_dist/(2*camera.lens))
 
-    objPos = bvpObj.pos3D
+    objPos = bvp_object.pos3D
     if cam_location is not None:
         camPos = cam_location
     else:
-        camPos = bvpCam.location[0]
+        camPos = camera.location[0]
     if cam_fix_location is not None:
         fix_location = cam_fix_location
     else:
-        fix_location = bvpCam.fix_location[0]
+        fix_location = camera.fix_location[0]
     
     # Convert to vector
     cPos = VectorFn(camPos)
-    #cPos.shape = (3, 1) 
     fPos = VectorFn(fix_location)
-    #fPos.shape = (3, 1)
-    oPos = VectorFn(objPos) #np.array(bvpObj.pos3D) 
+    oPos = VectorFn(objPos)
     # Prep for shift in L, R directions (wrt camera)
     cVec = fPos-cPos
     
-    # Made consistent w/ non-numpy version 2012.10.23
-    ##cVec.normalize() # bmu (mathutils) function!!
-    #Lshift = VectorFn([-cVec[1], cVec[0], 0])*bvpObj.size3D/2.
-    #Rshift = VectorFn([cVec[1], -cVec[0], 0])*bvpObj.size3D/2.
-    #
-    ## Get other bounds...
-    #oPos_Top = oPos+VectorFn([0, 0, bvpObj.size3D])
-    #oPos_L = oPos+Lshift
-    #oPos_R = oPos+Rshift
-    
     # Get other bounds...
-    oPos_Top = oPos+VectorFn([0, 0, bvpObj.size3D])
-    oPos_L = oPos-VectorFn([bvpObj.size3D/2., 0, 0])
-    oPos_R = oPos+VectorFn([bvpObj.size3D/2., 0, 0])
+    oPos_Top = oPos + VectorFn([0, 0, bvp_object.size3D])
+    oPos_L = oPos - VectorFn([bvp_object.size3D / 2., 0, 0])
+    oPos_R = oPos + VectorFn([bvp_object.size3D / 2., 0, 0])
 
-    #oPos.shape = (3, 1)
     # Compute cTheta (Euler angles (XYZ) of camera)
     cVec = fPos-cPos
-    #u, s, v = np.linalg.svd(cVec)
     # Get anlge of camera in world coordinates 
     cTheta = vec2eulerXYZ(cVec)
-    #print(cTheta)
-    Flag = {'Handedness':'Right'} # Blender is Right-handed
+    # Blender is Right-handed
+    handedness = 'right' 
     x, y, z = 0, 1, 2
-    if Flag['Handedness'].lower() == 'left':
+    if handedness == 'left':
+        # (Here just in case)
         # X rotation
         xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), -sind(cTheta[x])], 
@@ -242,7 +216,7 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
         zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
             [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
-    elif Flag['Handedness'].lower() == 'right':
+    elif handedness == 'right':
         # X rotation
         xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), sind(cTheta[x])], 
@@ -255,8 +229,6 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
         zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
             [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
-    else: 
-        raise Exception('WTF are you thinking handedness should be? Options are "Right" and "Left" only!')
 
     CamMat = xRot * yRot * zRot
     d = np.array(CamMat*(oPos-cPos))
@@ -268,17 +240,17 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
     yc = (y, 0)
     zc = (z, 0)
 
-    ImX_Bot = ImSz[x]/2. - d[xc]/d[zc] * (ImSz[x]/2.) / (tand(FOV/2.));
-    ImY_Bot = d[yc]/d[zc] * (ImSz[y]/2.) / (tand(FOV/2.)) + ImSz[y]/2.;
+    ImX_Bot = image_size[x]/2. - d[xc]/d[zc] * (image_size[x]/2.) / (tand(fov/2.));
+    ImY_Bot = d[yc]/d[zc] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.;
 
-    ImX_Top = ImSz[x]/2. - d_Top[xc]/d_Top[zc] * (ImSz[x]/2.) / (tand(FOV/2.))
-    ImY_Top = d_Top[yc]/d_Top[z] * (ImSz[y]/2.) / (tand(FOV/2.)) + ImSz[y]/2.
+    ImX_Top = image_size[x]/2. - d_Top[xc]/d_Top[zc] * (image_size[x]/2.) / (tand(fov/2.))
+    ImY_Top = d_Top[yc]/d_Top[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
-    ImX_L = ImSz[x]/2. - d_L[xc]/d_L[zc] * (ImSz[x]/2.) / (tand(FOV/2.))
-    ImY_L = d_L[yc]/d_L[z] * (ImSz[y]/2.) / (tand(FOV/2.)) + ImSz[y]/2.
+    ImX_L = image_size[x]/2. - d_L[xc]/d_L[zc] * (image_size[x]/2.) / (tand(fov/2.))
+    ImY_L = d_L[yc]/d_L[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
-    ImX_R = ImSz[x]/2. - d_R[xc]/d_R[zc] * (ImSz[x]/2.) / (tand(FOV/2.))
-    ImY_R = d_R[yc]/d_R[z] * (ImSz[y]/2.) / (tand(FOV/2.)) + ImSz[y]/2.
+    ImX_R = image_size[x]/2. - d_R[xc]/d_R[zc] * (image_size[x]/2.) / (tand(fov/2.))
+    ImY_R = d_R[yc]/d_R[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
     imPos_Bot = [ImX_Bot, ImY_Bot]
     imPos_Top = [ImX_Top, ImY_Top]
@@ -288,22 +260,26 @@ def perspective_projection(bvpObj, bvpCam, ImSz=(1., 1.), cam_location=None, cam
     mbs = lambda x: make_blender_safe(x, 'float')
     return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R) #, d, CamMat
 
-def PerspectiveProj_Inv(ImPos, bvpCam, Z):
-    """
-    Usage: oPos = PerspProj_Inv(ImPos, bvpCam, Z)
+def PerspectiveProj_Inv(image_location, camera, Z):
+    """Compute object location from image location 
     
-    Inputs:
-        ImPos = x, y image position as a pct of the image (in range 0-1)
-        bvpCam = Camera class, which contains all camera info (position, lens/FOV, angle)
-        Z = distance from camera for inverse computation
-    
-    Created by ML 2011.10.06
-    """
+    ... using inverse perspective projection
 
-    """
-    NOTES: 
+    Parameters
+    ----------
+    image_location : list-like
+        x, y image position as a pct of the image (in range 0-1)
+    camera : bvp.Camera instance
+        Camera class, which contains all camera info (position, 
+        lens/fov, angle)
+    Z : scalar
+        Distance from camera for inverse computation (distance
+        is not uniquely specified otherwise)
 
-    Blender seems to convert focal length(in mm) to FOV by assuming a particular
+    Notes
+    -----
+
+    Blender seems to convert focal length(in mm) to fov by assuming a particular
     (horizontal/diagonal) distance, in mm, across an image. This is not
     exactly correct, i.e. the rendering effects will not necessarily match
     with real rectilinear lenses, etc... See
@@ -311,28 +287,28 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
     for more discussion.
     
     Test run:
-    fL  = [10 15 25 35 50 100 182.881]; # different settings for focal length in Blender
-    FOV = [115.989 93.695 65.232 49.134 35.489 18.181 10] # corresponding values for FOV (computed by Blender)
-    ImDist = 32; # found by regression w/ values above and equation below:
-    FOVcomputed = 2*atand(ImDist./(2*fL)); # Focal length equation, from
+    focal_len  = [10 15 25 35 50 100 182.881]; # different settings for focal length in Blender
+    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] # corresponding values for fov (computed by Blender)
+    image_dist = 32; # found by regression w/ values above and equation below:
+    fov_computed = 2*atand(image_dist./(2*focal_len)); # Focal length equation, from
     # http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
-    plot(fL, FOV, 'bo', fL, FOVcomputed, 'r')
+    plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
     """
 
     # Blender uses right-handed coordinates
-    Handedness = 'Right'
-    ImDist = 32. # Blender assumption - see above!
-    FOV = 2*atand(ImDist/(2*bvpCam.lens))
+    handedness = 'right'
+    image_dist = 32. # Blender assumption - see above!
+    fov = 2*atand(image_dist/(2*camera.lens))
     x, y, z = 0, 1, 2
     if Z>0:
         # ensure that Z < 0
         Z = -Z
-    cPos = VectorFn(bvpCam.location[0]) 
-    fix_location = VectorFn(bvpCam.fix_location[0])
+    cPos = VectorFn(camera.location[0]) 
+    fix_location = VectorFn(camera.fix_location[0])
     cTheta = vec2eulerXYZ(lst(fix_location-cPos))
     cTheta = VectorFn(cTheta)
     # Complication?: zero rotation in blender is DOWN, zero rotation for this computation seems to be UP
-    if Handedness == 'Left':
+    if handedness == 'left':
         # X rotation
         xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), -sind(cTheta[x])], 
@@ -345,7 +321,7 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
         zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
             [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
             [0., 0., 1.]])
-    elif Handedness == 'Right':
+    elif handedness == 'right':
         # X rotation
         xRot = np.matrix([[1., 0., 0.], 
             [0., cosd(cTheta[x]), sind(cTheta[x])], 
@@ -360,20 +336,20 @@ def PerspectiveProj_Inv(ImPos, bvpCam, Z):
             [0., 0., 1.]])      
     else: 
         raise Exception('WTF are you thinking handedness should be? Options are "Right" and "Left" only!')
-    CamMat = xRot*yRot*zRot
-    xP, yP = ImPos
-    ImSz = [1, 1]
+    CamMat = xRot * yRot * zRot
+    xP, yP = image_location
+    image_size = [1, 1]
     CamMatInv = np.linalg.pinv(CamMat);
     # sample one point at Z units from camera
-    # This calculation is basically: PctToSideOfImage * x/f * Z = X  # (tand(FOV/2.) = x/f)
+    # This calculation is basically: PctToSideOfImage * x/f * Z = X  # (tand(fov/2.) = x/f)
     d = [0, 0, Z]; 
-    d[x] = -(xP-ImSz[x]/2.) * tand(FOV/2.)/(ImSz[x]/2.) * d[z] 
-    d[y] = (yP-ImSz[y]/2.) * tand(FOV/2.)/(ImSz[y]/2.) * d[z]
+    d[x] = -(xP-image_size[x]/2.) * tand(fov/2.)/(image_size[x]/2.) * d[z] 
+    d[y] = (yP-image_size[y]/2.) * tand(fov/2.)/(image_size[y]/2.) * d[z]
     d = VectorFn(d)
     # So: d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN (?)
     # d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
     # of the object in the world.
-    oPos = CamMatInv*d+cPos
+    oPos = CamMatInv * d + cPos
     return lst(oPos)
 
 def concatVoxels(fDir, mode='sum'):
@@ -427,19 +403,19 @@ class ImPosCount(object):
     xBin - x bin edges (or, r bin edges)
     yBin - y bin edges (or, theta bin edges)
 
-    ImSz - size of each dimesion of the image (scalar) (thus, the image is assumed to be square)
+    image_size - size of each dimesion of the image (scalar) (thus, the image is assumed to be square)
     nBins - number of bins per dimension of image (scalar) (image is assumed to be square)
     e - am't (exponent) by which to increase the probability of drawing an under-represented location
 
     NOTES: 
-    * for now, nBins and ImSz are both scalar** 2012.03.15
+    * for now, nBins and image_size are both scalar** 2012.03.15
     * it seems that this could be used for radial bins as well with some minor modification
     ** i.e., just by specifying r and theta values for xBin, yBin instead of x, y values
     """
-    def __init__(self, xBin, yBin, ImSz, nBins=None, e=1):
+    def __init__(self, xBin, yBin, image_size, nBins=None, e=1):
         if nBins:
-            self.xBin = np.linspace(0, ImSz, nBins+1)
-            self.yBin = np.linspace(0, ImSz, nBins+1)
+            self.xBin = np.linspace(0, image_size, nBins+1)
+            self.yBin = np.linspace(0, image_size, nBins+1)
             self.nBins = nBins**2
         else:
             self.nBins = (len(xBin)-1)*(len(yBin)-1)
@@ -549,20 +525,17 @@ class ImPosCount(object):
         return p
 
 def linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
-    """
-    Usage: IntPt = linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.))
-
-    Find intersection of line with a plane.
+    """Find intersection of line with a plane.
     
     Line is specified by two points L0 and L1, each of which is a 
     list / tuple of (x, y, z) values.
     P0 is a point on the plane, and n is the normal of the plane.
     default is a flat floor at z=0 (P0 = (0, 0, 0), n = (0, 0, 1))
-
+    
+    Notes
+    -----
     For formulas / more description, see:
     http://en.wikipedia.org/wiki/Line-plane_intersection
-
-    ML 2012.02.21
     """
     L0 = np.matrix(L0).T
     L1 = np.matrix(L1).T
