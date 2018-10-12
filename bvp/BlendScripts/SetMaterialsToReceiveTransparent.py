@@ -8,6 +8,6 @@ import bpy
 M = bpy.data.materials
 print('I think there are %d materials!'%len(M))
 for m in M:
-	m.use_transparent_shadows = True
+    m.use_transparent_shadows = True
 print('Done with switcheroo! saving...')
 bpy.ops.wm.save_as_mainfile(filepath=bpy.data.filepath)

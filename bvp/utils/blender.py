@@ -361,15 +361,14 @@ def get_mesh_objects(scn=None, select=True):
     return MeOb
 
 def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
-    """
-    Commits mirror / subsurf / other modifiers to meshes (use before joining meshes)
+    """Commits modifiers to meshes (use before joining meshes)
     
     Modifier types to commit are specified in "mTypes"
 
     NOTE: This is shitty and probably broken. Fix me.
     ALSO: deprecated. The point here should be to get a pointwise mesh, and
     there are better ways to do that than this. Leaving here temporarily, will
-    delete or replace soon.
+    eventually delete or replace.
     """
     Flag = {'Verbose':False}
     print('Committing modifiers...')
@@ -563,6 +562,54 @@ def add_img_material(name, imfile, imtype):
     mat.texture_slots.create(0)
     mat.texture_slots[0].texture = tex
     return mat
+
+def add_vcolor(hemis, mesh=None, name='color'):
+    """Seems like `hemis` is color you wish to apply to currently selected mesh."""
+    from bpy import context as C
+    from bpy import data as D
+    if mesh is None:
+        mesh = C.scene.objects.active.data
+    elif isinstance(mesh, str):
+        mesh = D.meshes[mesh]
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    color = hemis
+    if len(hemis) == 2:
+        color = hemis[0]
+        if len(mesh.vertices) == len(hemis[1]):
+            color = hemis[1]
+
+    vcolor = mesh.vertex_colors.new(name)
+    if hasattr(mesh, "loops"):
+        loopidx = [0]*len(mesh.loops)
+        mesh.loops.foreach_get('vertex_index', loopidx)
+
+        if not isinstance(color[0], (list, tuple)):
+            for i, j in enumerate(loopidx):
+                vcolor.data[i].color = [color[j]]*3
+        else:
+            for i, j in enumerate(loopidx):
+                vcolor.data[i].color = color[j]
+    else:
+        # older blender version, need to iterate faces instead
+        print("older blender found...")
+        if not isinstance(color[0], (list, tuple)):
+            for i in range(len(mesh.faces)):
+                v = mesh.faces[i].vertices
+                vcolor.data[i].color1 = [color[v[0]]] * 3
+                vcolor.data[i].color2 = [color[v[1]]] * 3
+                vcolor.data[i].color3 = [color[v[2]]] * 3
+        else:
+            for i in len(vcolor):
+                v = mesh.faces[i].vertices
+                vcolor.data[i].color1 = color[v[0]]
+                vcolor.data[i].color2 = color[v[1]]
+                vcolor.data[i].color3 = color[v[2]]
+
+    print("Successfully added vcolor '%s'"%name)
+    return vcolor
+
 
 # LAZY SHIT MOVE ME
 RLayerNode = 'CompositorNodeRLayers' 

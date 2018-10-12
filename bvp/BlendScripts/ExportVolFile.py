@@ -20,16 +20,16 @@ vL,vN = bvp.utils.blender.getVoxelizedVertList(Gx,size=10./vRes)
 
 # Get objects!
 for G in bpy.data.groups:
-	# File name
-	fDir,blendF = os.path.split(bpy.data.filepath)
-	Cat = re.search('(?<=Category_)[^_^.]*',blendF).group()
-	Res = '%dx%dx%d'%(vRes+buf,vRes+buf,vRes+buf*2)
-	ff = Cat+'_'+G.name+'.'+Res+'.verts'
-	fNm = fBase%(ff)
-	if os.path.exists(fNm):
-		if Is_Overwrite:
-			vL,nL = bvp.utils.blender.getVoxelizedVertList(G,size=10./vRes,fNm=fNm)
-		else:
-			print('Skipping %s!'%G.name)
-	else:
-		vL,nL = bvp.utils.blender.getVoxelizedVertList(G,size=10./vRes,fNm=fNm)
+    # File name
+    fDir,blendF = os.path.split(bpy.data.filepath)
+    Cat = re.search('(?<=Category_)[^_^.]*',blendF).group()
+    Res = '%dx%dx%d'%(vRes+buf,vRes+buf,vRes+buf*2)
+    ff = Cat+'_'+G.name+'.'+Res+'.verts'
+    fNm = fBase%(ff)
+    if os.path.exists(fNm):
+        if Is_Overwrite:
+            vL,nL = bvp.utils.blender.getVoxelizedVertList(G,size=10./vRes,fNm=fNm)
+        else:
+            print('Skipping %s!'%G.name)
+    else:
+        vL,nL = bvp.utils.blender.getVoxelizedVertList(G,size=10./vRes,fNm=fNm)

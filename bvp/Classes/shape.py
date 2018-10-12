@@ -1205,20 +1205,20 @@ def _computeAB(pts, polys):
 
 
 # def get_evecs(ob, k=None):
-# 	"""Get eigenvectors and eigenvalues of Laplace-Beltrami operator for a manifold mesh object.
+#     """Get eigenvectors and eigenvalues of Laplace-Beltrami operator for a manifold mesh object.
 
-# 	k is the number of eigenvectors to compute.
+#     k is the number of eigenvectors to compute.
 
-# 	"""
-# 	pts, polys = pts_polys(ob)
-# 	# Make shape object from 
-# 	A, B = _computeAB(pts, polys)
-# 	if k is None:
-# 		n = int(len(pts)*.8)
-# 	else:
-# 		n = k
-# 	evals, evecs = la.eigsh(A, M=B, k=n, which="SM")
-# 	return evals, evecs
+#     """
+#     pts, polys = pts_polys(ob)
+#     # Make shape object from 
+#     A, B = _computeAB(pts, polys)
+#     if k is None:
+#         n = int(len(pts)*.8)
+#     else:
+#         n = k
+#     evals, evecs = la.eigsh(A, M=B, k=n, which="SM")
+#     return evals, evecs
 
 
 
@@ -1235,7 +1235,7 @@ def construct_evecs(ob, evecs, B, n):
     newpts = ev2.dot(B.T).dot(pts)
     # Add as a shape key
     #if ob.data.shape_keys is None:
-    #	ob.shape_key_add(name='Basis')
+    #    ob.shape_key_add(name='Basis')
     nm = "%d eigenvectors"%n
     ob.shape_key_add(name=nm)
     skey = ob.data.shape_keys.key_blocks[nm]
@@ -1243,41 +1243,41 @@ def construct_evecs(ob, evecs, B, n):
         skey.data[iv].co = bmu.Vector(loc)
 
 def make_vertex_color_material(ob):
-	# start in object mode
-	raise NotImplementedError('WORK IN PROGRESS!')
-	"""
-	Currently example code from http://blenderscripting.blogspot.nl/2013/03/vertex-color-map.html
-	"""
-	my_object = bpy.data.objects['Cube'].data
-	color_map_collection = my_object.vertex_colors
-	if len(color_map_collection) == 0:
-	    color_map_collection.new()
-	 
-	"""
-	let us assume for sake of brevity that there is now 
-	a vertex color map called  'Col'    
-	"""
-	 
-	color_map = color_map_collection['Col']
-	 
-	# or you could avoid using the vertex color map name
-	# color_map = color_map_collection.active  
-	 
-	i = 0
-	for poly in my_object.polygons:
-	    for idx in poly.loop_indices:
-	        rgb = [random.random() for i in range(3)]
-	        color_map.data[i].color = rgb
-	        i += 1
-	 
-	mat = bpy.data.materials.new('vertex_material')
-	mat.use_vertex_color_paint = True
-	mat.use_vertex_color_light = True  # material affected by lights
-	 
-	my_object.materials.append(mat)
+    # start in object mode
+    raise NotImplementedError('WORK IN PROGRESS!')
+    """
+    Currently example code from http://blenderscripting.blogspot.nl/2013/03/vertex-color-map.html
+    """
+    my_object = bpy.data.objects['Cube'].data
+    color_map_collection = my_object.vertex_colors
+    if len(color_map_collection) == 0:
+        color_map_collection.new()
+     
+    """
+    let us assume for sake of brevity that there is now 
+    a vertex color map called  'Col'    
+    """
+     
+    color_map = color_map_collection['Col']
+     
+    # or you could avoid using the vertex color map name
+    # color_map = color_map_collection.active  
+     
+    i = 0
+    for poly in my_object.polygons:
+        for idx in poly.loop_indices:
+            rgb = [random.random() for i in range(3)]
+            color_map.data[i].color = rgb
+            i += 1
+     
+    mat = bpy.data.materials.new('vertex_material')
+    mat.use_vertex_color_paint = True
+    mat.use_vertex_color_light = True  # material affected by lights
+     
+    my_object.materials.append(mat)
 
 def show_ica(ob, ):
-	pass
+    pass
 
 # Test script:
 """
@@ -1290,12 +1290,12 @@ evals, evecs = shape.get_evecs(ob)
 
 # reconstruction by eigenvectors
 for n in [4, 5, 6, 7, 8, 9, 10]: #, 16, 32, 64, 128, 512]:
-	shape.construct_evecs(ob, evecs, B, n)
-	if n == 4:
-		old_nm = 'Basis'
-	nm = '%d eigenvectors'%n
-	ob.data.shape_keys.key_blocks[nm].relative_key=ob.data.shape_keys.key_blocks[old_nm]
-	old_nm = nm
+    shape.construct_evecs(ob, evecs, B, n)
+    if n == 4:
+        old_nm = 'Basis'
+    nm = '%d eigenvectors'%n
+    ob.data.shape_keys.key_blocks[nm].relative_key=ob.data.shape_keys.key_blocks[old_nm]
+    old_nm = nm
 
 
 # animate eigenvectors
@@ -1303,16 +1303,16 @@ fr = 31
 nsec_per_ev = 1
 fs = 30
 for t, k in enumerate(list(ob.data.shape_keys.key_blocks)[1:]): # skip basis
-	k.value = 0.0
-	k.keyframe_insert('value', frame=fr+t*fs)
-	k.value = 1.0
-	k.keyframe_insert('value', frame=fr+(t+1)*fs)
+    k.value = 0.0
+    k.keyframe_insert('value', frame=fr+t*fs)
+    k.value = 1.0
+    k.keyframe_insert('value', frame=fr+(t+1)*fs)
 
 # colors
 nevs = 4
 for nevs in range(6):
-	cmap = shape.map_colors(evecs[:, nevs-1])
-	shape.set_vertex_colors(ob, cmap, name='eigenvector %d'%nevs)
+    cmap = shape.map_colors(evecs[:, nevs-1])
+    shape.set_vertex_colors(ob, cmap, name='eigenvector %d'%nevs)
 
 # TO DO: Make vertex color materials
 # There seems to be a limit of 6 vertex color groups (?) per mesh

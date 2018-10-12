@@ -27,7 +27,7 @@ x,y = [p.flatten() for p in np.meshgrid(np.linspace(-5,5,nPos),np.linspace(-5,5,
 oPos = [(float(xx),float(yy),0) for xx,yy in zip(x,y)]
 
 # Cameras w/ motion (currently (2012.09.29) there are *8*)
-SLc = bvp.utils.basics.loadPik('/auto/k6/mark/SilhouettePrior/CamList.pik')
+SLc = bvp.utils.basics.load_pik('/auto/k6/mark/SilhouettePrior/CamList.pik')
 SceneCam = [s.Cam for s in SLc.ScnList]
 
 sPath = '/auto/k6/mark/SilhouettePrior/Scenes/' # Must have "Scenes/" at the end
@@ -43,47 +43,47 @@ RO.resolution_x = RO.resolution_y = Res # smaller images
 RO.BVPopts['Type'] = 'All' # 'FirstFrame' # 'FirstAndLastFrame' # 
 
 if subCat:
-	ToRender = Lib.getSCL(subCat,'objects')
+    ToRender = Lib.getSCL(subCat,'objects')
 else:
-	ToRender = Lib.objects # all objects
+    ToRender = Lib.objects # all objects
 
 ScCt = 0
 ScnL = []
 for o in ToRender:
-	# Get all object variations to add as separate scenes
-	ObToAdd = []
-	for s in oSz:
-		for pos in oPos:
-			for rotZ in oRot:
-				if o['nPoses'] and render_Pose:
-					for p in range(o['nPoses']):
-						O = bvp.Object(obID=o['name'],Lib=Lib,pos3D=pos,size3D=s,rot3D=(0,0,rotZ),pose=p)
-						ObToAdd.append(O)
-						if scaleObj:
-							ScObSz = 10.*scaleObj.size3D/O.size3D
-							ScObToAdd.append
-				else:
-					O = bvp.Object(obID=o['name'],Lib=Lib,pos3D=pos,size3D=s,rot3D=(0,0,rotZ))
-					ObToAdd.append(O)
-					# Add scale object in here somehwhere... Scale for each object!
-					if scaleObj:
-						ScObSz = 10.*scaleObj.size3D/O.size3D
-						ScObToAdd.append
-	# Lights (Sky), Background
-	Sky = bvp.Sky()
-	BG = bvp.Background()
-	# Objects
-	for Obj in ObToAdd:
-		# Camera
-		for c in SceneCam:
-			#Cam = bvp.Camera() # w/ some parameters...
-			# Create Scene
-			ScCt+=1
-			fpath = 'Sc%04d_##'%(ScCt)
-			ScnL.append(bvp.Scene(Num=ScCt,Obj=(Obj,),BG=BG,Sky=Sky,
-								Shadow=None,Cam=c,FrameRange=(1,nFrames),
-								fpath=fpath,FrameRate=15))
-# Convert list of scenes to SceneList	
+    # Get all object variations to add as separate scenes
+    ObToAdd = []
+    for s in oSz:
+        for pos in oPos:
+            for rotZ in oRot:
+                if o['nPoses'] and render_Pose:
+                    for p in range(o['nPoses']):
+                        O = bvp.Object(obID=o['name'],Lib=Lib,pos3D=pos,size3D=s,rot3D=(0,0,rotZ),pose=p)
+                        ObToAdd.append(O)
+                        if scaleObj:
+                            ScObSz = 10.*scaleObj.size3D/O.size3D
+                            ScObToAdd.append
+                else:
+                    O = bvp.Object(obID=o['name'],Lib=Lib,pos3D=pos,size3D=s,rot3D=(0,0,rotZ))
+                    ObToAdd.append(O)
+                    # Add scale object in here somehwhere... Scale for each object!
+                    if scaleObj:
+                        ScObSz = 10.*scaleObj.size3D/O.size3D
+                        ScObToAdd.append
+    # Lights (Sky), Background
+    Sky = bvp.Sky()
+    BG = bvp.Background()
+    # Objects
+    for Obj in ObToAdd:
+        # Camera
+        for c in SceneCam:
+            #Cam = bvp.Camera() # w/ some parameters...
+            # Create Scene
+            ScCt+=1
+            fpath = 'Sc%04d_##'%(ScCt)
+            ScnL.append(bvp.Scene(Num=ScCt,Obj=(Obj,),BG=BG,Sky=Sky,
+                                Shadow=None,Cam=c,FrameRange=(1,nFrames),
+                                fpath=fpath,FrameRate=15))
+# Convert list of scenes to SceneList    
 SL = bvp.SceneList(ScnList=ScnL,RenderOptions=RO)
 # Save
 SL.Save(os.path.join(LibDir,'SilhouetteSceneList.pik'))
