@@ -86,7 +86,7 @@ class MappedClass(object):
         if self.dbi is None:
             return None
         else:
-            dbdir = config.get('path','db_dir')
+            db_dir = os.path.expanduser(config.get('path','db_dir'))
             #db_dir = os.path.expanduser(self.dbi.db['config']['db_dir'])
             return os.path.join(db_dir, self.type)
 
