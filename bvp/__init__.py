@@ -275,7 +275,7 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
     # Check for existence of script
     if os.path.exists(script):
         with open(script) as fid:
-            lines = script.readlines()
+            lines = fid.readlines()
         script = '\n'.join(lines)
 
     # Run 

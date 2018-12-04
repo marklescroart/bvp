@@ -9,3 +9,5 @@ for scn in bpy.data.scenes:
 			bpy.ops.object.transform_apply(scale=True)
 		except:
 			print("Failed for object %s"%o.name)
+
+bpy.ops.wm.save_as_mainfile(f)
