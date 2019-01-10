@@ -338,7 +338,7 @@ class Scene(MappedClass):
             Bone for the camera to follow
         """
 
-        #TODO find some way to specify object to track.
+        #TODO find some way to specify object to track. [bone armature parent should do it]
 
         scn = bvpu.blender.set_scene(None)
         # set layers to correct setting
@@ -354,6 +354,7 @@ class Scene(MappedClass):
                     pass
                 else:
                     raise e
+        # TODO: this is bork as well. Object should be in input. 
         arm = bpy.context.object #Pick an object
         #TODO error catching. Should we do it?
         bone = arm.pose.bones[bone] #Find the bone to track
@@ -383,16 +384,16 @@ class Scene(MappedClass):
                 y_normalized = x_scale/np.sqrt(x_scale**2+y_scale**2)
                 return [loc[0]+x_scale*final_dist,loc[1]+y_scale*final_dist]
 
-            camera_distance = self.objects[0].size3D*3 #TODO make this less arbitrary
+            camera_distance = self.objects[0].size3D * 3 #TODO make this less arbitrary
 
             self.camera.location = [ tuple(extrapolate_cam_loc_from_ob(loc, pos, camera_distance)+[self.camera.location[0][2]]) for loc,pos in zip(object_locations, positions)]
             
-            self.camera.lens /= 1.2 # The camera is closer in this setting, so we should zoom less
+            self.camera.lens /= 1.2 # TODO: Fix for general circumstances The camera is closer in this setting, so we should zoom less
 
 
-        dist = np.linalg.norm(np.array(scn.camera.location[0])-np.array(scn.objects[0].location[0]))
+        dist = np.linalg.norm(np.array(self.camera.location[0])-np.array(self.objects[0].pos3D[0]))
         obsz = self.objects[0].size3D
-        self.camera.lens *= (dist/obsz)*1.713*3
+        self.camera.lens *= (dist/obsz)*1.713*3 # TODO: Utterly wrong for arbitrary positions of camera
 
         #TODO this doesn't seem to work
         for ob in linked_objects:
