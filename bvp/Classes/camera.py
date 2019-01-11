@@ -41,23 +41,22 @@ class Camera(object):
         Parameters
         ----------
         location : list of tuples
-            a list of positions for each of n keyframes, each specifying camera
+            A list of positions for each of n keyframes, each specifying camera
             location as an (x, y, z) tuple.
-            sampled according to default camera constraint.
         fix_location : list of tuples
-            as location, but for the fixation target for the camera. Can be
+            As location, but for the fixation target for the camera. Can be
             None, if `rotation_euler` is specified.
         rotation_euler : list of tuples
-            rotation of camera, specified in radians in an (x, y, z) tuple.
+            Rotation of camera, specified in radians in an (x, y, z) tuple.
             Can be None, if `fix_location` is specified.
         frames : list | None
-            a list of the keyframes at which to insert camera / fixation or
+            A list of the keyframes at which to insert camera / fixation or
             camera angles. Position is linearly interpolated for all frames
             between the keyframes. If None, location is set for only one frame.
         lens : scalar
-            focal length for camera lens
+            Focal length for camera lens
         clip : tuple
-            near, far clipping planes for camera
+            Near, far clipping planes for camera
         """
 
         # Default camera parameters
