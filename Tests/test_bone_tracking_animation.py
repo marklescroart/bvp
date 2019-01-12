@@ -10,10 +10,13 @@ ob = humans[-2]
 ob.action = dance
 
 # Create a scene
-cam = bvp.Camera()
-scn = bvp.Scene(objects=[ob], camera=cam)
+n_frames = int(ob.action.n_frames)
+cam = bvp.Camera(location=[[8, -8, 3]] * n_frames, fix_location=[[0,0,1.6]], frames=(0, n_frames))
+scn = bvp.Scene(objects=[ob], camera=cam, frame_range=(1, n_frames+1))
 bone_name = 'RightHandMiddle3'
-scn.bake(bone_name)
+# Number of values for cam.location needs to match frames. Lame.
+
+scn.bake(bone_name, change_camera_position=False)
 
 scn.create()
 

@@ -126,9 +126,9 @@ class Scene(MappedClass):
                     setattr(self, k, None)
                 else:
                     setattr(self, k, v)
+        self._db_fields = [] #'objects', 'background', 'sky', 'shadow' # don't store scenes in database...
+        self._data_fields = ['camera', 'objects', 'background', 'sky', 'shadow'] # FIX ME
         self._temp_fields = [] # hmm... 
-        self._data_fields = ['camera', 'objects']
-        self._db_fields = ['objects', 'background', 'sky', 'shadow']
 
         if self.objects is None:
             # Make "objects" field into a list
@@ -168,7 +168,7 @@ class Scene(MappedClass):
             rstr+='%s\n'%ob
         return rstr
 
-    def check_compatibility(self, bg, act, debug=True, RaiseError=True):
+    def check_compatibility(self, bg, act, debug=True, raise_error=True):
         """Helper function for populate_scene
 
         Does a quick check of whether or not a given action is compatible with a given background.
@@ -186,7 +186,7 @@ class Scene(MappedClass):
         Could possibly extend to objects with a certain size
         """
         if bg == None or act == None:
-            if RaiseError:
+            if raise_error:
                 raise Exception('Invalid Background or Action passed into check_compatibility!')
             if debug:
                 print('Invalid Background or Action passed into check_compatibility!')
@@ -239,11 +239,18 @@ class Scene(MappedClass):
             return False
 
     
-    def populate_scene(self, ObList, ResetCam=True, ImPosCt=None, EdgeDist=0., ObOverlap=0.50, MinSz2D=0, RaiseError=False, n_iter=50):
-        """Choose positions for all objects in "ObList" input within the scene, 
+    def populate_scene(self, object_list, 
+                       reset_camera=True, 
+                       image_position_count=None, 
+                       EdgeDist=0., 
+                       ObOverlap=0.50, 
+                       MinSz2D=0, 
+                       raise_error=False, 
+                       n_iter=50):
+        """Choose positions for all objects in "object_list" input within the scene, 
         according to constraints provided by scene background.
         
-        ImPosCt tracks the number of times that each image location (bin) 
+        image_position_count tracks the number of times that each image location (bin) 
         has had an object in it. Can be omitted for single scenes (defaults
         to randomly sampling whole image)
 
@@ -252,8 +259,8 @@ class Scene(MappedClass):
         # (This just might work doubtful)
 
         from random import shuffle
-        if not ImPosCt:
-            ImPosCt = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
+        if not image_position_count:
+            image_position_count = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
         attempt = 1
         done = False
         while attempt<=n_iter and not done:
@@ -261,13 +268,13 @@ class Scene(MappedClass):
             objects_to_add = []
             #if verbosity_level > 3:
             #    print('### --- Running populate_scene, attempt %d --- ###'%attempt)
-            if ResetCam:
+            if reset_camera:
                 # Start w/ random camera, fixation position
                 cPos = self.background.CamConstraint.sample_cam_pos(self.frame_range) #TODO fix
                 fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=objects_to_add)
             # Multiple object constraints for moving objects
             OC = []
-            for ob in ObList:
+            for ob in object_list:
                 # Randomly cycle through object constraints (in case there are multiple exclusive possible locations for an object)
                 self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
                 if not OC:
@@ -279,9 +286,9 @@ class Scene(MappedClass):
                 oc = OC.pop()
                 new_ob = copy.copy(ob) # resets size each iteration as well as position
                 if new_ob.action is not None:
-                    is_compatible = self.check_compatibility(self.background, new_ob.action, RaiseError=RaiseError)
+                    is_compatible = self.check_compatibility(self.background, new_ob.action, raise_error=raise_error)
                     if not is_compatible: #Check if it is even possible to use the action
-                        if RaiseError:
+                        if raise_error:
                             raise Exception('Action' + new_ob.action.name +'is incompatible with bg' + self.background.name)
                         pass
                 if self.background.obstacles:
@@ -300,7 +307,7 @@ class Scene(MappedClass):
                     new_ob.rot3D = oc.sampleRot(self.camera)
                 if not ob.pos3D:
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
-                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, RaiseError=False, ImPosCt=ImPosCt, MinSz2D=MinSz2D)
+                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, raise_error=False, image_position_count=image_position_count, MinSz2D=MinSz2D)
                     if new_ob.pos3D is None:
                         fail = True
                         break
@@ -310,9 +317,9 @@ class Scene(MappedClass):
             else:
                 attempt+=1
         # Check for failure
-        if attempt > n_iter and RaiseError:
+        if attempt > n_iter and raise_error:
             raise Exception('MaxAttemptReached', 'Unable to populate scene %s after %d attempts!'%(self.background.name, n_iter))
-        elif attempt>n_iter and not RaiseError:
+        elif attempt>n_iter and not raise_error:
             print('Warning! Could not populate scene! Only got to %d objects!'%len(objects_to_add))
         self.objects = objects_to_add
         # Make sure last fixation hasn't "wandered" away from objects: 
@@ -396,8 +403,10 @@ class Scene(MappedClass):
         self.camera.lens *= (dist/obsz)*1.713*3 # TODO: Utterly wrong for arbitrary positions of camera
 
         #TODO this doesn't seem to work
-        for ob in linked_objects:
-            bpy.context.scene.unlink(ob)
+        # Clear wholes scene??
+        print(linked_objects) # why aren't you working...
+        for ob in bpy.context.scene.objects: #linked_objects:
+            bpy.context.scene.objects.unlink(ob)
 
 
     def create(self, render_options=None, scn=None, is_working=False):
@@ -498,6 +507,13 @@ class Scene(MappedClass):
         # Render animation
         bpy.ops.render.render(animation=True, scene=scn.name)
 
+    def save(fname):
+        """Saves scene data to .json file
+
+        Save structured scene to .json file for later loading / rendering.
+        """
+        pass
+
     @classmethod
     def from_blender(cls, scn=None, dbi=None):
         """Gathers all elements present in a blender scene into a Scene.
@@ -515,12 +531,10 @@ class Scene(MappedClass):
             0-first index for scene in scene list. (Sets render path for scene to be 'Sc%04d_##'%(Num+1))
 
         """
-        raise Exception('HUGELY WIP. NOT READY YET.') ## TODO: FIX ME!
-        assert is_blender, "Hey bozo! from_blender() can't be run outside blender!"
+        raise NotImplementedError('HUGELY WIP. NOT READY YET.') ## TODO: FIX ME!
+        assert is_blender, "from_blender() can't be run outside blender"
         if scn is None:
             scn = bpy.context.scene
-        # Initialize scene:
-        new_scn = cls.__new__(blah)
         # Scroll through scene component types:
         scene_components = ['objects', 'backgrounds', 'skies', 'shadows']
         # Get scene components:
@@ -560,6 +574,10 @@ class Scene(MappedClass):
             raise Exception('Too many/too few cameras in scene! (Found %d)'%len(C))
         C = C[0]
         CamAct = C.animation_data.action
+
+        # Initialize scene:
+        new_scn = cls.__new__(blah)
+
         # lens
         new_scn.Cam.lens = C.data.lens
         # frames

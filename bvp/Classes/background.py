@@ -51,25 +51,28 @@ class Background(MappedClass):
                     setattr(self, k, v)
         if isinstance(self.real_world_size, (list, tuple)):
             self.real_world_size = self.real_world_size[0]
-        self._temp_fields = []
-        self._data_fields = []
         self._db_fields = []
+        self._data_fields = []
+        self._temp_fields = ['CamConstraint', 'ObConstraint']
         
         #mappedclass translation is not recursive, so we must set these manually. 
         #TODO Utkarsh: find better solution to this
-        self.CamConstraint = CamConstraint()
-        if camera_constraints:
-            for k in camera_constraints.keys():
-                setattr(self.CamConstraint,k,camera_constraints[k])
+        if self.camera_constraints is not None:
+            self.CamConstraint = CamConstraint(**camera_constraints)
+        if self.object_constraints is not None:
+            self.ObConstraint = ObConstraint(**object_constraints)
+        #if camera_constraints:
+        #    for k in camera_constraints.keys():
+        #        setattr(self.CamConstraint,k,camera_constraints[k])
         
-        self.obConstraints = ObConstraint()
-        if object_constraints:
-            print(object_constraints)
-            for k in object_constraints.keys():
-                setattr(self.obConstraints,k,object_constraints[k])
+        # self.obConstraints = ObConstraint()
+        # if object_constraints:
+        #     print(object_constraints)
+        #     for k in object_constraints.keys():
+        #         setattr(self.obConstraints,k,object_constraints[k])
 
         if obstacles:
-            print(obstacles)
+            #print(obstacles)
             self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] #TODO: SemanticCat =/= semantic_category. Fix this at some point.
 
     def place(self, scn=None):

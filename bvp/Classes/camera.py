@@ -1,6 +1,6 @@
 # Imports
 import numpy as np
-
+from .mapped_class import MappedClass
 from .constraint import CamConstraint
 from .. import utils as bvpu
 from ..options import config
@@ -11,6 +11,7 @@ def parse_config_str(s, fn=float, to_array=False, marker=','):
     if to_array:
         s = np.array(s)
     return s
+
 
 # Defaults
 LOCATION = parse_config_str(config.get('camera', 'location'))
@@ -26,7 +27,7 @@ except ImportError:
     is_blender = False
 
 
-class Camera(object):
+class Camera(MappedClass):
     """Class to handle placement and fixation/angle of camera in a scene."""
     def __init__(self,
                  location=LOCATION,
@@ -34,7 +35,7 @@ class Camera(object):
                  rotation_euler=None,
                  frames=None,
                  lens=LENS,
-                 clip=CLIP
+                 clip=CLIP,
                  ):
         """Class to handle placement and fixation/angle of camera in a scene.
 
@@ -54,6 +55,7 @@ class Camera(object):
             a list of the keyframes at which to insert camera / fixation or
             camera angles. Position is linearly interpolated for all frames
             between the keyframes. If None, location is set for only one frame.
+            Frame indices should start at 1, not zero.
         lens : scalar
             focal length for camera lens
         clip : tuple
@@ -62,6 +64,10 @@ class Camera(object):
 
         # Default camera parameters
         self.type = 'Camera'
+        self._db_fields = []
+        self._data_fields = ['location', 'fix_location', 'rotation_euler', 
+                            'frames','lens','clip']
+        self._temp_fields = []
         inpt = locals()
         for k, v in inpt.items():
             if not k in ('self', 'type'):
@@ -70,16 +76,12 @@ class Camera(object):
             self.frames = (1,)
 
     @property
-    def data(self):
-        # Return data in dictionary format to reconstruct where this camera was
-        pass
-    @property
     def n_loc(self):
-        return len(self.location)
+        return 1 if self.location is None else len(self.location)
 
     @property
     def n_fix(self):
-        return len(self.fix_location)
+        return 1 if self.fix_location is None else len(self.fix_location)
 
     @property
     def n_frames(self):
@@ -88,10 +90,11 @@ class Camera(object):
     @property
     def n_keyframes(self):
         return len(self.frames)
+
     def __repr__(self):
         S = '\n~C~ Camera ~C~\n'
-        S += 'Camera lens: %s, clipping: %s, frames: %s\n cam location key points: %s\n fix location key points: %s'%(str(self.lens), 
-            str(self.clip), str(self.frames), str([["%.2f"%x for x in Pos] for Pos in self.location]), str([["%.2f"%x for x in Pos] for Pos in self.fix_location]))
+        S += 'Camera lens: %s, clipping: %s, frames: %s\n %d cam location key points\n %d fix location key points'%(str(self.lens), 
+            str(self.clip), str(self.frames), self.n_loc, self.n_fix)
         return S
 
     def place(self, name='000', draw_size=0.33, scn=None):
@@ -123,16 +126,16 @@ class Camera(object):
         cam.data.lens = self.lens
         cam.data.clip_start, cam.data.clip_end = self.clip
 
-        frames = self.frames
-        if (len(self.frames) == 2) and (self.frames[0] == 0) and (len(self.location) != 2):
-            num_frames = len(self.location)
-            frames = np.floor(np.linspace(0, self.frames[-1], num_frames,
-                                          endpoint=True)).astype(np.int)
+        #frames = self.frames
+        #if (len(self.frames) == 2) and (self.frames[0] == 0) and (len(self.location) != 2):
+        #    num_frames = len(self.location)
+        #    frames = np.floor(np.linspace(0, self.frames[-1], num_frames,
+        #                                  endpoint=True)).astype(np.int)
 
         if self.fix_location is None and self.rotation_euler is not None:
             # Set camera rotation
             cam.rotation_euler = self.rotation_euler[0]
-            a = bvpu.blender.make_locrotscale_animation(frames,
+            a = bvpu.blender.make_locrotscale_animation(self.frames,
                     action_name='CamMotion', handle_type='VECTOR',
                     location=self.location, rotation_euler=self.rotation_euler)
         elif self.fix_location is not None and self.rotation_euler is None:
@@ -149,10 +152,10 @@ class Camera(object):
             trk2.up_axis = 'UP_Y'
 
             # Set camera motion (multiple camera positions for diff. frames)
-            a = bvpu.blender.make_locrotscale_animation(frames,
+            a = bvpu.blender.make_locrotscale_animation(self.frames,
                     action_name='CamMotion', handle_type='VECTOR',
                     location=self.location)
-            f = bvpu.blender.make_locrotscale_animation(frames,
+            f = bvpu.blender.make_locrotscale_animation(self.frames,
                     action_name='FixMotion', handle_type='VECTOR',
                     location=self.fix_location)
             fix.animation_data_create()

@@ -117,7 +117,7 @@ class ObConstraint(PosConstraint):
     """Constraints on objects, specifically"""
     def __init__(self, X=None, Y=None, Z=None, 
                 theta=(None, None, 0., 360.), phi=(0., 0., 0., 0.), r=(0., 5., -25., 25.), 
-                origin=(0., 0., 0.), Sz=(6., 1., 3., 10.), zRot=(None, None, -180., 180.)):
+                origin=(0., 0., 0.), sz=(6., 1., 3., 10.), Zrot=(None, None, -180., 180.)):
         """
         Usage: ObConstraint(X=None, Y=None, Z=None, 
                 theta=(None, None, 0., 360.), phi=(0., 0., 0., 0.), r=(0., 5., -25., 25.), 

@@ -75,10 +75,10 @@ class Object(MappedClass):
                 else:
                     setattr(self, k, v)
 
+        self._db_fields = [] # action?
+        self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose']
         self._temp_fields = ['min_xyz_pos', 'max_xyz_pos', 'bounding_box_center', 
                              'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory']
-        self._data_fields = ['pos2D', 'pos3D','rot3D', 'size3D', 'action', 'pose']
-        self._db_fields = []
         # What to do here?
         self.pos2D = None # location in the image plane (normalized 0-1)
         # TODO: Determine if this is still necessary (this relates to props stored in .blend files, prob.)
@@ -94,16 +94,16 @@ class Object(MappedClass):
             ob_str += ','.join(self.semantic_category) + '\n' #[0]
             #for s in self.semantic_category[1:]: ob_str+=', %s'%s
             #ob_str+='\n'
-        if self.pos3D:
-            ob_str+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
-        if self.size3D:
-            ob_str+='Size: %.2f '%self.size3D
-        if self.pose:
-            ob_str+='Pose: #%d'%self.pose
-        if self.pos3D or self.size3D or self.pose:
-            ob_str+='\n'
-        if self.n_vertices:
-            ob_str+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
+        # if self.pos3D:
+        #     ob_str+='Position: (x=%.2f, y=%.2f, z=%.2f) '%tuple(self.pos3D)
+        # if self.size3D:
+        #     ob_str+='Size: %.2f '%self.size3D
+        # if self.pose:
+        #     ob_str+='Pose: #%d'%self.pose
+        # if self.pos3D or self.size3D or self.pose:
+        #     ob_str+='\n'
+        # if self.n_vertices:
+        #     ob_str+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
         return(ob_str)
  
     def place(self, scn=None, proxy=True):
@@ -352,8 +352,8 @@ class Object(MappedClass):
         min_pos =  self.min_xyz_pos
         return ((max_pos[0]-min_pos[0])+self.size3D,(max_pos[1]-min_pos[1])+self.size3D,(max_pos[2]-min_pos[2])+self.size3D)
 
-    def collides_with(self, ob2):
-        """Returns whether or not this object's bounding box collides  with the bounding box of ob2
+    def collides_with(self, target):
+        """Returns whether or not this object's bounding box collides  with the bounding box of target
 
         The bounding box for the object is defined as an xyz-aligned cuboid with one vertex as the max position, and its diagonally opposite vertex as the min position. This function calculates its dimensions
 
@@ -370,8 +370,8 @@ class Object(MappedClass):
         # 
         c1 = self.bounding_box_center
         d1 = self.bounding_box_dimensions
-        c2 = ob2.bounding_box_center
-        d2 = ob2.bounding_box_dimensions
+        c2 = target.bounding_box_center
+        d2 = target.bounding_box_dimensions
         
         x_collision = abs(c1[0]-c2[0]) < (d1[0]+d2[0])/2
         y_collision = abs(c1[1]-c2[1]) < (d1[1]+d2[1])/2

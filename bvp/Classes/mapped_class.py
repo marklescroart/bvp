@@ -80,7 +80,7 @@ def _id2obj_dict(dct, dbi):
 class MappedClass(object):
     
     # Temporary, meant to be overwritten by child classes
-    dbi = None
+    #dbi = None
     @property
     def path(self):
         if self.dbi is None:
@@ -95,7 +95,7 @@ class MappedClass(object):
         return self.get_docdict()
     
     @property
-    def datadict(self):
+    def data(self):
         return self.get_datadict()
     
     @property
@@ -118,7 +118,7 @@ class MappedClass(object):
         of database objects 
         """
         # Fields that are never supposed to be saved in docdb
-        _to_remove = ('docdict', 'datadict', 'fpath', 'dbi', 'data', 'shape', 'path')
+        _to_remove = ('docdict', 'data', 'fpath', 'dbi', 'data', 'shape', 'path')
         attrs = [k for k in dir(self) if (not k[:2]=='__') and (not k in _to_remove)]
         attrs = [k for k in attrs if not callable(getattr(self, k))]
         # Exclusion criteria # NOTE got rid of no_value field (fields w/ value None), added 'path' above to _to_remove
@@ -147,11 +147,25 @@ class MappedClass(object):
     def get_datadict(self, fields=None):
         if fields is None:
             fields = self._data_fields
-        for f in fields:
-            if hasattr(self, 'extras') and f in self.extras:
-                raise Exception("There should be no data fields in 'extras' attribute!")
-        dd = dict((k, self[k]) for k in fields if hasattr(self, k) and self[k] is not None)
-        return dd
+        if hasattr(self, '_id') and (self._id is not None) and not ('_id' in fields):
+            fields += ['_id']
+        output = dict()
+        for field in fields:
+            tmp = getattr(self, field)
+            if tmp is None:
+                # Skip all None attrs; those should have defaults.
+                continue
+            # Tmp is a list of BVP objects
+            if isinstance(tmp, (list, tuple)):
+                if len(tmp) > 0 and isinstance(tmp[0], MappedClass): #hasattr(tmp[0], 'data'):
+                    output[field] = [t.data for t in tmp]
+                    continue
+            # Tmp is a BVP object
+            if isinstance(tmp, MappedClass): # hasattr(tmp, 'data'):
+                output[field] = tmp.data
+            else:
+                output[field] = tmp
+        return output
 
     def db_load(self):
         """Load all attributes that are database-mapped objects objects from database.
@@ -264,7 +278,7 @@ class MappedClass(object):
         if (self.dbi is None) or (self.dbi=='None'):
             raise Exception('Must define database interface for this to work!')
         # Search for extant db object
-        proceed,doc = self.db_check(is_overwrite=is_overwrite)
+        proceed, doc = self.db_check(is_overwrite=is_overwrite)
         if not proceed:
             if isinstance(doc,(list,tuple)) and len(doc)>1:
                 raise Exception("Multiple objects found in database that match this object!")
@@ -298,6 +312,25 @@ class MappedClass(object):
         """
         ob = cls.__new__(cls)
         ob.__init__(dbi=dbinterface, **docdict)
+        return ob
+
+    @classmethod
+    def from_datadict(cls, datadict, dbinterface):
+        if '_id' in datadict:
+            ID = datadict.pop('_id')
+            docdict = dbinterface.query_documents(1, _id=ID)
+        else:
+            docdict = {}
+        # Filter fields for data objects
+        # NOTE: comes up (so far) in actions of objects, elements of scenes
+        ob = cls.__new__(cls)
+        if hasattr(ob, 'dbi'):
+            # For database classes
+            ob.__init__(dbi=dbinterface, **docdict, **datadict)
+        else:
+            # For pure data classes
+            ob.__init__(**datadict)
+        
         return ob
 
     ### --- Housekeeping --- ###
