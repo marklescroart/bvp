@@ -67,69 +67,47 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
         `rotation_euler=...`, `scale=...` etc
         For example: location=[(x1,y1,z1), (x2, y2, z2), ...]
     """
-
-    # Make handle_type input into a list of lists for use below
-    if isinstance(handle_type, string_types):
-        handle_type = [handle_type] * len(frames)
-    for ih, h in enumerate(handle_type):
-        if isinstance(h, string_types):
-            handle_type[ih] = [h] * 2
-        elif isinstance(h, (list, tuple)):
-            if len(h) == 1:
-                handle_type[ih] = h * 2
+    def _reconcile_handles(handle_type, frames):
+        """Make handle_type input into a list of lists of appropriate length"""
+        htype = copy.copy(handle_type)
+        if isinstance(htype, string_types):
+            htype = [htype] * len(frames)
+        for ih, h in enumerate(htype):
+            if isinstance(h, string_types):
+                htype[ih] = [h] * 2
+            elif isinstance(h, (list, tuple)):
+                if len(h) == 1:
+                    htype[ih] = h * 2
+        return htype
 
     # Create new action
-    a = bpy.data.actions.new(action_name)
+    act = bpy.data.actions.new(action_name)
     for k, v in kwargs.items():
-        n_curves = len(a.fcurves)
+        n_curves = len(act.fcurves)
+        # Reconcile length of `frames` w/ length of input list
+        if len(v) == len(frames):
+            frames_ = copy.copy(frames)
+        else:
+            if len(frames)==1:
+                raise ValueError('Only one frame provided for animation w/ multiple keyframes!')
+            elif len(frames)==2:
+                # Start and end frame only provided - interpolate
+                frames_ = np.linspace(frames[0], frames[1], len(v))
+            else:
+                raise ValueError('Number of frames does not match number of keyframes!')
+        # match handles to frames
+        handles = _reconcile_handles(handle_type, frames_)
         for iXYZ in range(3):
-            a.fcurves.new(k, index=iXYZ, action_group="LocRotScale")
-            a.fcurves[iXYZ].extrapolation = 'LINEAR'
-            for ifr, fr in enumerate(frames):
+            act.fcurves.new(k, index=iXYZ, action_group="LocRotScale")
+            act.fcurves[iXYZ].extrapolation = 'LINEAR'
+            for ifr, fr in enumerate(frames_):
                 ii = iXYZ + n_curves
-                a.fcurves[ii].keyframe_points.insert(fr, v[ifr][iXYZ])
-                a.fcurves[ii].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
-                a.fcurves[ii].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
-            a.fcurves[iXYZ].extrapolation = 'CONSTANT'
-    return a
+                act.fcurves[ii].keyframe_points.insert(fr, v[ifr][iXYZ])
+                act.fcurves[ii].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
+                act.fcurves[ii].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
+            act.fcurves[iXYZ].extrapolation = 'CONSTANT'
+    return act
 
-def make_location_animation(location_list, frames, action_name='ObjectMotion', handle_type='VECTOR'):
-    """Create a location-changing action in Blender from a list of frames and XYZ coordinates.
-
-    Parameters
-    ----------
-    location_list : list
-        List of [x, y, z] coordinates for each frames
-    frames : list of ints
-        Keyframes at which to fix locations
-    action_name : string
-        Name for action
-    handle_type : string | list
-        string name to specify the types of handles on the Bezier splines
-        that govern how animation interpolation is accomplished. One of:
-        'VECTOR', ... [[TODO LOOK THIS UP IN BLENDER]]. A list can be 
-        provided if you want different handles for different frames (must
-        be on handle type per frame)
-    """
-    # Make handle_type input into a list of lists for use below
-    if isinstance(handle_type, string_types):
-        handle_type = [handle_type] * len(frames)
-    for ih, h in enumerate(handle_type):
-        if isinstance(h, string_types): 
-            handle_type[ih] = [h] * 2
-        elif isinstance(h, (list,tuple)):
-            if len(h)==1:
-                handle_type[ih] = h * 2
-    a = bpy.data.actions.new(action_name)
-    for iXYZ in range(3):
-        a.fcurves.new('location', index=iXYZ, action_group="LocRotScale")
-        a.fcurves[iXYZ].extrapolation = 'LINEAR'
-        for ifr, fr in enumerate(frames):
-            a.fcurves[iXYZ].keyframe_points.insert(fr, location_list[ifr][iXYZ])
-            a.fcurves[iXYZ].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
-            a.fcurves[iXYZ].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
-        a.fcurves[iXYZ].extrapolation = 'CONSTANT'
-    return a
 
 def add_selected_to_group(group_name):
     """Adds all selected objects to group named `group_name`
@@ -139,6 +117,7 @@ def add_selected_to_group(group_name):
     ob = [o for o in scn.objects if o.select]
     for o in ob:
         grp.objects.link(o)
+
 
 def clear_scene(scn=None):
     """Resets scene to empty, ready for next.
