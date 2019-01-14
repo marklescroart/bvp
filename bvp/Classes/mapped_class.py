@@ -2,6 +2,7 @@
 
 import os
 import json
+import copy
 from ..options import config
 
 """
@@ -77,10 +78,57 @@ def _id2obj_dict(dct, dbi):
     dbi.is_verbose = vb
     return dct
 
+def _data_to_obj(datadict, dbinterface, is_verbose=False):
+    import inspect
+    import importlib
+    old_is_verbose = copy.copy(dbinterface.is_verbose)
+    dbinterface.is_verbose = is_verbose
+    # Allow feeding this function whatever
+    if isinstance(datadict, dict) and 'bvp_object' in datadict:
+        object_class_name = datadict.pop('bvp_object')
+        module, clsname = object_class_name.split('.')
+        print('Importing %s, %s'%(module, clsname))
+        module = importlib.import_module('bvp.Classes.%s'%module)
+        obcls = getattr(module, clsname)
+    else:
+        return datadict
+    # Get database info for database mapped objects
+    if '_id' in datadict:
+        ID = datadict.pop('_id')
+        docdict = dbinterface.query_documents(1, _id=ID)
+    else:
+        docdict = {}
+    # Find fields containing data dicts, convert to bvp objects
+    for key in datadict.keys():
+        value = datadict[key]
+        if isinstance(value, dict):
+            datadict[key] = _data_to_obj(value, dbinterface, is_verbose=is_verbose)
+        elif (isinstance(value, (list, tuple)) and 
+              isinstance(value[0], dict)):
+            for i in range(len(value)):
+                datadict[key][i] = _data_to_obj(value[i], dbinterface, is_verbose=is_verbose)
+    # Instantiate object
+    ob = obcls.__new__(obcls)
+    argspec = inspect.signature(ob.__init__)
+    if 'dbi' in argspec.parameters:
+        # For database classes
+        ob.__init__(dbi=dbinterface, **docdict, **datadict)
+    else:
+        # For pure data classes
+        ob.__init__(**datadict)
+    # Reset verbosity
+    dbinterface.is_verbose = old_is_verbose
+    return ob    
+
 class MappedClass(object):
     
     # Temporary, meant to be overwritten by child classes
     #dbi = None
+    # NOTE: `dbi` field is no longer included here, because 
+    # some child classes are not db-mapped... This is a bit 
+    # sloppy, and probably a good case for multiple inheritance
+    # (one class for db-mapping, one class for other common
+    # functions such as from_datadict(), etc. )
     @property
     def path(self):
         if self.dbi is None:
@@ -165,6 +213,8 @@ class MappedClass(object):
                 output[field] = tmp.data
             else:
                 output[field] = tmp
+        module = self.__class__.__module__.split('.')[-1]
+        output['bvp_object'] = '.'.join([module, self.__class__.__name__])
         return output
 
     def db_load(self):
@@ -315,23 +365,9 @@ class MappedClass(object):
         return ob
 
     @classmethod
-    def from_datadict(cls, datadict, dbinterface):
-        if '_id' in datadict:
-            ID = datadict.pop('_id')
-            docdict = dbinterface.query_documents(1, _id=ID)
-        else:
-            docdict = {}
-        # Filter fields for data objects
-        # NOTE: comes up (so far) in actions of objects, elements of scenes
-        ob = cls.__new__(cls)
-        if hasattr(ob, 'dbi'):
-            # For database classes
-            ob.__init__(dbi=dbinterface, **docdict, **datadict)
-        else:
-            # For pure data classes
-            ob.__init__(**datadict)
-        
-        return ob
+    def from_datadict(cls, datadict, dbinterface, is_verbose=False):
+        """Create an instance of the class from a data dictionary"""
+        return _data_to_obj(datadict, dbinterface, is_verbose=is_verbose)
 
     ### --- Housekeeping --- ###
     def __getitem__(self, x):

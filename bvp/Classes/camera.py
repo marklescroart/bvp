@@ -14,8 +14,8 @@ def parse_config_str(s, fn=float, to_array=False, marker=','):
 
 
 # Defaults
-LOCATION = parse_config_str(config.get('camera', 'location'))
-FIX_LOCATION = parse_config_str(config.get('camera', 'fix_location'))
+LOCATION = [parse_config_str(config.get('camera', 'location'))]
+FIX_LOCATION = [parse_config_str(config.get('camera', 'fix_location'))]
 LENS = float(config.get('camera', 'lens'))
 CLIP = parse_config_str(config.get('camera', 'clip'))
 

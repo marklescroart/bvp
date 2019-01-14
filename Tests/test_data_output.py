@@ -10,8 +10,8 @@ ob1 = humans[3]
 
 cars = dbi.query(type='Object', semantic_category='auto')
 ob2 = cars[1]
-ob2.pos3D = [3,-1,0]
-ob2.size3D = [6.0]
+ob2.pos3D = [3, -1, 0]
+ob2.size3D = 6.0
 
 # Grab an action
 actions = dbi.query(type='Action', is_translating=True, is_broken=False)

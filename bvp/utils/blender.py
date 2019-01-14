@@ -103,8 +103,8 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
             for ifr, fr in enumerate(frames_):
                 ii = iXYZ + n_curves
                 act.fcurves[ii].keyframe_points.insert(fr, v[ifr][iXYZ])
-                act.fcurves[ii].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
-                act.fcurves[ii].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
+                act.fcurves[ii].keyframe_points[ifr].handle_left_type = handles[ifr][0]
+                act.fcurves[ii].keyframe_points[ifr].handle_right_type = handles[ifr][1]
             act.fcurves[iXYZ].extrapolation = 'CONSTANT'
     return act
 
