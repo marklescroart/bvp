@@ -22,9 +22,9 @@ try:
 except ImportError:
     is_blender = False
 
+RENDER_DIR = os.path.expanduser(config.get('path', 'render_dir'))
 bvp_basedir = os.path.abspath(os.path.join(os.path.dirname(__file__),
                                            '../', '../'))
-render_dir = os.path.expanduser(config.get('path', 'render_dir'))
 render_file = os.path.abspath(os.path.join(bvp_basedir, 'Scripts',
                                            'BlenderRender.py'))
 
@@ -171,7 +171,7 @@ class RenderOptions(object):
             "Clay":False, # Not yet implemented - All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
             "Type":'FirstFrame', # other options: "All", "FirstAndLastFrame", 'every4th'
             "RenderFile":render_file, 
-            "BasePath":render_dir, 
+            "BasePath":RENDER_DIR, 
             }
         # Disallow updates that add fields
         self.__dict__ = bvpu.basics.fixedKeyDict(self.__dict__)

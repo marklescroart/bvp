@@ -326,7 +326,10 @@ class MappedClass(object):
         """
         # Initial checks
         if (self.dbi is None) or (self.dbi=='None'):
-            raise Exception('Must define database interface for this to work!')
+            raise ValueError('Must define database interface for this to work!')
+        if self.fname == '':
+            raise ValueError('BVP objects cannot be saved unless they exist in a named file')
+
         # Search for extant db object
         proceed, doc = self.db_check(is_overwrite=is_overwrite)
         if not proceed:
