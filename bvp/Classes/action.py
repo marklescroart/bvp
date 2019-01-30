@@ -95,11 +95,11 @@ class Action(MappedClass):
         self._data_fields = []
         # self.motion_trajectory = [(0,0,0) for i in range(5)]
 
-    def save(self, context):
-        """Save Action to database; must be called inside an active Blender session"""
-        if not is_blender:
-            raise Exception("Can't save while operating outside of Blender!")
-        pass
+    #def save(self, context):
+    #    """Save Action to database; must be called inside an active Blender session"""
+    #    if not is_blender:
+    #        raise Exception("Can't save while operating outside of Blender!")
+    #    pass
 
     @classmethod
     def from_blender(cls, context, dbi):

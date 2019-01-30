@@ -1000,10 +1000,14 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
     return a
 
 def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Object'), proxy=True):
-    """Add a proxy object for a Blender group to the current scene. 
+    """Add a Blender group to the current scene. 
 
     Add a group of Blender objects (all the parts of a single object, most likely) from another 
-    file to the current scene. 
+    file to the current scene. Optionally, add as a proxy object (all objects in the group 
+    lumped into a single object)
+
+    Use proxy = False if you wish to do any editing of the object
+    Use proxy = True if you just want the object as is in the original file
 
     Parameters
     ----------
@@ -1013,17 +1017,16 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         Name of group to import 
     fpath : string
         Path of directory in which .blend file resides
+    proxy : bool
+        Whether to add a proxy object (True) or full group (False)
     
     Notes
     -----
     Counts objects currently in scene and increments count.
     """ 
 
-    if name in bpy.data.groups:
-        
-        # TO DO: add:
-        # if proxy:
-        # else:
+    if (name in bpy.data.groups): # and proxy:
+        # Only add a dupli group if past group is proxy object?
 
         # Group already exists in file, for whatever reason
         print('Found group! adding new object...')

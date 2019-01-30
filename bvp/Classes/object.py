@@ -135,10 +135,16 @@ class Object(MappedClass):
             grp = bpy.context.object
         else:
             grp = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
+        print("`grp` var is: ")
+        print(grp)
+        print(type(grp))
         # Select only this object as active object
         bvpu.blender.grab_only(grp) 
         if isinstance(grp, bpy.types.Object):
-            grp_ob = grp            
+            grp_ob = grp
+            if len(grp_ob.users_group) > 1:
+                raise Exception("Unknown case: object belongs to multiple groups")
+            grp = grp_ob.users_group[0]
         else:
             grp_ob = bvpu.blender.find_group_parent(grp)
         print('grp_ob: ',grp_ob)
@@ -176,6 +182,7 @@ class Object(MappedClass):
                     raise Exception("Aborting - all armatures have pose libraries, I don't know what to do")
             elif len(armatures)==1:
                 armature = armatures[0]
+                print(armature)
         else:
             armature = None
         if proxy and armature is not None:
