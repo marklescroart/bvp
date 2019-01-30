@@ -142,9 +142,10 @@ class Object(MappedClass):
         else:
             grp_ob = bvpu.blender.find_group_parent(grp)
         print('grp_ob: ',grp_ob)
-        sz = float(self.size3D)/10. # 10 is default size for objects in archival .blend files
-        print('Setting scale to {}'.format(sz))
-        grp_ob.scale = (sz, sz, sz) # uniform x, y, z scale
+        sz_factor = float(self.size3D)/10. # 10 is default size for objects in archival .blend files
+        print('Scaling by {}'.format(sz_factor))
+        # Apply current scale; OR, just multiply by scale factor
+        grp_ob.scale *= sz_factor #(sz, sz, sz) # uniform x, y, z scale
         if self.pos3D is not None:
             print('Setting 3D location to {}'.format(self.pos3D))
             grp_ob.location = self.pos3D
