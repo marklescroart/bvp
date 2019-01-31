@@ -125,54 +125,31 @@ class Object(MappedClass):
         scn = bvpu.blender.set_scene(scn)
         if self.name=='DummyObject':
             # Default object
-            uv = bpy.ops.mesh.primitive_uv_sphere_add
-            default_diameter=10.
-            uv(size=default_diameter/2.)
-            bvpu.blender.set_cursor((0, 0, -default_diameter/2.))
-            bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-            bpy.ops.transform.translate(value=(0, 0, default_diameter/2.))
-            bvpu.blender.set_cursor((0, 0, 0))
-            grp = bpy.context.object
+            grp_ob = self.add_dummy()
         else:
-            grp = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
-        print("`grp` var is: ")
-        print(grp)
-        print(type(grp))
-        # Select only this object as active object
-        bvpu.blender.grab_only(grp) 
-        if isinstance(grp, bpy.types.Object):
-            grp_ob = grp
+            grp_ob = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
+        if not proxy:
             if len(grp_ob.users_group) > 1:
                 raise Exception("Unknown case: object belongs to multiple groups")
             grp = grp_ob.users_group[0]
-        else:
-            grp_ob = bvpu.blender.find_group_parent(grp)
-        print('grp_ob: ',grp_ob)
-        sz_factor = float(self.size3D)/10. # 10 is default size for objects in archival .blend files
-        print('Scaling by {}'.format(sz_factor))
-        # Apply current scale; OR, just multiply by scale factor
-        grp_ob.scale *= sz_factor #(sz, sz, sz) # uniform x, y, z scale
         if self.pos3D is not None:
-            print('Setting 3D location to {}'.format(self.pos3D))
             grp_ob.location = self.pos3D
         if self.rot3D is not None:
-            print('Setting 3D rotation to {}'.format(self.rot3D))
             grp_ob.rotation_euler = self.rot3D
         # Get armature, if an armature exists for this object
         if proxy:
-            armatures = [x for x in grp.dupli_group.objects if x.type=='ARMATURE']
-        elif isinstance(grp, bpy.types.Group):
-            armatures = [x for x in grp.objects if x.type=='ARMATURE']
+            armatures = [x for x in grp_ob.dupli_group.objects if x.type=='ARMATURE']
         else:
-            # This line should never be reached
-            armatures = []
-        # Select one armature for poses
-        if len(armatures)>0:
+            armatures = [x for x in grp.objects if x.type=='ARMATURE']
+        # Select one armature for poses / actions, if armatures exist
+        if len(armatures) > 0:
             # Some armature object detected. Proceed with pose / action.
-            if len(armatures)>1:
-                # Mayhaps this should raise an error...
+            if len(armatures) > 1:
+                # NOTE: this if clause is probably a bad idea, and 
+                # should just generate an error. Leaving it for now.
                 warnings.warn('Multiple armatures detected, this is probably an irregularity in the file...')
-                # Try to deal with it by selecting the armature with a pose library attached:
+                # Try to deal with multiple armatures by selecting 
+                # the armature with a pose library attached
                 pose_test = [a for a in armatures if not a.pose_library is None]
                 if len(pose_test)==0:
                     armature = armatures[0]
@@ -180,9 +157,8 @@ class Object(MappedClass):
                     armature = pose_test[0]
                 else:
                     raise Exception("Aborting - all armatures have pose libraries, I don't know what to do")
-            elif len(armatures)==1:
+            elif len(armatures) == 1:
                 armature = armatures[0]
-                print(armature)
         else:
             armature = None
         if proxy and armature is not None:
@@ -194,30 +170,40 @@ class Object(MappedClass):
         # Update self w/ list of poses
         if pose_armature is not None and pose_armature.pose_library is not None:
             self.poses = [x.name for x in pose_armature.pose_library.pose_markers]
-
         # Set pose, action
         if not self.pose is None:
             self.apply_pose(pose_armature, self.pose)
         if not self.action is None:
-            # Get Action if not already an Action object
             self.apply_action(pose_armature, self.action)
-        # Deal with particle systems. Use of particle systems in general is not advised, since
-        # they complicate sizing and drastically slow renders.
+        # Deal with particle systems on imported objects. Use of particle 
+        # systems in general is not advised, since they complicate sizing 
+        # and drastically slow renders.
         if proxy:
-            for o in grp.dupli_group.objects:
-                # Get the MODIFIER object that contains the particle system
-                particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
-                for psm in particle_modifier:
-                    # Option 1: Turn off the whole modifier (this seems to work)
-                    if self.size3D  < 3.:
-                        psm.show_render = False
-                        psm.show_viewport = False
-                    # Option 2: shorten / lengthen w/ object size
-                    # NOTE: This doesn't work, since many particle systems are modified
-                    # after creation (e.g., hair is commonly styled). Again, avoid if 
-                    # possible...
+            ob_list = list(grp_ob.dupli_group.objects)
+        else:
+            ob_list = list(grp.objects) 
+        for o in ob_list:
+            # Get the MODIFIER object that contains the particle system
+            particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
+            for psm in particle_modifier:
+                # Option 1: Turn off the whole modifier (this seems to work)
+                if self.size3D  < 3.:
+                    psm.show_render = False
+                    psm.show_viewport = False
+                # Option 2: shorten / lengthen w/ object size
+                # NOTE: This doesn't work, since many particle systems are modified
+                # after creation (e.g., hair is commonly styled). Again, avoid if 
+                # possible...
+        # Scale to correct size
+        orig_size = 10. # By BVP convention, all objects are stored in library files w/ max dim of 10 units
+        sz_factor = float(self.size3D) / orig_size
+        if pose_armature is not None:
+            pose_armature.scale *= sz_factor
+        else:
+            grp_ob.scale *= sz_factor
+
         scn.update()
-        # Switch frame & update again, because some poses / effects 
+        # Switch frame & update again, because some poses and other effects 
         # don't seem to take effect until the frame changes
         scn.frame_current+=1
         scn.update()
@@ -240,10 +226,12 @@ class Object(MappedClass):
             Action to be applied. Must have file_name and path attributes
         """
         # 
-        print(action.fpath, action.name)
-        act = bvpu.blender.add_action(action.name, action.fname, action.path)
+        #print(action.fpath, action.name)
+        act = action.link()
         if arm.animation_data is None:
             arm.animation_data_create()
+        if act is None: 
+            raise Exception("FAAAAAAAK")
         arm.animation_data.action = act
 
     def apply_pose(self, armature, pose_index):
@@ -268,6 +256,22 @@ class Object(MappedClass):
         bpy.ops.poselib.apply_pose(pose_index=pose_index)
         # Set back to previous mode; otherwise Blender may puke and die with next command
         bpy.ops.object.posemode_toggle()
+
+    def add_dummy():
+        """add a sphere in place of object
+        
+        TODO: options for what sort of shape (not just a sphere?)
+        """
+        bpy.ops.mesh.primitive_uv_sphere_add(size=self.size3D / 2.)
+        bvpu.blender.set_cursor((0, 0, -self.size3D / 2.))
+        bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+        bpy.ops.transform.translate(value=(0, 0, self.size3D / 2.))
+        bvpu.blender.set_cursor((0, 0, 0))
+        grp = bpy.context.object
+        # ?
+        grp.location = self.pos3D
+        # Rotations don't matter; it's a sphere.
+        return grp
 
     @property
     def max_xyz_pos(self):

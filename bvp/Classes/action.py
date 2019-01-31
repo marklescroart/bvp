@@ -101,6 +101,11 @@ class Action(MappedClass):
     #        raise Exception("Can't save while operating outside of Blender!")
     #    pass
 
+    def link(self):
+        # TODO: move the whole add_action function here. 
+        # Seems dumb to have it elsewhere, only used here.
+        return bvpu.blender.add_action(self.name, self.fname, self.path)
+
     @classmethod
     def from_blender(cls, context, dbi):
         """Create an Action from a selected object in Blender. 

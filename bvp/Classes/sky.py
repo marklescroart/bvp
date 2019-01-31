@@ -156,7 +156,7 @@ class Sky(MappedClass):
                     'environment_color' : 'SKY_COLOR', 
                     })
 
-    def place(self, number=0, scn=None, scale=None):
+    def place(self, number=0, scn=None, scale=None, proxy=True):
         """Adds sky to Blender scene
         """
         # Make file local, if it isn't already
@@ -166,22 +166,30 @@ class Sky(MappedClass):
             scn = bpy.context.scene # Get current scene if input not supplied
         if not self.name in [None, 'default_indoor', 'default_outdoor', 'none']:
             # Add proxies of mesh objects
-            sky_ob = bvpu.blender.add_group(self.name, self.fname, self.path)
+            sky_ob = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
             if scale is not None:
                 print('Resizing...')
                 sz = scale / self.real_world_size # most skies are 100x100 in area
                 bpy.ops.transform.resize(value=(sz, sz, sz))
-            for o in sky_ob.dupli_group.objects:
-                bvpu.blender.grab_only(sky_ob)
-                bpy.ops.object.proxy_make(object=o.name) #, object=sky_ob.name, type=o.name)
-                new_ob = bpy.context.object
-                if new_ob.type=='MESH': # This better be the sky dome
-                    bvpu.blender.set_layers(new_ob, [9])
-                    new_ob.name=sky_ob.name
-                    new_ob.pass_index = 100
-                else:
-                    # Save lamp objects for more below
-                    lamp_ob.append(new_ob)
+            if proxy:
+                for o in sky_ob.dupli_group.objects:
+                    bvpu.blender.grab_only(sky_ob)
+                    bpy.ops.object.proxy_make(object=o.name) #, object=sky_ob.name, type=o.name)
+                    new_ob = bpy.context.object
+                    if new_ob.type=='MESH': # This better be the sky dome
+                        bvpu.blender.set_layers(new_ob, [9])
+                        new_ob.name=sky_ob.name
+                        new_ob.pass_index = 100
+                    else:
+                        # Save lamp objects for more below
+                        lamp_ob.append(new_ob)
+            else:
+                for o in sky_ob.users_group[0].objects:
+                    # Unclear what layers these will be on
+                    # If it varies, need to set pass index to 100
+                    if 
+                    o.pass_index = 100
+
             # Get rid of linked group now that mesh objects and lamps are imported
             bpy.context.scene.objects.unlink(sky_ob)
             # Rename lamps

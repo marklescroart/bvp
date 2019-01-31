@@ -1,6 +1,6 @@
 # Imports
 import os
-from bvp.utils.blender import add_group
+from bvp.utils.blender import add_group, grab_only
 from .constraint import ObConstraint, CamConstraint
 from .mapped_class import MappedClass
 from .object import Object
@@ -75,7 +75,7 @@ class Background(MappedClass):
             #print(obstacles)
             self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] #TODO: SemanticCat =/= semantic_category. Fix this at some point.
 
-    def place(self, scn=None):
+    def place(self, scn=None, proxy=True):
         """
         Adds background to Blender scene
         """
@@ -87,8 +87,8 @@ class Background(MappedClass):
             scn = bpy.context.scene # Get current scene if input not supplied
         if self.name is not 'DummyBackground':
             # Add group of mesh object(s)
-            print('{}, {}'.format(self.path, self.name))
-            add_group(self.name, self.fname, self.path)
+            #print('{}, {}'.format(self.path, self.name))
+            add_group(self.name, self.fname, self.path, proxy=proxy)
         else:
             # Potentially add default background (with ground plane, other render settings...)
             print("BG is empty!")
@@ -105,18 +105,18 @@ class Background(MappedClass):
         context : bpy context
             context for determining selected object, etc
         """
-        raise Exception("Still WIP!")
         # Idiot-proofing
         assert is_blender, "from_blender() only works within an active blender session."
+
         # Get relevant blender objects 
         wm = context.window_manager
         scn = context.scene
         ob = context.object
-        bvpu.blender.grab_only(ob)
-        # Compute parameters
+        grab_only(ob)
 
+        # Compute parameters
         ## GET GROUP, USE WORDNET LABELS FOR GROUP
-        grp = 0 # FIX ME
+        grp = ob.users_group[0]
         ## WordNet labels
         wordnet_label = [s.name for s in grp.Background.wordnet_label] # or whatever 
         semantic_category = [s.name for s in grp.Background.semantic_category] # OR whatever        
@@ -135,18 +135,18 @@ class Background(MappedClass):
         # Construct bvp Action
         bg = cls.__new__(cls)
         bg.__init__(name=grp.name, 
-                        fname=thisfile, 
-                        n_vertices=n_vertices, 
-                        n_faces=n_faces, 
-                        lens=lens, 
-                        semantic_category=grp.Background.semantic_category, 
-                        object_semantic_category=grp.Background.object_semantic_category, 
-                        sky_semantic_category=grp.Background.sky_semantic_category,
-                        camera_constraint=None, # Save these? Unclear... 
-                        object_constraints=None, # same
-                        obstacles=None, # same
-                        dbi=dbi
-                        )
+                    fname=thisfile, 
+                    n_vertices=n_vertices, 
+                    n_faces=n_faces, 
+                    lens=lens, 
+                    semantic_category=grp.Background.semantic_category, 
+                    object_semantic_category=grp.Background.object_semantic_category, 
+                    sky_semantic_category=grp.Background.sky_semantic_category,
+                    camera_constraint=None, # Save these? Unclear... 
+                    object_constraints=None, # same
+                    obstacles=None, # same
+                    dbi=dbi
+                    )
         return bg
             
     # def test_background(self, frames=(1, 1), object_list=(), n_objects=0, edge_dist=0., object_overlap=0.50):

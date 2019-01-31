@@ -1029,31 +1029,32 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         # Only add a dupli group if past group is proxy object?
 
         # Group already exists in file, for whatever reason
-        print('Found group! adding new object...')
+        print('Found group! Adding new dupligroup object.')
         # Add empty
         bpy.ops.object.add() 
         # Fill empty with dupli-group object of desired group
-        G = bpy.context.object
-        G.dupli_type = "GROUP"
-        G.dupli_group = bpy.data.groups[name]
-        G.name = name
+        ob = bpy.context.object
+        ob.dupli_type = "GROUP"
+        ob.dupli_group = bpy.data.groups[name]
+        ob.name = name
     else:
-        print('Did not find group! adding...')
+        print('Did not find group! Adding group to file.')
         old_obs = list(bpy.context.scene.objects)
-        print(fpath, fname, name, proxy)
         bpy.ops.wm.append(
             directory=os.path.join(fpath, fname)+"/Group/", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
             filepath="//"+fname+"/Group/"+name, # local filepath within .blend file to the scene to be imported
-            filename=name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
+            filename=name, 
+            # NOTE: "filename" is not the name of the file but the name 
+            # of the data block, i.e. the name of the group. 
+            # This stupid naming convention is due to Blender's API.
             link=proxy, 
             #relative_path=False, 
             autoselect=True, 
             instance_groups=proxy)
         new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
-        print(new_obs)
-        G  = find_group_parent(new_obs)
-        grab_only(G)
-    return G
+        ob  = find_group_parent(new_obs)
+    grab_only(ob)
+    return ob
 
 # Belongs in Object or Shape
 def meshify(ob):

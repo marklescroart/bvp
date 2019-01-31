@@ -309,6 +309,9 @@ class MappedClass(object):
                 cloud_dir = self.path.split('s3/')[-1]
                 bucket_name = cloud_dir.split('/')[0]
                 cci = cc.get_interface(bucket_name=bucket_name)
+            else:
+                raise ValueError("File not found!")
+            print("file ({}) not found locally - attempting to download from s3/google drive".format(self.fpath))
             tmp_dir = os.path.join(local_dir, cloud_dir)
             if not os.path.exists(tmp_dir):
                 os.makedirs(tmp_dir)
@@ -317,7 +320,8 @@ class MappedClass(object):
             #self.path = tmp_dir
             self._tmppath = tmp_dir
         else:
-            print("Doing nothing - file exists locally.")
+            #print("Doing nothing - file exists locally.")
+            pass
 
     def save(self, is_overwrite=False):
         """Save the meta-data for this object to docdb database
