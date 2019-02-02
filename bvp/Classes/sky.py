@@ -187,7 +187,7 @@ class Sky(MappedClass):
                 for o in sky_ob.users_group[0].objects:
                     # Unclear what layers these will be on
                     # If it varies, need to set pass index to 100
-                    if 
+                    #if 
                     o.pass_index = 100
 
             # Get rid of linked group now that mesh objects and lamps are imported

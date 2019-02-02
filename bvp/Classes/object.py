@@ -132,6 +132,9 @@ class Object(MappedClass):
             if len(grp_ob.users_group) > 1:
                 raise Exception("Unknown case: object belongs to multiple groups")
             grp = grp_ob.users_group[0]
+        #print("=========")
+        #print(grp_ob)
+        #print("=========")
         if self.pos3D is not None:
             grp_ob.location = self.pos3D
         if self.rot3D is not None:
@@ -209,6 +212,10 @@ class Object(MappedClass):
         scn.update()
         scn.frame_current-=1
         scn.update()
+        #print("=========")
+        #print(grp_ob)
+        #print("=========")        
+        return grp_ob
 
     def apply_action(self, arm, action):
         """Apply an action to an armature.

@@ -47,7 +47,7 @@ class Material(MappedClass):
                 filepath="//"+self.fname+"\\Material\\"+self.name, # local filepath within .blend file to the scene to be imported
                 directory=self.fpath+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
                 filename=self.name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
-                link=True)
+                link=False)
 
 
     @classmethod
