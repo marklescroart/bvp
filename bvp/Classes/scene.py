@@ -1,43 +1,13 @@
-## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
-
 """
+Class for scenes, composed of background, sky, object(s), [shadows], camera
++ misc scene parameters (frames, file name**)
 
-I have a scene. In that scene are 2 objects. 
-
-I have IDs for those objects; the IDs point to database entries that reflect the unchanging aspects of that object
-(the things that will be the same for that object wherever it appears). 
-
-There are changing aspects of the objects too:
-3d position (x, y, z)
-3d rotation (x, y, z)
-3d size (scalar)
-pose (if armature)
-action (if armature)
-
-2d position (i, j *)
-* depends on camera, time
-
-So: I have my docdict, but I also have a data dict. That data dict specifies values for each of those. 
-Thus, the data for the scene will be one big-ass json file. And that will be DATA (pointed to by a file path), 
-not an entry in the database. So a given scene will have:
-
-{'object1id' : {'pos3d':[2,1,0],
-                'size3d':5,
-                'pose':3,
-                'etc':33.2},
- 'object2id' : {'pos3d':[2,1,0],
-                'size3d':5,
-                'pose':3,
-                'etc':33.2},
- 
- 'camera' : {'camdata1': 2,
-             'camdata2': 3}
-}
-
+** each SCENE can have a unique file name. 
 """
 
 # Imports
 import copy
+import json
 import numpy as np
 
 from .mapped_class import MappedClass
@@ -47,13 +17,8 @@ from .background import Background
 from .object import Object
 from .sky import Sky
 from .shadow import Shadow
-
-# TODO: Get rid of all these imports, call e.g. bvpu.basics.fixedKeyDict
-from bvp import utils as bvpu
-from bvp.utils.basics import fixedKeyDict
-from bvp.utils.blender import set_cursor
-from bvp.utils.math import ImPosCount
-from bvp.options import config
+from .. import utils
+from ..options import config
 
 try:
     import bpy
@@ -127,7 +92,7 @@ class Scene(MappedClass):
                 else:
                     setattr(self, k, v)
         self._db_fields = [] #'objects', 'background', 'sky', 'shadow' # don't store scenes in database...
-        self._data_fields = ['camera', 'objects', 'background', 'sky', 'shadow'] # FIX ME
+        self._data_fields = ['camera', 'objects', 'background', 'sky', 'shadow', 'fname'] 
         self._temp_fields = [] # hmm... 
 
         if self.objects is None:
@@ -153,8 +118,8 @@ class Scene(MappedClass):
 
     @property
     def scn_params(self):
-        param_dict = fixedKeyDict({'frame_start':self.frame_range[0], 
-                                   'frame_end':self.frame_range[1]}) # Default is 3 seconds
+        param_dict = utils.basics.fixedKeyDict({'frame_start':self.frame_range[0], 
+                                                'frame_end':self.frame_range[1]}) # Default is 3 seconds
         return param_dict
 
     def __repr__(self):
@@ -260,7 +225,7 @@ class Scene(MappedClass):
 
         from random import shuffle
         if not image_position_count:
-            image_position_count = ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
+            image_position_count = utils.math.ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
         attempt = 1
         done = False
         while attempt<=n_iter and not done:
@@ -334,7 +299,7 @@ class Scene(MappedClass):
         """
         pass
 
-    def bake(self, bone, change_camera_position=False):
+    def bake(self, target, bone, change_camera_position=False, clear=False):
         """Perform computations that must be performed before render time, but still need to run in Blender. 
 
         Currently calculates camera trajectory when it is made to follow a body part.
@@ -347,49 +312,37 @@ class Scene(MappedClass):
 
         #TODO find some way to specify object to track. [bone armature parent should do it]
 
-        scn = bvpu.blender.set_scene(None)
-        # set layers to correct setting
-        scn.layers = [True]+[False]*19
+        scn = utils.blender.set_scene(None)
         # Place objects
-        linked_objects = []
-        for ob in self.objects:
-            try:
-                ob.place()
-            except Exception as e:
-                if is_working:
-                    linked_objects.append(ob)
-                    pass
-                else:
-                    raise e
-        # TODO: this is bork as well. Object should be in input. 
-        arm = bpy.context.object #Pick an object
-        #TODO error catching. Should we do it?
-        bone = arm.pose.bones[bone] #Find the bone to track
-        
-        positions = [] # List of positions of the bone. The next few lines fill this.
-        object_locations = [] #xyz location of the central (z) axis of the parent object during the same time
-
+        ob = target.place()
+        # Find the bone to track
+        bone = target.armature.pose.bones[bone] 
+        # bone positions:
+        positions = []
+        # xyz location of the central (z) axis of the parent 
+        # object during the same time:
+        object_locations = [] 
         #Extract action in order to get frame range
         st = int(np.floor(self.frame_range[0]))
         fin = int(np.ceil(self.frame_range[1]))
-        
         # Loop over all frames in action, getting locations of the bone and the central axis
-        for fr in range(st,fin):
+        for fr in range(st, fin):
             # Update scene frame 
             scn.frame_set(fr)
             scn.update()
-            positions.append(arm.matrix_world*bone.matrix*bone.location) #Calculate global position
-            object_locations.append(arm.location)
+            # Calculate global position
+            positions.append(target.armature.matrix_world * bone.matrix * bone.location)
+            object_locations.append(target.armature.location)
 
-        self.camera.fix_location = tuple(positions)
-
+        self.camera.fix_location = [tuple(p) for p in positions]
+        # This seems like a bad idea.
         if change_camera_position:
             def extrapolate_cam_loc_from_ob(loc, bone_pos, final_dist):
-                x_scale = (bone_pos[0]-loc[0])+0.00001
-                y_scale = (bone_pos[1]-loc[1])+0.00001
-                x_normalized = x_scale/np.sqrt(x_scale**2+y_scale**2)
-                y_normalized = x_scale/np.sqrt(x_scale**2+y_scale**2)
-                return [loc[0]+x_scale*final_dist,loc[1]+y_scale*final_dist]
+                x_scale = (bone_pos[0] - loc[0]) + 0.00001
+                y_scale = (bone_pos[1] - loc[1]) + 0.00001
+                x_normalized = x_scale / np.sqrt(x_scale**2 + y_scale**2)
+                y_normalized = x_scale / np.sqrt(x_scale**2 + y_scale**2)
+                return [loc[0]+x_scale * final_dist,loc[1] + y_scale * final_dist]
 
             camera_distance = self.objects[0].size3D * 3 #TODO make this less arbitrary
 
@@ -397,19 +350,16 @@ class Scene(MappedClass):
             
             self.camera.lens /= 1.2 # TODO: Fix for general circumstances The camera is closer in this setting, so we should zoom less
 
-
-        dist = np.linalg.norm(np.array(self.camera.location[0])-np.array(self.objects[0].pos3D[0]))
-        obsz = self.objects[0].size3D
-        self.camera.lens *= (dist/obsz)*1.713*3 # TODO: Utterly wrong for arbitrary positions of camera
-
-        #TODO this doesn't seem to work
-        # Clear wholes scene??
-        print(linked_objects) # why aren't you working...
-        for ob in bpy.context.scene.objects: #linked_objects:
+        # This is bork as well
+        #dist = np.linalg.norm(np.array(self.camera.location[0]) - np.array(self.objects[0].pos3D[0]))
+        #obsz = self.objects[0].size3D
+        #self.camera.lens *= (dist/obsz)*1.713*3 # TODO: Utterly wrong for arbitrary positions of camera
+        if clear:
             bpy.context.scene.objects.unlink(ob)
+            #target.clear() # fn does not exist.
 
 
-    def create(self, render_options=None, scn=None, is_working=False):
+    def create(self, render_options=None, scn=None, is_working=False, proxy=True):
         """Creates the stored scene (imports bg, sky, lights, objects, shadows) in Blender
 
         Optionally, applies rendering options 
@@ -422,33 +372,34 @@ class Scene(MappedClass):
             Scene to render within .blend file. Defaults to current scene.
         """
         # print(self.camera.fix_location)
-        scn = bvpu.blender.set_scene(scn)
+        scn = utils.blender.set_scene(scn)
         # set layers to correct setting
-        scn.layers = [True]+[False]*19
+        scn.layers = [True] + [False] * 19
         # set cursort to center
-        set_cursor((0, 0, 0))
+        utils.blender.set_cursor((0, 0, 0))
         # Background
-        self.background.place()
-        if self.background.semantic_category is not None and 'indoor' in self.background.semantic_category and self.background.real_world_size < 50.:
-            # Due to a problem with skies coming inside the corners of rooms
-            scale = self.background.real_world_size*1.5
-        else:
-            scale = self.background.real_world_size
+        if self.background is not None:
+            self.background.place(proxy=proxy)
+            if self.background.semantic_category is not None and 'indoor' in self.background.semantic_category and self.background.real_world_size < 50.:
+                # Due to a problem with skies coming inside the corners of rooms
+                scale = self.background.real_world_size * 1.5
+            else:
+                scale = self.background.real_world_size
         # Sky
-        self.sky.place(number=self.number, scale=scale)
+        if self.sky is not None:
+            self.sky.place(number=self.number, scale=scale, proxy=proxy)
         # Camera
-        self.camera.place(name='camera%03d'%self.number)
+        if self.camera is not None:
+            self.camera.place(name='camera%03d'%self.number)
         # Shadow
-        if self.shadow:
+        if self.shadow is not None:
             self.shadow.place(scale=self.background.real_world_size)
         # Objects
         for ob in self.objects:
             try:
-                ob.place()
+                ob.place(proxy=proxy)
             except Exception as e:
-                if is_working:
-                    pass
-                else:
+                if not is_working:
                     raise e
         #scn.name = self.fname
         # Details
@@ -476,7 +427,7 @@ class Scene(MappedClass):
         scn : string scene name
             Scene to render. Defaults to current scene.
         """
-        scn = bvpu.blender.set_scene(scn)
+        scn = utils.blender.set_scene(scn)
         # Reset scene nodes (?)
         
         # TODO: This is brittle and shitty. Need to revisit how to set final file names. 
@@ -507,12 +458,12 @@ class Scene(MappedClass):
         # Render animation
         bpy.ops.render.render(animation=True, scene=scn.name)
 
-    def save(fname):
+    def save(self, fname):
         """Saves scene data to .json file
 
         Save structured scene to .json file for later loading / rendering.
         """
-        pass
+        json.dump(self.get_datadict(), open(fname, 'w'))
 
     @classmethod
     def from_blender(cls, scn=None, dbi=None):

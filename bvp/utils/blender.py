@@ -534,8 +534,9 @@ def add_img_material(name, imfile, imtype):
     tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
     tex.image = img
     if imtype.upper()=='MOVIE':
+        print("== YO I HAVE %d FRAMES!! =="%img.frame_duration)
         tex.image_user.use_cyclic = True
-        bpy.ops.image.match_movie_length()
+        tex.image_user.frame_duration = img.frame_duration
     # Link texture to new material
     mat = bpy.data.materials.new(name=name)
     mat.texture_slots.create(0)
@@ -674,7 +675,9 @@ def apply_material(obj, mat, proxy_object=False, uv=True):
     except:
         obj.data.materials.append(mat)
     if uv:
+        bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.uv.smart_project()
+        bpy.ops.object.mode_set(mode='OBJECT')
 
 def set_scene(scene_name=None):
     """Sets all blender screens in an open Blender session to scene_name
@@ -699,7 +702,7 @@ def apply_action(target_object, action_file, action_name):
     # get list of matching bones
     # for all matching bones, apply (matrix? position?) of first frame
 
-def set_up_group(ObList=None, scn=None):
+def set_up_group(ob_list=None, scn=None):
     """    
     Set a group of objects to canonical position (centered, facing forward, max dimension = 10)
     Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
@@ -714,23 +717,23 @@ def set_up_group(ObList=None, scn=None):
     verbosity_level > 3
     if not scn:
         scn = bpy.context.scene # (NOTE: think about making this an input!)
-    if not ObList:
+    if not ob_list:
         for o in scn.objects:
             # Clear out cameras and (ungrouped) 
             if o.type in ['CAMERA', 'LAMP'] and not o.users_group:
                 scn.objects.unlink(o)
                 scn.update()
-        ObList = list(scn.objects)
+        ob_list = list(scn.objects)
     ToSet_Size = 10.0
     ToSet_Loc = (0.0, 0.0, 0.0)
     ToSet_Rot = 0.0
     # FIRST: Clear parent relationships
-    p = [o for o in ObList if not o.parent and not 'ChildOf' in o.constraints.keys()]
+    p = [o for o in ob_list if not o.parent and not 'ChildOf' in o.constraints.keys()]
     if len(p)>1:
         raise Exception('More than one parent in group! Now I commit Seppuku! Hi-YA!')
     else:
         p = p[0]
-    np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
+    np = [o for o in ob_list if o.parent or 'ChildOf' in o.constraints.keys()]
     if p:
         for o in np:
             grab_only(o)
@@ -739,7 +742,7 @@ def set_up_group(ObList=None, scn=None):
                 o.constraints.remove(o.constraints['ChildOf'])
     
     # SECOND: Reposition all object origins 
-    (MinXYZ, MaxXYZ) = get_group_bounding_box(ObList)
+    (MinXYZ, MaxXYZ) = get_group_bounding_box(ob_list)
     BotMid = [(MaxXYZ[0]+MinXYZ[0])/2, (MaxXYZ[1]+MinXYZ[1])/2, MinXYZ[2]]
     set_cursor(BotMid)
     
@@ -751,7 +754,7 @@ def set_up_group(ObList=None, scn=None):
     if verbosity_level > 3: 
         print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size, ScaleF, max(SzXYZ)))
     
-    for o in ObList:
+    for o in ob_list:
         grab_only(o)
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         o.scale = o.scale * ScaleF
@@ -765,8 +768,8 @@ def set_up_group(ObList=None, scn=None):
         o.select = True
         bpy.ops.object.parent_set()
     # Create group (if necessary) and name group
-    if not ObList[0].users_group:
-        for o in ObList:
+    if not ob_list[0].users_group:
+        for o in ob_list:
             o.select=True
         bpy.ops.group.create(name=scn.name)
 

@@ -571,7 +571,6 @@ class CamConstraint(PosConstraint):
                       270
                       (-y)
         THUS: to achieve 0 at dead-on (top position from -y), subtract 270 from all thetas
-
         """
         super(CamConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
         inpt = locals()
@@ -622,8 +621,6 @@ class CamConstraint(PosConstraint):
 
         NOTE: 
         ONLY tested up to 2 frames (i.e., len(frames)==2) as of 2012.02.15
-        
-        ML 2012.02
         """
         fps = 15.
         theta_offset = 270.
@@ -713,7 +710,7 @@ class CamConstraint(PosConstraint):
 
 # THIS SHOULD BE CONVERTED TO CLASS METHOD from_background(),  
 # SEPARATELY FOR EACH TYPE OF CONSTRAINT.
-def get_constraint(Grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
+def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/BlenderFiles/Scenes/'):
     """Get constraints on object & camera position for a particular background
     
     Parameters
@@ -739,13 +736,6 @@ def get_constraint(Grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
     Camera focal length and clipping plane should be determined by "RealWorldSize" property 
     """
 
-    """
-    NOTE: 
-    Starting off, this seemed like an elegant idea. In practice, it has proven to be an ugly
-    pain in the ass. There must be a better way to do this.
-    ML 2012.02.29
-    """
-
     # Get camera constraints
     ConstrType = [['cam', 'fix'], ['ob']]
     theta_offset = 270
@@ -759,7 +749,7 @@ def get_constraint(Grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
                 dimAdd = 'fix'
             else:
                 dimAdd = ''
-            ConstrOb = [o for o in Grp.objects if o.type=='EMPTY' and cType in o.name.lower()] 
+            ConstrOb = [o for o in grp.objects if o.type=='EMPTY' and cType in o.name.lower()] 
             # Size constraints (object only!)
             SzConstr =  [n for n in ConstrOb if 'size' in n.name.lower() and cType=='ob']
             if SzConstr:
@@ -809,7 +799,7 @@ def get_constraint(Grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
                 cParams['origin'] = tuple(rptOrigin)
             
             # Second: Get spherical constraints wrt that origin
-            for dim in pDims:
+            for dim in pDims: #pDims = ['r', 'phi', 'theta']
                 # Potentially problematic: IF xyz is already filled, fill nulls for all cParams in list of cParams
                 for iE in range(len(cParams)):
                     cParams[iE][dimAdd+dim] = [None, None, None, None]
@@ -846,7 +836,96 @@ def get_constraint(Grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
         Out.append(toAppend)
     return Out
 
+"""Super duper WIP: need to refactor above code to extract constraints for each draw type
+
+Sphere: if _min, get scale, map to max
+        if _max, get scale, map to max
+        if _meanstd, get ?? map to mean, std
+
+
+"""
+
+def _get_group_objects(grp):
+    if grp is None:
+        ob_list = list(bpy.context.scene.objects)
+    elif isinstance(grp, bpy.types.Object):
+        # Test for existence of dupli group
+        ob_list = list(grp.dupli_group.objects)
+    elif isinstance(grp, bpy.types.Group):
+        ob_list = list(grp.objects)
+    else:
+        raise ValueError("Unclear what to do with input of type {}".format(type(grp)))
+    return ob_list
+
+
+def _constraint_from_sphere(sphere, constraint_dict, param, constr):
+    """Get constraints on position from empty sphere in a blender scene
     
+    Parameters
+    ----------
+    sphere : empty object 
+        Emtpy w/ draw type=='SPHERE'
+    constraint_dict : dict
+        dictionary of constraints so far
+    param : string
+        key to fill in for dictionary
+    """
+
+    value = sphere.scale[0]
+    # Special cases
+    if param == 'theta':
+        value = circ_dst('wtf is this location?' - theta_offset, 0.)
+    # Map min, max to size
+    if constr == 'min':
+        constraint_dict[param][2] = sphere.scale[0]
+    elif constr == 'max':
+        constraint_dict[param][3] = sphere.scale[0]
+    elif constr == 'meanstd':
+        # interpret sphere w/out "min" or "max" as mean+std
+        # Interpretation of std here is a little confusing: 
+        # the visual display of the sphere will NOT correspond 
+        # to the desired angle. But it should work.
+        # dim = X, Y, or Z; or r, phi, or theta
+        #constraint_dict[dim] = xyz2constr(list(o.location), dim, rptOrigin)
+        #if dim=='theta':
+        #    constraint_dict[iE][dimAdd+dim][0] = value
+        #constraint_dict[iE][dimAdd+dim][1] = o.scale[0]
+        pass
+
+
+def _constraint_from_cube(cube, constraint_dict, ctype=None):
+    pass
+
+def _constraint_from_arrow(arrow, constraint_dict, ctype=None):
+    pass
+
+
+_empty_mapping = dict(SPHERE=_constraint_from_sphere,
+                      CUBE=_constraint_from_cube,
+                      SINGLE_ARROW=_constraint_from_arrow,
+                      )
+
+
+def get_constraints(grp):
+    constraints = dict(cam={}, fix={}, ob={})
+    empties = [m for m in _get_group_objects(grp) if m.type=='EMPTY']
+    # TODO: insert check for both spherical and cartesian constraints on objects, camera, or fixation
+    for ce in empties:
+        ctype, param, constr = ce.name.split('_')
+        # e.g.: 'cam', 'theta', 'min'
+        prefix = 'fix' if ctype=='fix' else ''
+        constraints[ctype] = _empty_mapping[ce.empty_draw_type](ce, constraints[ctype], param, constr, prefix=prefix)
+    if isempty(constraints['ob']):
+        ob = None
+    else:
+        ob = constraints['ob']
+    if (isempty(constraints['fix']) and isempty(constraints['cam'])):
+        cam = None
+    else:
+        cam = CamConstraint(**constraints['cam'], **constraints['fix'])
+    return ob, cam
+
+
 class SLConstraint(Constraint):
     """
     Class to contain constraints for properties of a scene list
@@ -963,10 +1042,10 @@ class SLConstraint(Constraint):
                 else:
                     obII = int(ObTmp.real)
                     Pose = None
-                Grp, Fil = self.Lib.objects[Cat][obII]
+                grp, Fil = self.Lib.objects[Cat][obII]
                 oParams = {
                     'categ':Cat, #bvpu.basics.make_blender_safe(ObTmp.imag), 
-                    'exemp':Grp, #bvpu.basics.make_blender_safe(ObTmp.real), 
+                    'exemp':grp, #bvpu.basics.make_blender_safe(ObTmp.real), 
                     'obFile':Fil, #self.obFiles, 
                     'obLibDir':os.path.join(self.Lib.LibDir, 'Objects'), #self.obLibDir, 
                     'pose':Pose, 
@@ -980,10 +1059,10 @@ class SLConstraint(Constraint):
             # Get BG
             if bgIdx:
                 Cat = self.Lib.bgs.keys()[int(bgIdx[iScn].imag)]
-                Grp, Fil = self.Lib.bgs[Cat][int(bgIdx[iScn].real)]
+                grp, Fil = self.Lib.bgs[Cat][int(bgIdx[iScn].real)]
                 bgParams = {
                     'categ':Cat, #bvpu.basics.make_blender_safe(bgIdx[iScn].imag), 
-                    'exemp':Grp, #bvpu.basics.make_blender_safe(bgIdx[iScn].real), 
+                    'exemp':grp, #bvpu.basics.make_blender_safe(bgIdx[iScn].real), 
                     'bgFile':Fil, 
                     'bgLibDir':os.path.join(self.Lib.LibDir, 'Backgrounds'), #self.bgLibDir, 
                     #'oParams':{}
@@ -997,10 +1076,10 @@ class SLConstraint(Constraint):
             # Get Sky
             if skyIdx:
                 Cat = self.Lib.skies.keys()[int(skyIdx[iScn].imag)]
-                Grp, Fil = self.Lib.skies[Cat][int(skyIdx[iScn].real)]          
+                grp, Fil = self.Lib.skies[Cat][int(skyIdx[iScn].real)]          
                 skyParams = {
                     'categ':Cat, #bvpu.basics.make_blender_safe(skyIdx[iScn].imag), 
-                    'exemp':Grp, #bvpu.basics.make_blender_safe(skyIdx[iScn].real), 
+                    'exemp':grp, #bvpu.basics.make_blender_safe(skyIdx[iScn].real), 
                     'skyLibDir':os.path.join(self.Lib.LibDir, 'Skies'), #self.skyLibDir, 
                     #'skyFiles':self.skyFiles, 
                     'skyFile':Fil

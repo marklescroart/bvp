@@ -48,7 +48,7 @@ class Material(MappedClass):
                 directory=self.fpath+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
                 filename=self.name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
                 link=False)
-
+        return bpy.data.materials[self.name]
 
     @classmethod
     def from_blender(cls, name, dbi=None, **kwargs):
@@ -90,7 +90,7 @@ class Material(MappedClass):
         # Make sure material is always saved in this file
         mat.use_fake_user = True
         # Saving main file is up to user... seems precipitous to save whole file here.
-        blend_file = bpy.data.filepath
+        blend_file = os.path.split(bpy.data.filepath)[1]
         # Instantiate class
         ob = cls.__new__(cls)
         ob.__init__(name=name, fname=blend_file, dbi=dbi, is_cycles=is_cycles, **kwargs)

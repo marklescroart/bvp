@@ -11,7 +11,7 @@ Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
 import os
 import warnings
 from .mapped_class import MappedClass
-from bvp import utils as bvpu
+from bvp import utils
 from bvp.options import config
 
 try:
@@ -22,7 +22,7 @@ except ImportError:
 class Object(MappedClass):
     """Layer of abstraction for objects (imported from other files) in Blender scenes.
     """
-    def __init__(self, name='DummyObject', type='Object', fname=None, action=None, pose=None, 
+    def __init__(self, name='DummyObject', type='Object', fname=None, action=None, pose=None, materials=None,
         pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), n_faces=None, n_vertices=None, n_poses=0,
         basic_category=None, semantic_category=None, wordnet_label=None, armature=None, 
         constraints=None, real_world_size=None, _id=None, _rev=None, dbi=None, is_cycles=False, 
@@ -76,10 +76,15 @@ class Object(MappedClass):
                     setattr(self, k, v)
 
         self._db_fields = [] # action?
-        self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose']
+        self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose', 'materials']
         self._temp_fields = ['min_xyz_pos', 'max_xyz_pos', 'bounding_box_center', 
-                             'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory']
-        # What to do here?
+                             'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory',
+                             'blender_object', 'blender_group', 'proxy']
+        # Extras
+        self.blender_object = None
+        self.blender_group = None
+        self.armature = None
+        self.proxy = None
         self.pos2D = None # location in the image plane (normalized 0-1)
         # TODO: Determine if this is still necessary (this relates to props stored in .blend files, prob.)
         if isinstance(self.real_world_size, (list, tuple)):
@@ -121,36 +126,36 @@ class Object(MappedClass):
         """
         # Make file local, if it isn't already
         self.cloud_download()
+        prev_placed = self.blender_object is not None
         # Optionally link to a specific scene
-        scn = bvpu.blender.set_scene(scn)
+        scn = utils.blender.set_scene(scn)
+        # Get object (parent of group / proxy)
         if self.name=='DummyObject':
             # Default object
-            grp_ob = self.add_dummy()
+            self.blender_object = self.add_dummy()
         else:
-            grp_ob = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
-        if not proxy:
-            if len(grp_ob.users_group) > 1:
-                raise Exception("Unknown case: object belongs to multiple groups")
-            grp = grp_ob.users_group[0]
-        #print("=========")
-        #print(grp_ob)
-        #print("=========")
-        if self.pos3D is not None:
-            grp_ob.location = self.pos3D
-        if self.rot3D is not None:
-            grp_ob.rotation_euler = self.rot3D
-        # Get armature, if an armature exists for this object
+            self.blender_object = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
+        # Get group of meshes in this object / proxy object
         if proxy:
-            armatures = [x for x in grp_ob.dupli_group.objects if x.type=='ARMATURE']
+            self.blender_group = self.blender_object.dupli_group
         else:
-            armatures = [x for x in grp.objects if x.type=='ARMATURE']
+            # HRMMM
+            #assert len(self.blender_object.users_group) == 1
+            self.blender_group = self.blender_object.users_group[0]
+        # Position / rotation
+        if self.pos3D is not None:
+            self.blender_object.location = self.pos3D
+        if self.rot3D is not None:
+            self.blender_object.rotation_euler = self.rot3D
+        # Get armature, if an armature exists for this object
+        armatures = [x for x in self.blender_group.objects if x.type=='ARMATURE']
         # Select one armature for poses / actions, if armatures exist
-        if len(armatures) > 0:
+        if len(armatures) == 0:
+            armature = None
+        else:
             # Some armature object detected. Proceed with pose / action.
             if len(armatures) > 1:
-                # NOTE: this if clause is probably a bad idea, and 
-                # should just generate an error. Leaving it for now.
-                warnings.warn('Multiple armatures detected, this is probably an irregularity in the file...')
+                raise Exception('Multiple armatures detected, this is probably an irregularity in the file...')
                 # Try to deal with multiple armatures by selecting 
                 # the armature with a pose library attached
                 pose_test = [a for a in armatures if not a.pose_library is None]
@@ -162,30 +167,27 @@ class Object(MappedClass):
                     raise Exception("Aborting - all armatures have pose libraries, I don't know what to do")
             elif len(armatures) == 1:
                 armature = armatures[0]
-        else:
-            armature = None
+
         if proxy and armature is not None:
             bpy.ops.object.proxy_make(object=armature.name) #object=pOb.name,type=armatures.name)
-            pose_armature = bpy.context.object
-            pose_armature.pose_library = armature.pose_library
+            self.armature = bpy.context.object
+            self.armature.pose_library = armature.pose_library
         else:
-            pose_armature = armature
+            self.armature = armature
         # Update self w/ list of poses
-        if pose_armature is not None and pose_armature.pose_library is not None:
-            self.poses = [x.name for x in pose_armature.pose_library.pose_markers]
+        if self.armature is not None and self.armature.pose_library is not None:
+            self.poses = [x.name for x in self.armature.pose_library.pose_markers]
         # Set pose, action
         if not self.pose is None:
-            self.apply_pose(pose_armature, self.pose)
+            self.apply_pose(self.armature, self.pose)
         if not self.action is None:
-            self.apply_action(pose_armature, self.action)
+            self.apply_action(self.armature, self.action)
+        if not self.materials is None:
+            self.apply_materials(self.materials)
         # Deal with particle systems on imported objects. Use of particle 
         # systems in general is not advised, since they complicate sizing 
         # and drastically slow renders.
-        if proxy:
-            ob_list = list(grp_ob.dupli_group.objects)
-        else:
-            ob_list = list(grp.objects) 
-        for o in ob_list:
+        for o in self.blender_group.objects:
             # Get the MODIFIER object that contains the particle system
             particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
             for psm in particle_modifier:
@@ -200,22 +202,22 @@ class Object(MappedClass):
         # Scale to correct size
         orig_size = 10. # By BVP convention, all objects are stored in library files w/ max dim of 10 units
         sz_factor = float(self.size3D) / orig_size
-        if pose_armature is not None:
-            pose_armature.scale *= sz_factor
-        else:
-            grp_ob.scale *= sz_factor
+        # THIS IS A YOOOOGE HACK
+        if not prev_placed:
+            if self.armature is not None:
+                self.armature.scale *= sz_factor
+            else:
+                self.blender_object.scale *= sz_factor
+        self.proxy = proxy
 
         scn.update()
         # Switch frame & update again, because some poses and other effects 
         # don't seem to take effect until the frame changes
-        scn.frame_current+=1
+        scn.frame_current += 1
         scn.update()
-        scn.frame_current-=1
+        scn.frame_current -= 1
         scn.update()
-        #print("=========")
-        #print(grp_ob)
-        #print("=========")        
-        return grp_ob
+        return self.blender_object
 
     def apply_action(self, arm, action):
         """Apply an action to an armature.
@@ -232,13 +234,12 @@ class Object(MappedClass):
         action : Action
             Action to be applied. Must have file_name and path attributes
         """
-        # 
-        #print(action.fpath, action.name)
         act = action.link()
         if arm.animation_data is None:
             arm.animation_data_create()
-        if act is None: 
-            raise Exception("FAAAAAAAK")
+        if act is None:
+            # Necessary?
+            raise ValueError("action linking returned `None`")
         arm.animation_data.action = act
 
     def apply_pose(self, armature, pose_index):
@@ -257,12 +258,37 @@ class Object(MappedClass):
         to update this function to pose individual bones of an armature.
         """
         # Set mode to pose mode
-        bvpu.blender.grab_only(armature)
+        utils.blender.grab_only(armature)
         bpy.ops.object.posemode_toggle()
         bpy.ops.pose.select_all(action="SELECT")
         bpy.ops.poselib.apply_pose(pose_index=pose_index)
         # Set back to previous mode; otherwise Blender may puke and die with next command
         bpy.ops.object.posemode_toggle()
+
+    def apply_materials(self, materials):
+        """Apply materials to already-placed object.
+        
+        Parameters
+        ----------
+        objects : list
+            list of all blender objects in this group
+        materials : list
+            list of bvp materials to apply. ** CURRENTLY ONLY WORKS FOR ONE MATERIAL **
+        """
+        # TODO: Deal with uv. 
+        # WIP error
+        if len(materials) > 1:
+            raise NotImplementedError('Multiple material assignment not working yet.')
+
+        for i, material in enumerate(materials):
+            mat = material.link()
+            if self.proxy:
+                utils.blender.apply_material(self.blender_object, mat, proxy_object=self.proxy, uv=False)
+            else:
+                for o in self.blender_group.objects:
+                    if o.type=='MESH':
+                        utils.blender.apply_material(o, mat, proxy_object=self.proxy, uv=False)
+
 
     def add_dummy():
         """add a sphere in place of object
@@ -270,10 +296,10 @@ class Object(MappedClass):
         TODO: options for what sort of shape (not just a sphere?)
         """
         bpy.ops.mesh.primitive_uv_sphere_add(size=self.size3D / 2.)
-        bvpu.blender.set_cursor((0, 0, -self.size3D / 2.))
+        utils.blender.set_cursor((0, 0, -self.size3D / 2.))
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         bpy.ops.transform.translate(value=(0, 0, self.size3D / 2.))
-        bvpu.blender.set_cursor((0, 0, 0))
+        utils.blender.set_cursor((0, 0, 0))
         grp = bpy.context.object
         # ?
         grp.location = self.pos3D
