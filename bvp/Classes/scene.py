@@ -299,7 +299,7 @@ class Scene(MappedClass):
         """
         pass
 
-    def bake(self, target, bone, change_camera_position=False, clear=False):
+    def bake(self, target, bone, change_camera_position=False, clear=False, fix_offset=None):
         """Perform computations that must be performed before render time, but still need to run in Blender. 
 
         Currently calculates camera trajectory when it is made to follow a body part.
@@ -310,11 +310,9 @@ class Scene(MappedClass):
             Bone for the camera to follow
         """
 
-        #TODO find some way to specify object to track. [bone armature parent should do it]
-
         scn = utils.blender.set_scene(None)
         # Place objects
-        ob = target.place()
+        ob = target.place() # TODO: specify proxy / not.
         # Find the bone to track
         bone = target.armature.pose.bones[bone] 
         # bone positions:
@@ -333,6 +331,11 @@ class Scene(MappedClass):
             # Calculate global position
             positions.append(target.armature.matrix_world * bone.matrix * bone.location)
             object_locations.append(target.armature.location)
+        if fix_offset is not None:
+            # Shift position of fixation 
+            new_pos = []
+            # Need to do this in working scene to have it make any damn sense.
+            #new_pos = perspective_projection_inv(loc)
 
         self.camera.fix_location = [tuple(p) for p in positions]
         # This seems like a bad idea.

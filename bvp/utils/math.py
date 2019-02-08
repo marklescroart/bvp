@@ -196,58 +196,56 @@ def perspective_projection_bounds():
         fix_location = camera.fix_location[0]
     
     # Convert to vector
-    cPos = VectorFn(camPos)
-    fPos = VectorFn(fix_location)
+    camera_location = VectorFn(camPos)
+    fix_location = VectorFn(fix_location)
     oPos = VectorFn(objPos)
-    # Prep for shift in L, R directions (wrt camera)
-    cVec = fPos-cPos
     
     # Get other bounds...
     oPos_Top = oPos + VectorFn([0, 0, bvp_object.size3D])
     oPos_L = oPos - VectorFn([bvp_object.size3D / 2., 0, 0])
     oPos_R = oPos + VectorFn([bvp_object.size3D / 2., 0, 0])
 
-    # Compute cTheta (Euler angles (XYZ) of camera)
-    cVec = fPos-cPos
+    # Compute camera_euler (Euler angles (XYZ) of camera)
+    cVec = fix_location-camera_location
     # Get anlge of camera in world coordinates 
-    cTheta = vec2eulerXYZ(cVec)
+    camera_euler = vector_to_eulerxyz(cVec)
     # Blender is Right-handed
     handedness = 'right' 
     x, y, z = 0, 1, 2
     if handedness == 'left':
         # (Here just in case)
         # X rotation
-        xRot = np.matrix([[1., 0., 0.], 
-            [0., cosd(cTheta[x]), -sind(cTheta[x])], 
-            [0., sind(cTheta[x]), cosd(cTheta[x])]])
+        x_rot = np.matrix([[1., 0., 0.], 
+            [0., cosd(camera_euler[x]), -sind(camera_euler[x])], 
+            [0., sind(camera_euler[x]), cosd(camera_euler[x])]])
         # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
+        y_rot = np.matrix([[cosd(camera_euler[y]), 0., sind(camera_euler[y])], 
             [0., 1., 0.], 
-            [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
+            [-sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
         # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
-            [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
+        z_rot = np.matrix([[cosd(camera_euler[z]), -sind(camera_euler[z]), 0.], 
+            [sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
             [0., 0., 1.]])
     elif handedness == 'right':
         # X rotation
-        xRot = np.matrix([[1., 0., 0.], 
-            [0., cosd(cTheta[x]), sind(cTheta[x])], 
-            [0., -sind(cTheta[x]), cosd(cTheta[x])]])
+        x_rot = np.matrix([[1., 0., 0.], 
+            [0., cosd(camera_euler[x]), sind(camera_euler[x])], 
+            [0., -sind(camera_euler[x]), cosd(camera_euler[x])]])
         # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
+        y_rot = np.matrix([[cosd(camera_euler[y]), 0., -sind(camera_euler[y])], 
             [0., 1., 0.], 
-            [sind(cTheta[y]), 0., cosd(cTheta[y])]])
+            [sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
         # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
-            [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
+        z_rot = np.matrix([[cosd(camera_euler[z]), sind(camera_euler[z]), 0.], 
+            [-sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
             [0., 0., 1.]])
 
-    CamMat = xRot * yRot * zRot
-    d = np.array(CamMat*(oPos-cPos))
+    camera_matrix = x_rot * y_rot * z_rot
+    d = np.array(camera_matrix * (oPos - camera_location))
     # Other positions:
-    d_Top = np.array(CamMat*(oPos_Top-cPos))
-    d_L = np.array(CamMat*(oPos_L-cPos))
-    d_R = np.array(CamMat*(oPos_R-cPos))
+    d_Top = np.array(camera_matrix*(oPos_Top-camera_location))
+    d_L = np.array(camera_matrix*(oPos_L-camera_location))
+    d_R = np.array(camera_matrix*(oPos_R-camera_location))
     xc = (x, 0)
     yc = (y, 0)
     zc = (z, 0)
@@ -273,6 +271,64 @@ def perspective_projection_bounds():
     return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
 
 
+def get_camera_matrix(camera_location, 
+                      fix_location,
+                      camera_fov=None, 
+                      camera_lens=None, 
+                      image_size=(1., 1.),
+                      handedness='right', # Blender default
+                      ):
+    """Get 3 x 3 camera matrix. 
+
+    Unclear if this is formally correct; works so far.
+    """
+    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
+    assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
+    if camera_lens is not None:
+        camera_fov = 2*atand(image_dist/(2*camera_lens))
+    
+    # Convert to vector
+    camera_location = VectorFn(camera_location)
+    fix_location = VectorFn(fix_location)
+    # Prep for shift in L, R directions (wrt camera)
+    camera_vector = fix_location - camera_location
+    # Get anlge of camera in world coordinates 
+    camera_euler = vector_to_eulerxyz(camera_vector)
+    # Blender is Right-handed
+    x, y, z = 0, 1, 2
+    if handedness == 'left':
+        # (Here just in case)
+        # X rotation
+        x_rot = np.matrix([[1., 0., 0.], 
+            [0., cosd(camera_euler[x]), -sind(camera_euler[x])], 
+            [0., sind(camera_euler[x]), cosd(camera_euler[x])]])
+        # Y rotation
+        y_rot = np.matrix([[cosd(camera_euler[y]), 0., sind(camera_euler[y])], 
+            [0., 1., 0.], 
+            [-sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
+        # Z rotation
+        z_rot = np.matrix([[cosd(camera_euler[z]), -sind(camera_euler[z]), 0.], 
+            [sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
+            [0., 0., 1.]])
+    elif handedness == 'right':
+        # X rotation
+        x_rot = np.matrix([[1., 0., 0.], 
+            [0., cosd(camera_euler[x]), sind(camera_euler[x])], 
+            [0., -sind(camera_euler[x]), cosd(camera_euler[x])]])
+        # Y rotation
+        y_rot = np.matrix([[cosd(camera_euler[y]), 0., -sind(camera_euler[y])], 
+            [0., 1., 0.], 
+            [sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
+        # Z rotation
+        z_rot = np.matrix([[cosd(camera_euler[z]), sind(camera_euler[z]), 0.], 
+            [-sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
+            [0., 0., 1.]])
+
+    camera_matrix = x_rot * y_rot * z_rot
+    print("Camera matrix:")
+    print(camera_matrix)
+    return camera_matrix    
+
 def perspective_projection(location, 
                            camera_location, 
                            fix_location,
@@ -290,7 +346,7 @@ def perspective_projection(location,
     camera_location : array-like
         3D (x, y, z) camera and location
     fix_location : array-like
-
+        3D (x, y, z) fixation location (track point for camera)
     image_size : array-like
         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
 
@@ -317,97 +373,47 @@ def perspective_projection(location,
     # http://www.bobatkins.com/photography/technical/field_of_view.html
     fov_computed = 2 * atand(image_dist. / (2 * focal_len)) 
     plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
+
+    Also, look into this (for within Blender only): 
+    https://blender.stackexchange.com/questions/16472/how-can-i-get-the-cameras-projection-matrix
     """
-    image_dist = 32. # Blender assumption - see above!
-    assert sum([(camera lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
+    location = VectorFn(location)
+
+    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
+    assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
         camera_fov = 2*atand(image_dist/(2*camera_lens))
     
     # Convert to vector
-    cPos = VectorFn(camera_location)
-    fPos = VectorFn(fix_location)
-    oPos = VectorFn(location)
-    # Prep for shift in L, R directions (wrt camera)
-    cVec = fPos-cPos
-    
-    # Get other bounds...
-    oPos_Top = oPos + VectorFn([0, 0, bvp_object.size3D])
-    oPos_L = oPos - VectorFn([bvp_object.size3D / 2., 0, 0])
-    oPos_R = oPos + VectorFn([bvp_object.size3D / 2., 0, 0])
-
-    # Compute cTheta (Euler angles (XYZ) of camera)
-    cVec = fPos-cPos
-    # Get anlge of camera in world coordinates 
-    cTheta = vec2eulerXYZ(cVec)
+    location = VectorFn(location)
+    camera_location = VectorFn(camera_location)
+    camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
+                                      camera_lens=camera_lens, image_size=image_size, 
+                                      handedness=handedness)
     # Blender is Right-handed
-    x, y, z = 0, 1, 2
-    if handedness == 'left':
-        # (Here just in case)
-        # X rotation
-        xRot = np.matrix([[1., 0., 0.], 
-            [0., cosd(cTheta[x]), -sind(cTheta[x])], 
-            [0., sind(cTheta[x]), cosd(cTheta[x])]])
-        # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
-            [0., 1., 0.], 
-            [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
-        # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
-            [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
-            [0., 0., 1.]])
-    elif handedness == 'right':
-        # X rotation
-        xRot = np.matrix([[1., 0., 0.], 
-            [0., cosd(cTheta[x]), sind(cTheta[x])], 
-            [0., -sind(cTheta[x]), cosd(cTheta[x])]])
-        # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
-            [0., 1., 0.], 
-            [sind(cTheta[y]), 0., cosd(cTheta[y])]])
-        # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
-            [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
-            [0., 0., 1.]])
-
-    CamMat = xRot * yRot * zRot
-    d = np.array(CamMat*(oPos-cPos))
-    # Other positions:
-    d_Top = np.array(CamMat*(oPos_Top-cPos))
-    d_L = np.array(CamMat*(oPos_L-cPos))
-    d_R = np.array(CamMat*(oPos_R-cPos))
-    xc = (x, 0)
-    yc = (y, 0)
-    zc = (z, 0)
-
-    ImX_Bot = image_size[x]/2. - d[xc]/d[zc] * (image_size[x]/2.) / (tand(camera_fov/2.));
-    ImY_Bot = d[yc]/d[zc] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.;
-
-    ImX_Top = image_size[x]/2. - d_Top[xc]/d_Top[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
-    ImY_Top = d_Top[yc]/d_Top[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
-
-    ImX_L = image_size[x]/2. - d_L[xc]/d_L[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
-    ImY_L = d_L[yc]/d_L[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
-
-    ImX_R = image_size[x]/2. - d_R[xc]/d_R[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
-    ImY_R = d_R[yc]/d_R[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
-
-    imPos_Bot = [ImX_Bot, ImY_Bot]
-    imPos_Top = [ImX_Top, ImY_Top]
-    imPos_L = [ImX_L, ImY_L]
-    imPos_R = [ImX_R, ImY_R]
-
-    mbs = lambda x: make_blender_safe(x, 'float')
-    return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
+    x_sz, y_sz = image_size
+    #d = np.array(camera_matrix * (location - camera_location))
+    dx, dy, dz = np.array(camera_matrix * (location - camera_location)).flatten()
+    #im_x = image_size[x] / 2. - d[x, 0] / d[x, 0] * (image_size[x] / 2.) / (tand(camera_fov / 2.))
+    im_x = x_sz / 2. - dx / dz * (x_sz / 2.) / (tand(camera_fov / 2.))
+    #im_y = d[y, 0] / d[z, 0] * (image_size[y] / 2.) / (tand(camera_fov / 2.)) + image_size[y] / 2.
+    im_y = dy / dz * (y_sz / 2.) / (tand(camera_fov / 2.)) + y_sz / 2.
+    return make_blender_safe([im_x, im_y], 'float')
 
 
-def PerspectiveProj_Inv(image_location, camera, Z):
-    """Compute object location from image location 
-    
-    ... using inverse perspective projection
+def perspective_projection_inv(image_location, 
+                           camera_location, 
+                           fix_location,
+                           Z,
+                           camera_fov=None, 
+                           camera_lens=None, 
+                           image_size=(1., 1.),
+                           handedness='right'): 
+    """Compute object location from image location + distance using inverse perspective projection
 
     Parameters
     ----------
-    image_location : list-like
+    image_location : array-like
         x, y image position as a pct of the image (in range 0-1)
     camera : bvp.Camera instance
         Camera class, which contains all camera info (position, 
@@ -418,121 +424,38 @@ def PerspectiveProj_Inv(image_location, camera, Z):
 
     Notes
     -----
-
-    Blender seems to convert focal length(in mm) to fov by assuming a particular
-    (horizontal/diagonal) distance, in mm, across an image. This is not
-    exactly correct, i.e. the rendering effects will not necessarily match
-    with real rectilinear lenses, etc... See
-    http://www.metrocast.net/~chipartist/BlensesSite/index.html
-    for more discussion.
-    
-    Test run:
-    focal_len  = [10 15 25 35 50 100 182.881]; # different settings for focal length in Blender
-    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] # corresponding values for fov (computed by Blender)
-    image_dist = 32; # found by regression w/ values above and equation below:
-    fov_computed = 2*atand(image_dist./(2*focal_len)); # Focal length equation, from
-    # http://kmp.bdimitrov.de/technology/fov.html and http://www.bobatkins.com/photography/technical/field_of_view.html
-    plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
+    See `perspective_projection()` docstring for math
     """
-
-    # Blender uses right-handed coordinates
-    handedness = 'right'
-    image_dist = 32. # Blender assumption - see above!
-    fov = 2*atand(image_dist/(2*camera.lens))
-    x, y, z = 0, 1, 2
+    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
     if Z>0:
-        # ensure that Z < 0
-        Z = -Z
-    cPos = VectorFn(camera.location[0]) 
-    fix_location = VectorFn(camera.fix_location[0])
-    cTheta = vec2eulerXYZ(lst(fix_location-cPos))
-    cTheta = VectorFn(cTheta)
-    # Complication?: zero rotation in blender is DOWN, zero rotation for this computation seems to be UP
-    if handedness == 'left':
-        # X rotation
-        xRot = np.matrix([[1., 0., 0.], 
-            [0., cosd(cTheta[x]), -sind(cTheta[x])], 
-            [0., sind(cTheta[x]), cosd(cTheta[x])]])
-        # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])],
-                          [0., 1., 0.],
-                          [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
-        # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.],
-                          [sind(cTheta[z]), cosd(cTheta[z]), 0.],
-                          [0., 0., 1.]])
-    elif handedness == 'right':
-        # X rotation
-        xRot = np.matrix([[1., 0., 0.],
-                          [0., cosd(cTheta[x]), sind(cTheta[x])],
-                          [0., -sind(cTheta[x]), cosd(cTheta[x])]])
-        # Y rotation
-        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])],
-                          [0., 1., 0.], 
-                          [sind(cTheta[y]), 0., cosd(cTheta[y])]])
-        # Z rotation
-        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.],
-                          [-sind(cTheta[z]), cosd(cTheta[z]), 0.],
-                          [0., 0., 1.]])
-    else:
-        raise Exception('WTF are you thinking handedness should be? Options are "Right" and "Left" only!')
-    CamMat = xRot * yRot * zRot
-    xP, yP = image_location
-    image_size = [1, 1]
-    CamMatInv = np.linalg.pinv(CamMat)
-    # sample one point at Z units from camera
+        Z = -Z # ensure that Z < 0
+    assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
+    if camera_lens is not None:
+        camera_fov = 2*atand(image_dist/(2*camera_lens))
+    
+    # Get camera matrix
+    camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
+                                      camera_lens=camera_lens, image_size=image_size, 
+                                      handedness=handedness)
+
+    x_pos, y_pos = image_location
+    x_sz, y_sz = image_size
+    camera_matrix_inv = np.linalg.pinv(camera_matrix)
+    # Sample one point at Z units from camera
     # This calculation is basically: PctToSideOfImage * x/f * Z = X  # (tand(fov/2.) = x/f)
-    d = [0, 0, Z]
-    d[x] = -(xP-image_size[x]/2.) * tand(fov/2.)/(image_size[x]/2.) * d[z] 
-    d[y] = (yP-image_size[y]/2.) * tand(fov/2.)/(image_size[y]/2.) * d[z]
-    d = VectorFn(d)
-    # So: d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN (?)
+    dx = -(x_pos - x_sz / 2.) * tand(camera_fov / 2.) / (x_sz / 2.) * Z
+    dy = (y_pos - y_sz / 2.) * tand(camera_fov / 2.) / (y_sz / 2.) * Z
+    d = VectorFn([dx, dy, Z])
+    # d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN
     # d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
     # of the object in the world.
-    oPos = CamMatInv * d + cPos
-    return lst(oPos)
-
-
-def concatVoxels(fDir, mode='sum'):
-    """
-    Aggregate all 360 degree fisheye rendered images to a voxelization of an object
-    Inputs:
-        fDir = directory for 
-
-    """
-    import matplotlib.pyplot as plt
-    import re, os
-    from scipy.io import savemat
-    try:
-        IsStr = isinstance(fDir, (str, unicode))
-    except NameError:
-        IsStr = isinstance(fDir, str)
-
-    if IsStr and '*' in fDir:
-        # Support wild-card directory structure
-        fD, fP = os.path.split(fDir)
-        fDir = sorted([f for f in os.listdir(fD) if fp.strip('*') in f])
-    elif IsStr and not '*' in fDir:
-        fDir = [fDir]
-
-    dt = np.bool if mode=='inside' else np.float32
-
-    # Get resolution from directory name
-    mm = re.search('(?<=res)[0-9]*', fDir[0])
-    res = int(mm.group())
-    vox = np.zeros((res**3, ), dt)
-
-    for fD in fDir:
-        fNm = sorted([os.path.join(fD, f) for f in os.listdir(fD) if 'png' in f])
-        for f in fNm:
-            mm = re.search('(?<=vox)[0-9]*', f)
-            idx = int(mm.group())-1
-            tmp = plt.imread(f)
-            if mode=='inside':
-                vox[idx] = np.all(tmp.flatten()==np.max(tmp))
-            elif mode=='sum':
-                vox[idx] = np.sum(tmp)
-    return make_blender_safe(vox, 'float')
+    # Not quite working 100% correctly. Requires stupid fiddling to 
+    # work correctly for non-square aspect ratio images.
+    #print(d)
+    #print(camera_location)
+    location_3d = camera_matrix_inv * d + VectorFn(camera_location)
+    #print(location_3d)
+    return lst(location_3d)
 
 
 class ImPosCount(object):
@@ -576,18 +499,6 @@ class ImPosCount(object):
             Y = [Y]
         hstNew = np.histogram2d(Y, X, (self.xBin, self.yBin))[0]
         self.hst += hstNew
-
-    def sampleXYnoWt(self):
-        """
-        DEPRECATED!
-        """
-        raise Exception("Deprecated! (I didn't think anyone used this shit!)")
-        # One: pull one random sample within each spatial bin
-        xl = [np.random.rand()*self.xBin[1]+x for x in self.xBin[:-1]]
-        yl = [np.random.rand()*self.yBin[1]+x for x in self.yBin[:-1]]
-        xp, yp = np.meshgrid(xl, yl)
-        keep = np.random.randint(0, len(xp.flatten()))
-        return xp.flatten()[keep], yp.flatten()[keep]
 
     def sampleXY(self):
         # One: pull one random sample within each spatial bin
@@ -646,7 +557,7 @@ class ImPosCount(object):
         return aa/bb
 
     @property
-    def noisyPinv(self):
+    def noisy_posinv(self):
         # Add noise to allow not exactly flat distribution
         # (A flat distribution would REQUIRE filling in one of each bin each iteration
         # through the bins, which would be too strict a condition for scenes with stuff
@@ -667,7 +578,7 @@ class ImPosCount(object):
         return p
 
 
-def linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
+def line_plane_intersection(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
     """Find intersection of line with a plane.
 
     Line is specified by two points L0 and L1, each of which is a
@@ -683,11 +594,11 @@ def linePlaneInt(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
     L0 = np.matrix(L0).T
     L1 = np.matrix(L1).T
     P0 = np.matrix(P0).T # point on the plane (floor - z=0)
-    n = np.matrix(n).T #Plane normal vector (straight up)
+    n = np.matrix(n).T # plane normal vector (straight up)
     L = L1-L0
-    #d = (P0-L0)*n / (L*n)
+    # d = (P0 - L0) * n / (L * n)
     # So...:
-    d = np.dot((P0-L0).T, n)/np.dot(L.T, n)
+    d = np.dot((P0 - L0).T, n) / np.dot(L.T, n)
     # Intersection should be at [0, -2, -0]...
     # Take that, multiply it by L, add it to L0
     Intersection = lst(L*d + L0)
@@ -722,29 +633,16 @@ def mat2eulerZYX(mat):
     return np.array([zR, yR, xR])
 
 
-def vec2eulerXYZ(vec):
+def vector_to_eulerxyz(vec, y_rot=0):
     """Converts vector from CAMERA to ORIGIN to euler angles of rotation
     Parameters
     ----------
-    vec : list | 3-tuple | array
-        vec = camera_target_location-camera_location
-
+    vec : array-like
+        vector from camera to target (camera_target_location-camera_location)
+    y_rot : 
     """
-    X, Y, Z = vec
-    zR = -np.degrees(np.arctan2(X, Y)) # Always true?? #np.sign(X)*np.sign(Y)*
-    yR = 0. # ASSUMED - no roll of camera
-    xR = np.degrees(np.arctan(-np.linalg.norm([X, Y])/Z))
-    return xR, yR, zR
+    x, y, z = np.array(vec).flatten()
+    z_rot = -np.degrees(np.arctan2(x, y)) # Always true?? #np.sign(x)*np.sign(y)*
+    x_rot = np.degrees(np.arctan(-np.linalg.norm([x, y])/z))
+    return x_rot, y_rot, z_rot
 
-
-def mnrnd(d, p, n=1):
-    """
-    sample distribution "d" w/ associated probabilities "p" "n" times
-    """
-    rr = np.random.rand(n)
-    cumP = np.cumsum(p)
-    s = []
-    for r in rr:
-        idx = min(np.nonzero(r<cumP)[0])
-        s.append(d[idx])
-    return s

@@ -458,8 +458,8 @@ class ObConstraint(PosConstraint):
             Sz = Ob.size3D
             # Draw random (x, y) image position to start:
             ImPos = ImPosCt.sampleXY() 
-            oPosZ = bvpu.math.PerspectiveProj_Inv(ImPos, Cam, Z=100)
-            oPosUp = bvpu.math.linePlaneInt(Cam.location[0], oPosZ, P0=(0, 0, Zbase+Sz/2.))
+            oPosZ = bvpu.math.perspective_projection_inv(ImPos, Cam, Z=100)
+            oPosUp = bvpu.math.line_plane_intersection(Cam.location[0], oPosZ, P0=(0, 0, Zbase+Sz/2.))
             TmpPos = oPosUp
             TmpPos[2] -= Sz/2.
             TmpOb = Object(pos3D=TmpPos, size3D=Sz, action = Ob.action)
@@ -531,7 +531,7 @@ class ObConstraint(PosConstraint):
             # Get vector from fixation->camera
             cVec = VectorFn(Cam.fix_location[0])-VectorFn(Cam.location[0])
             # Convert to X, Y, Z Euler angles
-            x, y, z = bvpu.math.vec2eulerXYZ(cVec)
+            x, y, z = bvpu.math.vector_to_eulerxyz(cVec)
             if round(np.random.rand()):
                 posNeg=1
             else:
