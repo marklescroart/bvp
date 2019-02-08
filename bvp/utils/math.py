@@ -140,8 +140,7 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
         circ_pos[:, 1] = -(circ_pos[:, 2]-y_center) + y_center
     return circ_pos
 
-
-def perspective_projection(bvp_object, camera, image_size=(1., 1.), cam_location=None, cam_fix_location=None,cam_lens=None): 
+def perspective_projection_bounds():
     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
@@ -274,6 +273,133 @@ def perspective_projection(bvp_object, camera, image_size=(1., 1.), cam_location
     return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
 
 
+def perspective_projection(location, 
+                           camera_location, 
+                           fix_location,
+                           camera_fov=None, 
+                           camera_lens=None, 
+                           image_size=(1., 1.),
+                           handedness='right', # Blender default
+                           ): 
+    """Maps a 3D location to its 2D location given camera parameters
+    
+    Parameters
+    ----------
+    location : array-like
+        3D (x, y, z) object location to be projected
+    camera_location : array-like
+        3D (x, y, z) camera and location
+    fix_location : array-like
+
+    image_size : array-like
+        Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
+
+    Notes
+    -----
+    Blender seems to convert focal length in mm to FOV by assuming 
+    a particular (horizontal/diagonal) distance, in mm, across an 
+    image. This is not exactly correct, i.e. the rendering effects 
+    will not necessarily match with real rectilinear lenses, etc... 
+    See http://www.metrocast.net/~chipartist/BlensesSite/index.html
+    for more discussion.
+
+    # Code testing the above:
+    import numpy as np
+    import matplotlib.pyplot as plt
+    # different settings for focal length in Blender
+    focal_len  = [10 15 25 35 50 100 182.881]; 
+    # corresponding values for fov (computed by Blender)
+    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
+    # Assumed by Blender
+    image_dist = 32.
+    # Focal length equation, from:
+    # http://kmp.bdimitrov.de/technology/fov.html
+    # http://www.bobatkins.com/photography/technical/field_of_view.html
+    fov_computed = 2 * atand(image_dist. / (2 * focal_len)) 
+    plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
+    """
+    image_dist = 32. # Blender assumption - see above!
+    assert sum([(camera lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
+    if camera_lens is not None:
+        camera_fov = 2*atand(image_dist/(2*camera_lens))
+    
+    # Convert to vector
+    cPos = VectorFn(camera_location)
+    fPos = VectorFn(fix_location)
+    oPos = VectorFn(location)
+    # Prep for shift in L, R directions (wrt camera)
+    cVec = fPos-cPos
+    
+    # Get other bounds...
+    oPos_Top = oPos + VectorFn([0, 0, bvp_object.size3D])
+    oPos_L = oPos - VectorFn([bvp_object.size3D / 2., 0, 0])
+    oPos_R = oPos + VectorFn([bvp_object.size3D / 2., 0, 0])
+
+    # Compute cTheta (Euler angles (XYZ) of camera)
+    cVec = fPos-cPos
+    # Get anlge of camera in world coordinates 
+    cTheta = vec2eulerXYZ(cVec)
+    # Blender is Right-handed
+    x, y, z = 0, 1, 2
+    if handedness == 'left':
+        # (Here just in case)
+        # X rotation
+        xRot = np.matrix([[1., 0., 0.], 
+            [0., cosd(cTheta[x]), -sind(cTheta[x])], 
+            [0., sind(cTheta[x]), cosd(cTheta[x])]])
+        # Y rotation
+        yRot = np.matrix([[cosd(cTheta[y]), 0., sind(cTheta[y])], 
+            [0., 1., 0.], 
+            [-sind(cTheta[y]), 0., cosd(cTheta[y])]])
+        # Z rotation
+        zRot = np.matrix([[cosd(cTheta[z]), -sind(cTheta[z]), 0.], 
+            [sind(cTheta[z]), cosd(cTheta[z]), 0.], 
+            [0., 0., 1.]])
+    elif handedness == 'right':
+        # X rotation
+        xRot = np.matrix([[1., 0., 0.], 
+            [0., cosd(cTheta[x]), sind(cTheta[x])], 
+            [0., -sind(cTheta[x]), cosd(cTheta[x])]])
+        # Y rotation
+        yRot = np.matrix([[cosd(cTheta[y]), 0., -sind(cTheta[y])], 
+            [0., 1., 0.], 
+            [sind(cTheta[y]), 0., cosd(cTheta[y])]])
+        # Z rotation
+        zRot = np.matrix([[cosd(cTheta[z]), sind(cTheta[z]), 0.], 
+            [-sind(cTheta[z]), cosd(cTheta[z]), 0.], 
+            [0., 0., 1.]])
+
+    CamMat = xRot * yRot * zRot
+    d = np.array(CamMat*(oPos-cPos))
+    # Other positions:
+    d_Top = np.array(CamMat*(oPos_Top-cPos))
+    d_L = np.array(CamMat*(oPos_L-cPos))
+    d_R = np.array(CamMat*(oPos_R-cPos))
+    xc = (x, 0)
+    yc = (y, 0)
+    zc = (z, 0)
+
+    ImX_Bot = image_size[x]/2. - d[xc]/d[zc] * (image_size[x]/2.) / (tand(camera_fov/2.));
+    ImY_Bot = d[yc]/d[zc] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.;
+
+    ImX_Top = image_size[x]/2. - d_Top[xc]/d_Top[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
+    ImY_Top = d_Top[yc]/d_Top[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
+
+    ImX_L = image_size[x]/2. - d_L[xc]/d_L[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
+    ImY_L = d_L[yc]/d_L[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
+
+    ImX_R = image_size[x]/2. - d_R[xc]/d_R[zc] * (image_size[x]/2.) / (tand(camera_fov/2.))
+    ImY_R = d_R[yc]/d_R[z] * (image_size[y]/2.) / (tand(camera_fov/2.)) + image_size[y]/2.
+
+    imPos_Bot = [ImX_Bot, ImY_Bot]
+    imPos_Top = [ImX_Top, ImY_Top]
+    imPos_L = [ImX_L, ImY_L]
+    imPos_R = [ImX_R, ImY_R]
+
+    mbs = lambda x: make_blender_safe(x, 'float')
+    return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
+
+
 def PerspectiveProj_Inv(image_location, camera, Z):
     """Compute object location from image location 
     
@@ -285,7 +411,7 @@ def PerspectiveProj_Inv(image_location, camera, Z):
         x, y image position as a pct of the image (in range 0-1)
     camera : bvp.Camera instance
         Camera class, which contains all camera info (position, 
-        lens/fov, angle)
+        lens/camera_fov, angle)
     Z : scalar
         Distance from camera for inverse computation (distance
         is not uniquely specified otherwise)
