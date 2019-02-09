@@ -22,7 +22,7 @@ except ImportError:
 class Object(MappedClass):
     """Layer of abstraction for objects (imported from other files) in Blender scenes.
     """
-    def __init__(self, name='DummyObject', type='Object', fname=None, action=None, pose=None, materials=None,
+    def __init__(self, name=None, type='Object', fname=None, action=None, pose=None, materials=None,
         pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), n_faces=None, n_vertices=None, n_poses=0,
         basic_category=None, semantic_category=None, wordnet_label=None, armature=None, 
         constraints=None, real_world_size=None, _id=None, _rev=None, dbi=None, is_cycles=False, 
@@ -130,8 +130,9 @@ class Object(MappedClass):
         # Optionally link to a specific scene
         scn = utils.blender.set_scene(scn)
         # Get object (parent of group / proxy)
-        if self.name=='DummyObject':
+        if self.name is None:
             # Default object
+            proxy = False
             self.blender_object = self.add_dummy()
         else:
             self.blender_object = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
@@ -290,21 +291,23 @@ class Object(MappedClass):
                         utils.blender.apply_material(o, mat, proxy_object=self.proxy, uv=False)
 
 
-    def add_dummy():
-        """add a sphere in place of object
+    def add_dummy(self):
+        """Add a sphere
         
         TODO: options for what sort of shape (not just a sphere?)
         """
-        bpy.ops.mesh.primitive_uv_sphere_add(size=self.size3D / 2.)
-        utils.blender.set_cursor((0, 0, -self.size3D / 2.))
-        bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
-        bpy.ops.transform.translate(value=(0, 0, self.size3D / 2.))
+        blender_default_size = 10 # by convention... just making explicit here
         utils.blender.set_cursor((0, 0, 0))
-        grp = bpy.context.object
-        # ?
-        grp.location = self.pos3D
+        bpy.ops.mesh.primitive_uv_sphere_add(size=blender_default_size / 2.)
+        utils.blender.set_cursor((0, 0, -blender_default_size / 2.))
+        bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
+        bpy.ops.transform.translate(value=(0, 0, blender_default_size / 2.))
+        utils.blender.set_cursor((0, 0, 0))
+        obj = bpy.context.object
+        grp = bpy.data.groups.new('dummy')
+        grp.objects.link(obj)
         # Rotations don't matter; it's a sphere.
-        return grp
+        return obj
 
     @property
     def max_xyz_pos(self):

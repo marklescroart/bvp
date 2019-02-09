@@ -7,7 +7,7 @@ import numpy as np
 from .basics import make_blender_safe
 
 
-def VectorFn(a):
+def vector_fn(a):
     b = np.array(a)
     b.shape = (len(a), 1)
     return b
@@ -21,8 +21,8 @@ def lst(a):
 def circ_avg(a, b):
     """Circular average of two values (in DEGREES)
     """
-    tmp = np.e**(1j * a/180. * np.pi) + np.e**(1j * b / 180. * np.pi)
-    m = np.arctan2(tmp.imag, tmp.real) / np.pi * 180.
+    tmp = np.e**(1j * np.radians(a)) + np.e**(1j * np.radians(b))
+    m = np.degrees(np.arctan2(tmp.imag, tmp.real))
     return m
 
 
@@ -95,7 +95,7 @@ def cart2sph(x, y, z, degrees=True):
         return r, theta, phi
 
 
-def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
+def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
     '''Return points in a circle. 
     
     Parameters
@@ -123,8 +123,8 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
     
     circ_pos = np.nan * np.ones((n_positions, 2))
     for ii, tt in enumerate(np.arange(0, 360., 360./n_positions)):
-        circ_pos[ii, 0] = radius[ii]*_sind(tt) + x_center
-        circ_pos[ii, 1] = -radius[ii]*_cosd(tt) + y_center
+        circ_pos[ii, 0] = radius[ii]*sind(tt) + x_center
+        circ_pos[ii, 1] = -radius[ii]*cosd(tt) + y_center
         ii += 1
         
     if direction.upper()=='BOTCCW':
@@ -139,6 +139,7 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='BotCCW'):
     elif direction.upper()=='TOPCW':
         circ_pos[:, 1] = -(circ_pos[:, 2]-y_center) + y_center
     return circ_pos
+
 
 def perspective_projection_bounds():
     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
@@ -196,14 +197,14 @@ def perspective_projection_bounds():
         fix_location = camera.fix_location[0]
     
     # Convert to vector
-    camera_location = VectorFn(camPos)
-    fix_location = VectorFn(fix_location)
-    oPos = VectorFn(objPos)
+    camera_location = vector_fn(camPos)
+    fix_location = vector_fn(fix_location)
+    oPos = vector_fn(objPos)
     
     # Get other bounds...
-    oPos_Top = oPos + VectorFn([0, 0, bvp_object.size3D])
-    oPos_L = oPos - VectorFn([bvp_object.size3D / 2., 0, 0])
-    oPos_R = oPos + VectorFn([bvp_object.size3D / 2., 0, 0])
+    oPos_Top = oPos + vector_fn([0, 0, bvp_object.size3D])
+    oPos_L = oPos - vector_fn([bvp_object.size3D / 2., 0, 0])
+    oPos_R = oPos + vector_fn([bvp_object.size3D / 2., 0, 0])
 
     # Compute camera_euler (Euler angles (XYZ) of camera)
     cVec = fix_location-camera_location
@@ -288,8 +289,8 @@ def get_camera_matrix(camera_location,
         camera_fov = 2*atand(image_dist/(2*camera_lens))
     
     # Convert to vector
-    camera_location = VectorFn(camera_location)
-    fix_location = VectorFn(fix_location)
+    camera_location = vector_fn(camera_location)
+    fix_location = vector_fn(fix_location)
     # Prep for shift in L, R directions (wrt camera)
     camera_vector = fix_location - camera_location
     # Get anlge of camera in world coordinates 
@@ -325,8 +326,8 @@ def get_camera_matrix(camera_location,
             [0., 0., 1.]])
 
     camera_matrix = x_rot * y_rot * z_rot
-    print("Camera matrix:")
-    print(camera_matrix)
+    #print("Camera matrix:")
+    #print(camera_matrix)
     return camera_matrix    
 
 def perspective_projection(location, 
@@ -377,7 +378,7 @@ def perspective_projection(location,
     Also, look into this (for within Blender only): 
     https://blender.stackexchange.com/questions/16472/how-can-i-get-the-cameras-projection-matrix
     """
-    location = VectorFn(location)
+    location = vector_fn(location)
 
     image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
@@ -385,8 +386,8 @@ def perspective_projection(location,
         camera_fov = 2*atand(image_dist/(2*camera_lens))
     
     # Convert to vector
-    location = VectorFn(location)
-    camera_location = VectorFn(camera_location)
+    location = vector_fn(location)
+    camera_location = vector_fn(camera_location)
     camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
                                       camera_lens=camera_lens, image_size=image_size, 
                                       handedness=handedness)
@@ -402,20 +403,20 @@ def perspective_projection(location,
 
 
 def perspective_projection_inv(image_location, 
-                           camera_location, 
-                           fix_location,
-                           Z,
-                           camera_fov=None, 
-                           camera_lens=None, 
-                           image_size=(1., 1.),
-                           handedness='right'): 
+                               camera_location, 
+                               fix_location,
+                               Z,
+                               camera_fov=None, 
+                               camera_lens=None, 
+                               image_size=(1., 1.),
+                               handedness='right'): 
     """Compute object location from image location + distance using inverse perspective projection
 
     Parameters
     ----------
     image_location : array-like
         x, y image position as a pct of the image (in range 0-1)
-    camera : bvp.Camera instance
+    camera_location : bvp.Camera instance
         Camera class, which contains all camera info (position, 
         lens/camera_fov, angle)
     Z : scalar
@@ -443,20 +444,68 @@ def perspective_projection_inv(image_location,
     camera_matrix_inv = np.linalg.pinv(camera_matrix)
     # Sample one point at Z units from camera
     # This calculation is basically: PctToSideOfImage * x/f * Z = X  # (tand(fov/2.) = x/f)
-    dx = -(x_pos - x_sz / 2.) * tand(camera_fov / 2.) / (x_sz / 2.) * Z
-    dy = (y_pos - y_sz / 2.) * tand(camera_fov / 2.) / (y_sz / 2.) * Z
-    d = VectorFn([dx, dy, Z])
+    if isinstance(x_pos, (int, np.integer)):
+        x_pos = ((x_pos - x_sz / 2.) / (x_sz / 2.))
+        # Assume if x_pos is int, so is y_pos
+        if x_sz > y_sz:
+            x_frac, y_frac = x_sz / y_sz, 1.0
+        else:
+            x_frac, y_frac = 1.0, x_sz / y_sz
+    else:
+        x_pos = (x_pos - 0.5) / 0.5
+        x_frac, y_frac = x_sz, y_sz
+    if isinstance(y_pos, (int, np.integer)):
+        # Convert pixels to fraction
+        y_pos = ((y_pos - y_sz / 2.) / (y_sz / 2.))
+    else:
+        y_pos = (y_pos - 0.5) / 0.5
+    dx = -x_pos * tand(camera_fov / 2.) * (x_frac / 2.) * Z
+    dy = y_pos * tand(camera_fov / 2.) * (y_frac / 2.) * Z
+    d = vector_fn([dx, dy, Z])
     # d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN
     # d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
     # of the object in the world.
-    # Not quite working 100% correctly. Requires stupid fiddling to 
-    # work correctly for non-square aspect ratio images.
-    #print(d)
-    #print(camera_location)
-    location_3d = camera_matrix_inv * d + VectorFn(camera_location)
-    #print(location_3d)
+    location_3d = camera_matrix_inv * d + vector_fn(camera_location)
     return lst(location_3d)
 
+
+def aim_camera(object_location,
+               image_location, 
+               camera_location, 
+               camera_fov=None, 
+               camera_lens=None, 
+               image_size=(1., 1.),
+               handedness='right'):
+    """Place camera fixation to put an object at a specified 2D location
+
+    Return 3D coordintes to place fixation for `object_location` to appear at `image_location`
+    """
+    # Compute image-center relative coords
+    image_location = np.array(image_location)
+    image_size = np.array(image_size)
+    sz_x, sz_y = image_size
+    if all(image_size > 1):
+        # Pixel coordinates specified
+        # `_c` for center-relative
+        im_x, im_y = image_location
+        im_x_c = -(im_x - (sz_x / 2))
+        im_y_c = -(im_y - (sz_y / 2))
+        fix_location_image = [int(im_x_c + (sz_x / 2)), 
+                              int(im_y_c + (sz_y / 2))]
+    else:
+        im_loc_c = image_location - 0.5
+        fix_location_image = -im_loc_c + 0.5
+    Z = -np.linalg.norm(np.array(object_location) - np.array(camera_location))
+    fix_location_3d = perspective_projection_inv(fix_location_image, 
+                                                 camera_location, 
+                                                 object_location,
+                                                 Z,
+                                                 camera_fov=camera_fov, 
+                                                 camera_lens=camera_lens, 
+                                                 image_size=image_size,
+                                                 handedness=handedness)
+    return fix_location_3d
+    
 
 class ImPosCount(object):
     """

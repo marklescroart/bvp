@@ -527,9 +527,9 @@ class ObConstraint(PosConstraint):
         """
         if not Cam is None:
             import random
-            VectorFn = bvpu.math.VectorFn
+            vector_fn = bvpu.math.vector_fn
             # Get vector from fixation->camera
-            cVec = VectorFn(Cam.fix_location[0])-VectorFn(Cam.location[0])
+            cVec = vector_fn(Cam.fix_location[0])-vector_fn(Cam.location[0])
             # Convert to X, Y, Z Euler angles
             x, y, z = bvpu.math.vector_to_eulerxyz(cVec)
             if round(np.random.rand()):

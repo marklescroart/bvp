@@ -66,13 +66,15 @@ class Camera(MappedClass):
         self._db_fields = []
         self._data_fields = ['location', 'fix_location', 'rotation_euler', 
                             'frames','lens','clip']
-        self._temp_fields = []
+        self._temp_fields = ['blender_camera', 'blender_fixation']
         inpt = locals()
         for k, v in inpt.items():
             if not k in ('self', 'type'):
                 setattr(self, k, v)
         if self.frames is None or all([x == 1 for x in self.frames]):
             self.frames = (1,)
+        self.blender_camera = None
+        self.blender_fixation = None
 
     @property
     def n_loc(self):
@@ -119,6 +121,7 @@ class Camera(MappedClass):
         cam = bpy.data.objects.new('cam_{}'.format(name), cam_data)
         # Make camera object present in scene
         scn.objects.link(cam)
+        self.blender_camera = cam
         # Set as active camera
         scn.camera = cam
         cam.location = self.location[0]
@@ -159,6 +162,7 @@ class Camera(MappedClass):
                     location=self.fix_location)
             fix.animation_data_create()
             fix.animation_data.action = f
+            self.blender_fixation = fix
         else:
             raise ValueError(('To place a camera, either property `fix_location` or'
                               '`rotation_euler` must be specified!'))
