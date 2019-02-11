@@ -85,7 +85,7 @@ class Background(MappedClass):
                         pass 
                 else:
                     print(obstacles)
-    def place(self, scn=None, proxy=True):
+    def place(self, scn=None, proxy=False):
         """
         Adds background to Blender scene
         """
@@ -99,6 +99,10 @@ class Background(MappedClass):
             # Add group of mesh object(s)
             #print('{}, {}'.format(self.path, self.name))
             bg_ob = add_group(self.name, self.fname, self.path, proxy=proxy)
+            if not proxy:
+                bg_grp = bg_ob.users_group[0]
+                for o in bg_grp.objects:
+                    o.name = 'BG_' + o.name
         else:
             # Potentially add default background (with ground plane, other render settings...)
             print("BG is empty!")

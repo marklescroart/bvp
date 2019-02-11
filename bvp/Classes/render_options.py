@@ -316,7 +316,10 @@ class RenderOptions(object):
         DisallowedNames = ['BG_', 'CamTar', 'Shadow_'] # Also constraint objects...
         Ob = [o for o in bpy.context.scene.objects if not any([x in o.name for x in DisallowedNames])]
         PassCt = 1
+        to_skip = []
         for o in Ob:
+            if o.name in to_skip:
+                continue
             # Check for dupli groups:
             if o.type=='EMPTY':
                 if o.dupli_group:
@@ -326,10 +329,18 @@ class RenderOptions(object):
                     bvpu.blender.set_layers(o, [0, PassCt])
                     PassCt +=1
             # Check for mesh objects:
-            elif o.type=='MESH':
+            elif o.type in ('MESH', 'CURVE'):
+                print('assigning pass index %d to %s'%(PassCt, o.name))
                 o.pass_index = PassCt
                 bvpu.blender.set_layers(o, [0, PassCt])
-                PassCt +=1
+                if len(o.users_group) > 0:
+                    for sibling in o.users_group[0].objects:
+                        to_skip.append(sibling.name)
+                        print('assigning pass index %d to %s'%(PassCt, sibling.name))
+                        print(to_skip)
+                        sibling.pass_index = PassCt
+                        bvpu.blender.set_layers(sibling, [0, PassCt])                
+                PassCt += 1
             # Other types of objects?? 
         
         #####################################################################
