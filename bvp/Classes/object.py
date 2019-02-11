@@ -111,7 +111,7 @@ class Object(MappedClass):
         #     ob_str+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
         return(ob_str)
  
-    def place(self, scn=None, proxy=True):
+    def place(self, scn=None, proxy=False):
         """Places object into Blender scene, with pose & animation information
 
         Parameters
@@ -126,30 +126,34 @@ class Object(MappedClass):
         """
         # Make file local, if it isn't already
         self.cloud_download()
-        prev_placed = self.blender_object is not None
+        if self.blender_object is None:
+            instance = 0
+        else:
+            # Allow for multiple instances of this object
+            instance = len(self.blender_object)
         # Optionally link to a specific scene
         scn = utils.blender.set_scene(scn)
         # Get object (parent of group / proxy)
         if self.name is None:
             # Default object
             proxy = False
-            self.blender_object = self.add_dummy()
+            new_ob = self.add_dummy()
         else:
-            self.blender_object = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
+            new_ob = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
         # Get group of meshes in this object / proxy object
         if proxy:
-            self.blender_group = self.blender_object.dupli_group
+            new_grp = new_ob.dupli_group
         else:
-            # HRMMM
+            # Necessary?
             #assert len(self.blender_object.users_group) == 1
-            self.blender_group = self.blender_object.users_group[0]
-        # Position / rotation
+            new_grp = new_ob.users_group[0]
+        # Position / rotationn
         if self.pos3D is not None:
-            self.blender_object.location = self.pos3D
+            new_ob.location = self.pos3D
         if self.rot3D is not None:
-            self.blender_object.rotation_euler = self.rot3D
+            new_ob.rotation_euler = self.rot3D
         # Get armature, if an armature exists for this object
-        armatures = [x for x in self.blender_group.objects if x.type=='ARMATURE']
+        armatures = [x for x in new_grp.objects if x.type=='ARMATURE']
         # Select one armature for poses / actions, if armatures exist
         if len(armatures) == 0:
             armature = None
@@ -171,24 +175,26 @@ class Object(MappedClass):
 
         if proxy and armature is not None:
             bpy.ops.object.proxy_make(object=armature.name) #object=pOb.name,type=armatures.name)
-            self.armature = bpy.context.object
-            self.armature.pose_library = armature.pose_library
+            new_armature = bpy.context.object
+            new_armature.pose_library = armature.pose_library
         else:
-            self.armature = armature
+            new_armature = armature
         # Update self w/ list of poses
-        if self.armature is not None and self.armature.pose_library is not None:
-            self.poses = [x.name for x in self.armature.pose_library.pose_markers]
+        if new_armature is not None and new_armature.pose_library is not None:
+            self.poses = [x.name for x in new_armature.pose_library.pose_markers]
         # Set pose, action
-        if not self.pose is None:
-            self.apply_pose(self.armature, self.pose)
-        if not self.action is None:
-            self.apply_action(self.armature, self.action)
-        if not self.materials is None:
-            self.apply_materials(self.materials)
+        if self.materials is not None:
+            if proxy:
+                raise ValueError("Can't change materials of proxy objects. Use proxy=False.")
+            self.apply_materials(new_grp, self.materials)
+        if self.pose is not None:
+            self.apply_pose(new_armature, self.pose)
+        if self.action is not None:
+            self.apply_action(new_armature, self.action)
         # Deal with particle systems on imported objects. Use of particle 
         # systems in general is not advised, since they complicate sizing 
         # and drastically slow renders.
-        for o in self.blender_group.objects:
+        for o in new_grp.objects:
             # Get the MODIFIER object that contains the particle system
             particle_modifier = [p for p in o.modifiers if p.type=='PARTICLE_SYSTEM']
             for psm in particle_modifier:
@@ -201,47 +207,51 @@ class Object(MappedClass):
                 # after creation (e.g., hair is commonly styled). Again, avoid if 
                 # possible...
         # Scale to correct size
-        orig_size = 10. # By BVP convention, all objects are stored in library files w/ max dim of 10 units
-        sz_factor = float(self.size3D) / orig_size
-        # THIS IS A YOOOOGE HACK
-        if not prev_placed:
-            if self.armature is not None:
-                self.armature.scale *= sz_factor
-            else:
-                self.blender_object.scale *= sz_factor
-        self.proxy = proxy
+        library_size = 10. # By BVP convention, all objects are stored in library files w/ max dim of 10 units
+        scale = float(self.size3D) / library_size
+        if new_armature is not None:
+            new_armature.scale *= scale
+        else:
+            new_ob.scale *= scale
+
+        # Keep track of multiple instances of this object
+        if instance == 0:
+            self.blender_object = [new_ob]
+            self.blender_group = [new_grp]
+            self.armature = [new_armature]
+            self.proxy = [proxy]
+        else:
+            self.blender_object.append(new_ob)
+            self.blender_group.append(new_grp)
+            self.armature.append(new_armature)
+            self.proxy.append(proxy)
 
         scn.update()
-        # Switch frame & update again, because some poses and other effects 
-        # don't seem to take effect until the frame changes
+        # Switch frame & update again, because some poses 
+        # and other effects don't seem to take effect until 
+        # the frame changes
         scn.frame_current += 1
         scn.update()
         scn.frame_current -= 1
         scn.update()
         return self.blender_object
 
-    def apply_action(self, arm, action):
+    def apply_action(self, armature, action):
         """Apply an action to an armature.
-
-        Kept separate from Object __init__ function so to be able to interactively apply actions 
-        in an open Blender session.
-
-        Make this a method of Action instead??
 
         Parameters
         ----------
-        arm : bpy.data.object containing armature
+        armature : bpy.data.object containing armature
             Armature object to which the action is applied.
         action : Action
             Action to be applied. Must have file_name and path attributes
         """
         act = action.link()
-        if arm.animation_data is None:
-            arm.animation_data_create()
+        if armature.animation_data is None:
+            armature.animation_data_create()
         if act is None:
-            # Necessary?
             raise ValueError("action linking returned `None`")
-        arm.animation_data.action = act
+        armature.animation_data.action = act
 
     def apply_pose(self, armature, pose_index):
         """Apply a pose to an armature.
@@ -266,7 +276,7 @@ class Object(MappedClass):
         # Set back to previous mode; otherwise Blender may puke and die with next command
         bpy.ops.object.posemode_toggle()
 
-    def apply_materials(self, materials):
+    def apply_materials(self, bpy_grp, materials):
         """Apply materials to already-placed object.
         
         Parameters
@@ -275,21 +285,20 @@ class Object(MappedClass):
             list of all blender objects in this group
         materials : list
             list of bvp materials to apply. ** CURRENTLY ONLY WORKS FOR ONE MATERIAL **
+
+        Notes
+        -----
+        TODO: Deal with uv in more sensible fashion
         """
-        # TODO: Deal with uv. 
-        # WIP error
+        
         if len(materials) > 1:
             raise NotImplementedError('Multiple material assignment not working yet.')
 
         for i, material in enumerate(materials):
             mat = material.link()
-            if self.proxy:
-                utils.blender.apply_material(self.blender_object, mat, proxy_object=self.proxy, uv=False)
-            else:
-                for o in self.blender_group.objects:
-                    if o.type=='MESH':
-                        utils.blender.apply_material(o, mat, proxy_object=self.proxy, uv=False)
-
+            for o in bpy_grp.objects:
+                if o.type in ('MESH', 'CURVE'): # More? 
+                    utils.blender.apply_material(o, mat, uv=False)
 
     def add_dummy(self):
         """Add a sphere
@@ -476,3 +485,17 @@ class Object(MappedClass):
         pos = self.pos3D
         return [((mi[0]+ma[0])/2,(mi[1]+ma[1])/2, mi[2]) for mi, ma in zip(min_pt, max_pt)]
     
+    def clear(self, scn=None, instance=-1):
+        """Unlink an object from a scene"""
+        if scn is None:
+            scn = bpy.context.scene
+        scn.objects.unlink(self.blender_object[instance])
+        for o in self.blender_group[instance].objects:
+            if o.name in scn.objects:
+                scn.objects.unlink(o)
+        _ = self.blender_object.pop(instance)
+        _ = self.blender_group.pop(instance)
+        _ = self.armature.pop(instance)
+        _ = self.proxy.pop(instance)
+        # Go further? Delete from memory? 
+        

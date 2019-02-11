@@ -333,11 +333,11 @@ def get_mesh_objects(scn=None, select=True):
     if scn is None:
         scn = bpy.context.scene
     bpy.ops.object.select_all(action='DESELECT')
-    MeOb = [ob for ob in scn.objects if ob.type=='MESH']
+    mesh_objects = [ob for ob in scn.objects if ob.type=='MESH']
     if select:
-        for ob in MeOb:
+        for ob in mesh_objects:
             ob.select = True
-    return MeOb
+    return mesh_objects
 
 def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
     """Commits modifiers to meshes (use before joining meshes)
@@ -502,9 +502,6 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
 def add_img_material(name, imfile, imtype):
     """Add a texture containing an image to Blender.
 
-    Is this optimal? May require different materials/textures w/ different uv mappings 
-    to fully paint all the shit in a scene. Better to just load an image?
-
     Parameters
     ----------
     name : string
@@ -653,27 +650,23 @@ def add_img_background(imfile, imtype='FILE', scn=None):
     scn.node_tree.links.new(img_node.outputs['Image'], mix_node.inputs[1])
     scn.node_tree.links.new(mix_node.outputs['Image'], compositor_output.inputs['Image'])
 
-def apply_material(obj, mat, proxy_object=False, uv=True):
-    """Apply a material to ab object"""
-    if proxy_object:
-        for g in obj.dupli_group.objects:
-            grab_only(obj)
-            if not g.type=='MESH':
-                continue
-            bpy.ops.object.proxy_make(object=g.name)
-            o = bpy.context.object
-            for ms in o.material_slots:
-                ms.material = mat
-            # Get rid of proxy now that material is set
-            bpy.context.scene.objects.unlink(o)
-        return
+def apply_material(obj, mat, material_slot=None, uv=True):
+    """Apply a material to an object"""
     # Get object
     grab_only(obj)
+    # assure at least one material slot
+    if len(obj.material_slots) == 0:
+        bpy.ops.object.material_slot_add()
     # Apply to object
-    try:
-        obj.material_slots[0].material = mat
-    except:
-        obj.data.materials.append(mat)
+    if material_slot is None:
+        for ms in obj.material_slots:
+            ms.material = mat
+    else:
+        #try:
+        obj.material_slots[material_slot].material = mat
+        #except:
+        #    # Unclear what to do with this. 
+        #    obj.data.materials.append(mat)
     if uv:
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.uv.smart_project()
@@ -1028,34 +1021,34 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     Counts objects currently in scene and increments count.
     """ 
 
-    if (name in bpy.data.groups): # and proxy:
-        # Only add a dupli group if past group is proxy object?
-
-        # Group already exists in file, for whatever reason
-        print('Found group! Adding new dupligroup object.')
-        # Add empty
-        bpy.ops.object.add() 
-        # Fill empty with dupli-group object of desired group
-        ob = bpy.context.object
-        ob.dupli_type = "GROUP"
-        ob.dupli_group = bpy.data.groups[name]
-        ob.name = name
-    else:
-        print('Did not find group! Adding group to file.')
-        old_obs = list(bpy.context.scene.objects)
-        bpy.ops.wm.append(
-            directory=os.path.join(fpath, fname)+"/Group/", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-            filepath="//"+fname+"/Group/"+name, # local filepath within .blend file to the scene to be imported
-            filename=name, 
-            # NOTE: "filename" is not the name of the file but the name 
-            # of the data block, i.e. the name of the group. 
-            # This stupid naming convention is due to Blender's API.
-            link=proxy, 
-            #relative_path=False, 
-            autoselect=True, 
-            instance_groups=proxy)
-        new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
-        ob  = find_group_parent(new_obs)
+    #if (name in bpy.data.groups): # and proxy:
+    #    # Only add a dupli group if past group is proxy object?
+    #    
+    #    # Group already exists in file, for whatever reason
+    #    print('Found group! Adding new dupligroup object.')
+    #    # Add empty
+    #    bpy.ops.object.add() 
+    #    # Fill empty with dupli-group object of desired group
+    #    ob = bpy.context.object
+    #    ob.dupli_type = "GROUP"
+    #    ob.dupli_group = bpy.data.groups[name]
+    #    ob.name = name
+    #else:
+    #    print('Did not find group! Adding group to file.')
+    old_obs = list(bpy.context.scene.objects)
+    bpy.ops.wm.append(
+        directory=os.path.join(fpath, fname)+"/Group/", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+        filepath="//"+fname+"/Group/"+name, # local filepath within .blend file to the scene to be imported
+        filename=name, 
+        # NOTE: "filename" is not the name of the file but the name 
+        # of the data block, i.e. the name of the group. 
+        # This stupid naming convention is due to Blender's API.
+        link=proxy, 
+        #relative_path=False, 
+        autoselect=True, 
+        instance_groups=proxy)
+    new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
+    ob  = find_group_parent(new_obs)
     grab_only(ob)
     return ob
 

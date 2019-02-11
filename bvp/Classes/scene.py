@@ -312,9 +312,10 @@ class Scene(MappedClass):
 
         scn = utils.blender.set_scene(None)
         # Place objects
-        ob = target.place() # TODO: specify proxy / not.
+        ob = target.place(proxy=False)
+        ta = target.armature[-1]
         # Find the bone to track
-        bone = target.armature.pose.bones[bone] 
+        bone = ta.pose.bones[bone] 
         # bone positions:
         positions = []
         # xyz location of the central (z) axis of the parent 
@@ -329,8 +330,8 @@ class Scene(MappedClass):
             scn.frame_set(fr)
             scn.update()
             # Calculate global position
-            positions.append(target.armature.matrix_world * bone.matrix * bone.location)
-            object_locations.append(target.armature.location)
+            positions.append(ta.matrix_world * bone.matrix * bone.location)
+            object_locations.append(ta.location)
         if fix_offset is not None:
             # Shift position of fixation 
             new_pos = []
@@ -353,13 +354,12 @@ class Scene(MappedClass):
             
             self.camera.lens /= 1.2 # TODO: Fix for general circumstances The camera is closer in this setting, so we should zoom less
 
-        # This is bork as well
         #dist = np.linalg.norm(np.array(self.camera.location[0]) - np.array(self.objects[0].pos3D[0]))
         #obsz = self.objects[0].size3D
         #self.camera.lens *= (dist/obsz)*1.713*3 # TODO: Utterly wrong for arbitrary positions of camera
         if clear:
-            bpy.context.scene.objects.unlink(ob)
-            #target.clear() # fn does not exist.
+            #bpy.context.scene.objects.unlink(ob)
+            target.clear()
 
 
     def create(self, render_options=None, scn=None, is_working=False, proxy=True):
@@ -383,9 +383,12 @@ class Scene(MappedClass):
         # Background
         if self.background is not None:
             self.background.place(proxy=proxy)
-            if self.background.semantic_category is not None and 'indoor' in self.background.semantic_category and self.background.real_world_size < 50.:
-                # Due to a problem with skies coming inside the corners of rooms
-                scale = self.background.real_world_size * 1.5
+            if self.background.semantic_category is not None and 'indoor' in self.background.semantic_category:
+                if (self.background.real_world_size is not None) and (self.background.real_world_size < 50):
+                    # Due to a problem with skies coming inside the corners of rooms
+                    scale = self.background.real_world_size * 1.5
+                else:
+                    scale = None #pass # this whole clause should go.
             else:
                 scale = self.background.real_world_size
         # Sky

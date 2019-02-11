@@ -1,6 +1,7 @@
 # Imports
 import os
-from bvp.utils.blender import add_group, grab_only
+import six
+from bvp.utils.blender import add_group, grab_only, apply_material
 from .constraint import ObConstraint, CamConstraint
 from .mapped_class import MappedClass
 from .object import Object
@@ -22,7 +23,7 @@ class Background(MappedClass):
     def __init__(self, name='DummyBackground', fname=None, n_vertices=None, n_faces=None, 
         type='Background', wordnet_label=None, real_world_size=None, lens=50., 
         semantic_category=None, object_semantic_category='all', sky_semantic_category='all',
-        camera_constraints=None, object_constraints=None, obstacles=None, 
+        camera_constraints=None, object_constraints=None, obstacles=None, materials=None,
         _id=None, _rev=None, dbi=None): 
         """Class to store Backgrounds (floor, walls, maybe lights, + constraints on objects) 
 
@@ -52,7 +53,7 @@ class Background(MappedClass):
         if isinstance(self.real_world_size, (list, tuple)):
             self.real_world_size = self.real_world_size[0]
         self._db_fields = []
-        self._data_fields = []
+        self._data_fields = ['materials']
         self._temp_fields = ['CamConstraint', 'ObConstraint']
         
         #mappedclass translation is not recursive, so we must set these manually. 
@@ -71,10 +72,19 @@ class Background(MappedClass):
         #     for k in object_constraints.keys():
         #         setattr(self.obConstraints,k,object_constraints[k])
 
-        if obstacles:
-            #print(obstacles)
-            self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] #TODO: SemanticCat =/= semantic_category. Fix this at some point.
-
+        if obstacles is not None: # and obstacles.lower() != 'none'
+            if isinstance(obstacles, list):
+                #TODO: SemanticCat =/= semantic_category. Fix this at some point.
+                self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] 
+            else:
+                if isinstance(obstacles, six.string_types):
+                    if obstacles.lower() != 'none':
+                        raise Exception('String variable for `obstacles` in background not understood')
+                    else:
+                        # Fine.
+                        pass 
+                else:
+                    print(obstacles)
     def place(self, scn=None, proxy=True):
         """
         Adds background to Blender scene
@@ -88,10 +98,40 @@ class Background(MappedClass):
         if self.name is not 'DummyBackground':
             # Add group of mesh object(s)
             #print('{}, {}'.format(self.path, self.name))
-            add_group(self.name, self.fname, self.path, proxy=proxy)
+            bg_ob = add_group(self.name, self.fname, self.path, proxy=proxy)
         else:
             # Potentially add default background (with ground plane, other render settings...)
             print("BG is empty!")
+        if self.materials is not None:
+            if proxy:
+                raise ValueError("Can't change materials of proxy objects. Use proxy=False.")
+            self.apply_materials(bg_ob.users_group[0], self.materials)
+
+
+    def apply_materials(self, bpy_grp, materials):
+        """Apply materials to already-placed background.
+        
+        Parameters
+        ----------
+        objects : list
+            list of all blender objects in this group
+        materials : list
+            list of bvp materials to apply. ** CURRENTLY ONLY WORKS FOR ONE MATERIAL **
+
+        Notes
+        -----
+        TODO: Deal with uv in more sensible fashion
+        """
+        
+        if len(materials) > 1:
+            raise NotImplementedError('Multiple material assignment not working yet.')
+
+        for i, material in enumerate(materials):
+            mat = material.link()
+            for o in bpy_grp.objects:
+                if o.type in ('MESH', 'CURVE'): # More? 
+                    apply_material(o, mat, uv=False)
+  
 
     @classmethod
     def from_blender(cls, context, dbi):
@@ -119,7 +159,7 @@ class Background(MappedClass):
         grp = ob.users_group[0]
         ## WordNet labels
         wordnet_label = [s.name for s in grp.Background.wordnet_label] # or whatever 
-        semantic_category = [s.name for s in grp.Background.semantic_category] # OR whatever        
+        semantic_category = [s.name for s in grp.Background.semantic_category] # OR whatever
         
         #  TODO: n_vertices, n_faces, lens (interactive manual input?), constraints.
         

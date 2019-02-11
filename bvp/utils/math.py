@@ -433,6 +433,7 @@ def perspective_projection_inv(image_location,
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
         camera_fov = 2*atand(image_dist/(2*camera_lens))
+        camera_lens = None
     
     # Get camera matrix
     camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 

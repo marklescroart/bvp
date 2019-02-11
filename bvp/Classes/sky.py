@@ -4,7 +4,7 @@
 import os
 import math as bnp
 from six import string_types
-from .. import utils as bvpu
+from .. import utils
 from .mapped_class import MappedClass
 
 try:
@@ -17,7 +17,7 @@ class Sky(MappedClass):
     """Class for skies and lighting (sun, lamps, world) for scenes    
     """
     def __init__(self, name='default_outdoor', light_location=None, light_type=None, light_rotation=None, 
-        semantic_category=None, real_world_size=100., fname=None, n_faces=None, n_vertices=None, 
+        semantic_category=None, real_world_size=100., materials=None, fname=None, n_faces=None, n_vertices=None, 
         world_params=None, world_lighting=None, type='Sky', dbi=None, _id=None, _rev=None):
         """ Class for skies & lights in Blender scenes
 
@@ -66,7 +66,7 @@ class Sky(MappedClass):
                     setattr(self, k, v)
         # Set _temp_params, etc.
         self._temp_fields = []
-        self._data_fields = []
+        self._data_fields = ['materials']
 
         # TO DO: delete me once we've verified that it's OK with current blender files
         if isinstance(self.real_world_size, (list, tuple)):
@@ -79,7 +79,7 @@ class Sky(MappedClass):
             self.light_type = 'SUN'
             self.light_location = (0., 0., 35.)
             self.light_rotation = (0.6503279805183411, 0.055217113345861435, 1.8663908243179321)
-            self.world_params = bvpu.basics.fixedKeyDict({
+            self.world_params = utils.basics.fixedKeyDict({
                     # Sky color
                     'horizon_color' : (.55, .65, .75), # bluish
                     'use_sky_paper' : False, 
@@ -87,7 +87,7 @@ class Sky(MappedClass):
                     'use_sky_real' : False, 
                     })
                     # Stars? Mist? 
-            self.world_lighting = bvpu.basics.fixedKeyDict({
+            self.world_lighting = utils.basics.fixedKeyDict({
                     # World lighting settings (defaults for no bg, no sky, no lights, just blank scene + camera)
                     # AO
                     'use_ambient_occlusion' : True, 
@@ -107,7 +107,7 @@ class Sky(MappedClass):
             self.light_type = 'SUN' # Make this a few point lights??
             self.light_location = [[0, 0, 25]]
             self.light_rotation = [[0, 0, 0]]            
-            self.world_params = bvpu.basics.fixedKeyDict({
+            self.world_params = utils.basics.fixedKeyDict({
                     # Sky color
                     'horizon_color' : (.6, .55, .43), #brownish
                     'use_sky_paper' : False, 
@@ -115,7 +115,7 @@ class Sky(MappedClass):
                     'use_sky_real' : False, 
                     })
                     # Stars? Mist? 
-            self.world_lighting = bvpu.basics.fixedKeyDict({
+            self.world_lighting = utils.basics.fixedKeyDict({
                     # World lighting settings (defaults for no bg, no sky, no lights, just blank scene + camera)
                     # AO
                     'use_ambient_occlusion' : True, 
@@ -132,7 +132,7 @@ class Sky(MappedClass):
                     })
         elif self.name in ('none', None):
             # No lights, just environment settings
-            self.world_params = bvpu.basics.fixedKeyDict({
+            self.world_params = utils.basics.fixedKeyDict({
                     # Sky color
                     'horizon_color' : (.5, .5, .5), #flat gray
                     'use_sky_paper' : False, 
@@ -140,7 +140,7 @@ class Sky(MappedClass):
                     'use_sky_real' : False, 
                     })
                     # Stars? Mist? 
-            self.world_lighting = bvpu.basics.fixedKeyDict({
+            self.world_lighting = utils.basics.fixedKeyDict({
                     # World lighting settings (defaults for no bg, no sky, no lights, just blank scene + camera)
                     # AO
                     'use_ambient_occlusion' : True, 
@@ -156,7 +156,7 @@ class Sky(MappedClass):
                     'environment_color' : 'SKY_COLOR', 
                     })
 
-    def place(self, number=0, scn=None, scale=None, proxy=True):
+    def place(self, number=0, scn=None, scale=None, proxy=False):
         """Adds sky to Blender scene
         """
         # Make file local, if it isn't already
@@ -166,46 +166,48 @@ class Sky(MappedClass):
             scn = bpy.context.scene # Get current scene if input not supplied
         if not self.name in [None, 'default_indoor', 'default_outdoor', 'none']:
             # Add proxies of mesh objects
-            sky_ob = bvpu.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
+            sky_ob = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
             if scale is not None:
                 print('Resizing...')
                 sz = scale / self.real_world_size # most skies are 100x100 in area
                 bpy.ops.transform.resize(value=(sz, sz, sz))
             if proxy:
                 for o in sky_ob.dupli_group.objects:
-                    bvpu.blender.grab_only(sky_ob)
+                    utils.blender.grab_only(sky_ob)
                     bpy.ops.object.proxy_make(object=o.name) #, object=sky_ob.name, type=o.name)
                     new_ob = bpy.context.object
                     if new_ob.type=='MESH': # This better be the sky dome
-                        bvpu.blender.set_layers(new_ob, [9])
+                        utils.blender.set_layers(new_ob, [9])
                         new_ob.name=sky_ob.name
                         new_ob.pass_index = 100
                     else:
                         # Save lamp objects for more below
                         lamp_ob.append(new_ob)
+                # Get rid of linked group now that mesh objects and lamps are imported
+                bpy.context.scene.objects.unlink(sky_ob)
             else:
+                lamp_ob = []
                 for o in sky_ob.users_group[0].objects:
-                    # Unclear what layers these will be on
-                    # If it varies, need to set pass index to 100
-                    #if 
-                    o.pass_index = 100
-
-            # Get rid of linked group now that mesh objects and lamps are imported
-            bpy.context.scene.objects.unlink(sky_ob)
+                    if o.type=="LAMP":
+                        lamp_ob.append(o)
+                    else:
+                        o.pass_index = 100
+            if self.materials is not None:
+                if proxy:
+                    raise ValueError("Can't change materials of proxy objects. Use proxy=False.")
+                self.apply_materials(sky_ob.users_group[0], self.materials)
             # Rename lamps
             for l in lamp_ob:
                 l.name = 'BG_Lamp%04d'%(number)
             # Add world
             world = self.add_world() # Relies on world being named same thing as sky group... Could be problematic, but anything else is a worse pain
-            scn.world.name = 's%04dworld'%(number) 
-            
             scn.update()
             
         else:
             # Clear other lamps
-            for ob in bpy.context.scene.objects: 
+            for ob in scn.objects: 
                 if ob.type=='LAMP':
-                    bpy.context.scene.objects.unlink(ob)
+                    scn.objects.unlink(ob)
             if self.light_type is not None:
                 # TO DO: Multiple lamps for defaults? 
                 new_lamp = bpy.data.lamps.new('Default lamp', self.light_type)
@@ -214,7 +216,7 @@ class Sky(MappedClass):
                 lamp_ob.location = self.light_location
 
         if not scn.world:
-            scn.world = bpy.data.worlds.new('s%04dworld'%number)
+            scn.world = bpy.data.worlds.new('world')
 
         if self.world_params is not None:
             for k, v in self.world_params.items():
@@ -230,20 +232,47 @@ class Sky(MappedClass):
         # (/TEMP?) Over-ride of AO
         
     def add_world(self, scn=None):
-        """Adds a specified world from a specified file, as in bvp.utils.blender.add_group()
+        """Adds a specified world from a specified file
 
-        NOTE! Currently (2012.02) worlds and sky groups must have the same (unique) name!
+        Notes
+        -----
+        For this to work, sky groups and associated blender 
+        world objects must have the same name
         """
         if not scn:
             scn = bpy.context.scene
-        bpy.ops.wm.link_append(
-            directory=os.path.join(self.path, self.fname)+"\\World\\", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
-            filepath="//"+self.fname+"\\World\\"+self.name, # local filepath within .blend file to the world to be imported
+        bpy.ops.wm.append(
+            directory=os.path.join(self.path, self.fname)+"/World/", # i.e., directory WITHIN .blend file (Scenes / Objects / World / etc)
+            filepath="//"+self.fname+"/World/"+self.name, # local filepath within .blend file to the world to be imported
             filename=self.name, # "filename" being the name of the data block, i.e. the name of the world.
             link=False, 
-            relative_path=False, 
+            #relative_path=False, 
             autoselect=True)
         scn.world = bpy.data.worlds[self.name]
+
+    def apply_materials(self, bpy_grp, materials):
+        """Apply materials to already-placed sky.
+        
+        Parameters
+        ----------
+        objects : list
+            list of all blender objects in this group
+        materials : list
+            list of bvp materials to apply. ** CURRENTLY ONLY WORKS FOR ONE MATERIAL **
+
+        Notes
+        -----
+        TODO: Deal with uv in more sensible fashion
+        """
+        
+        if len(materials) > 1:
+            raise NotImplementedError('Multiple material assignment not working yet.')
+
+        for i, material in enumerate(materials):
+            mat = material.link()
+            for o in bpy_grp.objects:
+                if o.type in ('MESH', 'CURVE'): # More? 
+                    utils.blender.apply_material(o, mat, uv=False)
 
     def __repr__(self):
         S = '\n ~S~ Sky "%s" ~S~\n'%(self.name)
