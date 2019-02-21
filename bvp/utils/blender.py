@@ -1036,9 +1036,13 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     #else:
     #    print('Did not find group! Adding group to file.')
     old_obs = list(bpy.context.scene.objects)
+    if bpy.app.version[1] < 80:
+        import_type = '/Group/'
+    else:
+        import_type = '/Collection/'
     bpy.ops.wm.append(
-        directory=os.path.join(fpath, fname)+"/Group/", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-        filepath="//"+fname+"/Group/"+name, # local filepath within .blend file to the scene to be imported
+        directory=os.path.join(fpath, fname) + import_type, # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+        filepath="//"+fname+import_type+name, # local filepath within .blend file to the scene to be imported
         filename=name, 
         # NOTE: "filename" is not the name of the file but the name 
         # of the data block, i.e. the name of the group. 
@@ -1101,3 +1105,56 @@ def make_cube(name, mn, mx):
     mesh.from_pydata(verts, [], faces)
     mesh.update(calc_edges=True)
 
+def label_limb(obj, vertex_label, weight_thresh=0.2, name='label', 
+               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0)):
+    """Highlight all vertices in a group with some color"""
+    
+    # Get vertex group indices
+    vertex_groups = obj.vertex_groups
+    if not isinstance(vertex_label, (list, tuple)):
+        vertex_label = (vertex_label,)
+    for label in vertex_label:
+        vertex_groups = [x for x in vertex_groups if label in x.name]
+    vertex_indices = [vg.index for vg in vertex_groups]
+
+    # Make new materials for fg and bg
+    fg_mat = bpy.data.materials.new(name)
+    fg_mat.diffuse_color = color
+    fg_mat.diffuse_intensity = 1.0
+    fg_mat.use_shadeless = True
+    if bg_color is not None:
+        bg_mat = bpy.data.materials.new(name)
+        bg_mat.diffuse_color = bg_color
+        bg_mat.diffuse_intensity = 1.0
+        bg_mat.use_shadeless = True
+
+        #Assign first material on all the mesh
+        obj.data.materials.clear(update_data=True)
+        bpy.ops.object.material_slot_add() #Add a material slot
+        obj.material_slots[0].material = bg_mat
+
+    # Deselect all
+    bpy.ops.object.editmode_toggle()  #Go in edit mode
+    bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
+    bpy.ops.object.editmode_toggle()  #Return in object mode
+
+    vertices = []
+    for vg_idx in vertex_indices:
+        vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
+        vertices += vs
+
+    # Set up list to keep...
+    for v in vertices:
+        for vg in v.groups:
+            if vg.group in vertex_indices:
+                print(vg.weight)
+                if vg.weight > weight_thresh:
+                    v.select = True
+
+    #Assign first material on all the mesh
+    bpy.ops.object.material_slot_add() #Add a material slot
+    obj.material_slots[-1].material = fg_mat
+    bpy.ops.object.editmode_toggle()  #Go in edit mode
+    bpy.ops.object.material_slot_assign() #QAssign the material on the selected vertices
+    bpy.ops.object.editmode_toggle()  #Return in object mode
+    return [v for v in vertices if v.select]
