@@ -1144,17 +1144,19 @@ def label_limb(obj, vertex_label, weight_thresh=0.2, name='label',
         vertices += vs
 
     # Set up list to keep...
+    any_vertex = False
     for v in vertices:
         for vg in v.groups:
             if vg.group in vertex_indices:
-                print(vg.weight)
+                #print(vg.weight)
                 if vg.weight > weight_thresh:
                     v.select = True
-
-    #Assign first material on all the mesh
-    bpy.ops.object.material_slot_add() #Add a material slot
-    obj.material_slots[-1].material = fg_mat
-    bpy.ops.object.editmode_toggle()  #Go in edit mode
-    bpy.ops.object.material_slot_assign() #QAssign the material on the selected vertices
-    bpy.ops.object.editmode_toggle()  #Return in object mode
+                    any_vertex = True
+    if any_vertex:
+        #Assign first material on all the mesh
+        bpy.ops.object.material_slot_add() #Add a material slot
+        obj.material_slots[-1].material = fg_mat
+        bpy.ops.object.editmode_toggle()  #Go in edit mode
+        bpy.ops.object.material_slot_assign() #QAssign the material on the selected vertices
+        bpy.ops.object.editmode_toggle()  #Return in object mode
     return [v for v in vertices if v.select]
