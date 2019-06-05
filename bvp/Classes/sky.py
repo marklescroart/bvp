@@ -187,7 +187,11 @@ class Sky(MappedClass):
                 bpy.context.scene.objects.unlink(sky_ob)
             else:
                 lamp_ob = []
-                for o in sky_ob.users_group[0].objects:
+                if bpy.app.version < (2, 80, 0):
+                    skg = sky_ob.users_group
+                else:
+                    skg = sky_ob.users_collection
+                for o in skg[0].objects:
                     if o.type=="LAMP":
                         lamp_ob.append(o)
                     else:
@@ -195,7 +199,7 @@ class Sky(MappedClass):
             if self.materials is not None:
                 if proxy:
                     raise ValueError("Can't change materials of proxy objects. Use proxy=False.")
-                self.apply_materials(sky_ob.users_group[0], self.materials)
+                self.apply_materials(skg[0], self.materials)
             # Rename lamps
             for l in lamp_ob:
                 l.name = 'BG_Lamp%04d'%(number)

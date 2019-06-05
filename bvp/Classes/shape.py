@@ -92,9 +92,13 @@ class Shape(object):
         """
         scn = bpy.context.scene
         # Test for single (manifold?) mesh:
-        if isinstance(obgrp,bpy.types.Object):
+        if bpy.app.version < (2, 80, 0):
+            btype = bpy.types.Group
+        else:
+            btype = bpy.types.Collection
+        if isinstance(obgrp, bpy.types.Object):
             obgrp = [obgrp]
-        elif isinstance(obgrp,bpy.types.Group):
+        elif isinstance(obgrp, btype):
             obgrp = list(obgrp.objects)
         # if len(obgrp)>1:
         #     # Ruh roh... (TEMP ERRROR for multiple objects) 

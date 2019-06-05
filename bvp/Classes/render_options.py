@@ -333,8 +333,12 @@ class RenderOptions(object):
                 print('assigning pass index %d to %s'%(PassCt, o.name))
                 o.pass_index = PassCt
                 bvpu.blender.set_layers(o, [0, PassCt])
-                if len(o.users_group) > 0:
-                    for sibling in o.users_group[0].objects:
+                if bpy.app.version < (2, 80, 0):
+                    ug = o.users_group
+                else:
+                    ug = o.users_collection
+                if len(ug) > 0:
+                    for sibling in ug[0].objects:
                         to_skip.append(sibling.name)
                         print('assigning pass index %d to %s'%(PassCt, sibling.name))
                         print(to_skip)

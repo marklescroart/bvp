@@ -846,12 +846,16 @@ Sphere: if _min, get scale, map to max
 """
 
 def _get_group_objects(grp):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection
     if grp is None:
         ob_list = list(bpy.context.scene.objects)
     elif isinstance(grp, bpy.types.Object):
         # Test for existence of dupli group
         ob_list = list(grp.dupli_group.objects)
-    elif isinstance(grp, bpy.types.Group):
+    elif isinstance(grp, btype):
         ob_list = list(grp.objects)
     else:
         raise ValueError("Unclear what to do with input of type {}".format(type(grp)))

@@ -100,7 +100,10 @@ class Background(MappedClass):
             #print('{}, {}'.format(self.path, self.name))
             bg_ob = add_group(self.name, self.fname, self.path, proxy=proxy)
             if not proxy:
-                bg_grp = bg_ob.users_group[0]
+                if bpy.app.version < (2, 80, 0):
+                    bg_grp = bg_ob.users_group[0]
+                else:
+                    bg_grp = bg_ob.users_collection[0]
                 for o in bg_grp.objects:
                     o.name = 'BG_' + o.name
         else:
@@ -109,7 +112,10 @@ class Background(MappedClass):
         if self.materials is not None:
             if proxy:
                 raise ValueError("Can't change materials of proxy objects. Use proxy=False.")
-            self.apply_materials(bg_ob.users_group[0], self.materials)
+            if bpy.app.version < (2, 80, 0):
+                self.apply_materials(bg_ob.users_group[0], self.materials)
+            else:
+                self.apply_materials(bg_ob.users_collection[0], self.materials)
 
 
     def apply_materials(self, bpy_grp, materials):
@@ -160,7 +166,10 @@ class Background(MappedClass):
 
         # Compute parameters
         ## GET GROUP, USE WORDNET LABELS FOR GROUP
-        grp = ob.users_group[0]
+        if bpy.app.version < (2, 80, 0):
+            grp = ob.users_group[0]
+        else:
+            grp = ob.users_collection[0]
         ## WordNet labels
         wordnet_label = [s.name for s in grp.Background.wordnet_label] # or whatever 
         semantic_category = [s.name for s in grp.Background.semantic_category] # OR whatever

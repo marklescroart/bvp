@@ -146,7 +146,10 @@ class Object(MappedClass):
         else:
             # Necessary?
             #assert len(self.blender_object.users_group) == 1
-            new_grp = new_ob.users_group[0]
+            if bpy.app.version < (2, 80, 0):
+                new_grp = new_ob.users_group[0]
+            else:
+                new_grp = new_ob.users_collection[0]
         # Position / rotationn
         if self.pos3D is not None:
             new_ob.location = self.pos3D

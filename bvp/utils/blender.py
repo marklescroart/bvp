@@ -270,9 +270,12 @@ def get_cursor():
     """
     # Now this is some serious bullshit. Look where Blender hides the cursor 
     # information. Just look.
-    vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
-    vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
-    return vw_area.spaces[0].cursor_location
+    if bpy.app.version < (2, 80, 0):
+        vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+        vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+        return vw_area.spaces[0].cursor_location
+    else:
+        return bpy.context.scene.cursor_location
 
 def set_cursor(location):
     """Sets 3D cursor to specified location in VIEW_3D window
@@ -285,9 +288,13 @@ def set_cursor(location):
     location : list or bpy Vector
         Desired position of the cursor
     """
-    vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
-    vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
-    vw_area.spaces[0].cursor_location = location
+    if bpy.app.version < (2, 80, 0):
+        vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+        vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+        vw_area.spaces[0].cursor_location = location
+    else:
+        # SO MUCH SIMPLER. Deprecate this function it's so simple.
+        bpy.context.scene.cursor_location = location
 
 def grab_only(ob):
     """Selects the input object `ob` and and deselects everything else
@@ -301,14 +308,27 @@ def grab_only(ob):
         if bpy.context.active_object.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     bpy.ops.object.select_all(action='DESELECT')
-    if isinstance(ob, bpy.types.Group):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection    
+    if isinstance(ob, btype):
         ob = find_group_parent(ob)
-    ob.select = True
-    bpy.context.scene.objects.active = ob    
+    if bpy.app.version < (2, 80, 0):
+        ob.select = True
+        bpy.context.scene.objects.active = ob
+    else:
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+    
 
 def find_group_parent(group):
     """Find parent object among group objects"""
-    if isinstance(group, bpy.types.Group):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection    
+    if isinstance(group, btype):
         obs = group.objects
     else:
         obs = group
@@ -336,7 +356,10 @@ def get_mesh_objects(scn=None, select=True):
     mesh_objects = [ob for ob in scn.objects if ob.type=='MESH']
     if select:
         for ob in mesh_objects:
-            ob.select = True
+            if bpy.app.version < (2, 80, 0):
+                ob.select = True
+            else:
+                ob.select_set(True)
     return mesh_objects
 
 def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
@@ -399,7 +422,11 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
             print('Setting no memory mode!')
         set_no_memory_mode()
     # Recursive call to deal with groups with multiple objects:
-    if isinstance(obj, bpy.types.Group):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection
+    if isinstance(obj, btype):
         ct = 0
         verts = []
         norms = []
@@ -713,7 +740,11 @@ def set_up_group(ob_list=None, scn=None):
     if not ob_list:
         for o in scn.objects:
             # Clear out cameras and (ungrouped) 
-            if o.type in ['CAMERA', 'LAMP'] and not o.users_group:
+            if bpy.app.version < (2, 80, 0):
+                og = o.users_group
+            else:
+                og = o.users_collection
+            if o.type in ['CAMERA', 'LAMP'] and not og:
                 scn.objects.unlink(o)
                 scn.update()
         ob_list = list(scn.objects)
@@ -758,12 +789,22 @@ def set_up_group(ob_list=None, scn=None):
     # Re-parent everything
     for o in np:
         grab_only(p)
-        o.select = True
+        if bpy.app.version < (2, 80, 0):
+            o.select = True
+        else:
+            o.select_set(True)
         bpy.ops.object.parent_set()
     # Create group (if necessary) and name group
-    if not ob_list[0].users_group:
+    if bpy.app.version < (2, 80, 0):
+        olg = ob_list[0].users_group
+    else:
+        olg = ob_list[0].users_collection
+    if not olg:
         for o in ob_list:
-            o.select=True
+            if bpy.app.version < (2, 80, 0):
+                o.select = True
+            else:
+                o.select_set(True)
         bpy.ops.group.create(name=scn.name)
 
 def get_group_bounding_box(ob_list=None):
@@ -782,7 +823,10 @@ def get_group_bounding_box(ob_list=None):
     """
     bb_types = ['MESH', 'LATTICE', 'ARMATURE'] 
     if ob_list is None:
-        ob_list = [o for o in bpy.context.scene.objects if o.select]
+        if bpy.app.version < (2, 80, 0):
+            ob_list = [o for o in bpy.context.scene.objects if o.select]
+        else:
+            ob_list = [o for o in bpy.context.scene.objects if o.select_get()]
     BBx = list()
     BBy = list()
     BBz = list()
@@ -1038,8 +1082,10 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     old_obs = list(bpy.context.scene.objects)
     if bpy.app.version[1] < 80:
         import_type = '/Group/'
+        kw = dict(instance_groups=proxy)
     else:
         import_type = '/Collection/'
+        kw = dict(instance_collections=proxy)
     bpy.ops.wm.append(
         directory=os.path.join(fpath, fname) + import_type, # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
         filepath="//"+fname+import_type+name, # local filepath within .blend file to the scene to be imported
@@ -1050,7 +1096,7 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         link=proxy, 
         #relative_path=False, 
         autoselect=True, 
-        instance_groups=proxy)
+        **kw)
     new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
     ob  = find_group_parent(new_obs)
     grab_only(ob)

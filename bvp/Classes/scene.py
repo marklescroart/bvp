@@ -377,7 +377,8 @@ class Scene(MappedClass):
         # print(self.camera.fix_location)
         scn = utils.blender.set_scene(scn)
         # set layers to correct setting
-        scn.layers = [True] + [False] * 19
+        if bpy.app.version < (2, 80, 0):
+            scn.layers = [True] + [False] * 19
         # set cursort to center
         utils.blender.set_cursor((0, 0, 0))
         # Background
@@ -421,7 +422,8 @@ class Scene(MappedClass):
             scn.render.filepath = filepath.format(scene_name=self.fname)
             # Apply other options
             render_options.apply_opts()
-        scn.layers = [True]*20
+        if bpy.app.version < (2, 80, 0):
+            scn.layers = [True]*20
 
     def render(self, render_options, scn=None):
         """Renders the scene (immediately, in open instance of Blender)
@@ -446,7 +448,8 @@ class Scene(MappedClass):
         # Apply rendering options
         render_options.apply_opts()
         # Render all layers!
-        scn.layers = [True]*20 # TODO: Revisit locations where layers are set in this class's methods / in RenderOptions methods
+        if bpy.app.version < (2, 80, 0):
+            scn.layers = [True]*20 # TODO: Revisit locations where layers are set in this class's methods / in RenderOptions methods
         # TODO: Why isn't this in RenderOptions.apply_opts? Seems as if it should be...
         if render_options.BVPopts['Type'].lower()=='firstframe':
             scn.frame_step = scn.frame_end+1 # so only one frame will render
