@@ -1105,9 +1105,35 @@ def make_cube(name, mn, mx):
     mesh.from_pydata(verts, [], faces)
     mesh.update(calc_edges=True)
 
-def label_limb(obj, vertex_label, weight_thresh=0.2, name='label', 
-               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0)):
-    """Highlight all vertices in a group with some color"""
+def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
+               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
+               return_vertices=False):
+    """Highlight all vertices in a group with some color
+    
+    Parameters
+    ----------
+    obj : blender object
+        Object to be colorized
+    vertex_label : string or list/tuple of strings
+        Names (or parts of names) of vertex groups to colorize. 
+        These names must be IN the name of the vertex group (e.g. 
+        'Leg' will select vertex groups called "Right Leg" and 
+        "Right Lower Leg"). For tuples with more than one string,
+        logical AND is assumed.
+    weight_thresh : scalar  
+        threshold for vertex weights (some weights for vertex groups
+        are continuous from 0 to 1; this binarizes for labeling)
+    name : string
+        name of resulting material
+    color : 3-tuple
+        R,G,B values for color. 
+    bg_color : 3-tuple
+        background color. If provided, all materials are cleared
+        and whole mesh is set to bg_color at outset.
+    return_vertices : bool
+        whether to return blender vertices for the group that was
+        labeled.
+    """
     
     # Get vertex group indices
     vertex_groups = obj.vertex_groups
@@ -1122,6 +1148,8 @@ def label_limb(obj, vertex_label, weight_thresh=0.2, name='label',
     fg_mat.diffuse_color = color
     fg_mat.diffuse_intensity = 1.0
     fg_mat.use_shadeless = True
+
+    # Create & assign background color only if provided
     if bg_color is not None:
         bg_mat = bpy.data.materials.new(name)
         bg_mat.diffuse_color = bg_color
@@ -1138,12 +1166,13 @@ def label_limb(obj, vertex_label, weight_thresh=0.2, name='label',
     bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
     bpy.ops.object.editmode_toggle()  #Return in object mode
 
+    # Select vertices in specified group
     vertices = []
     for vg_idx in vertex_indices:
         vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
         vertices += vs
 
-    # Set up list to keep...
+    # Set up list to keep
     any_vertex = False
     for v in vertices:
         for vg in v.groups:
@@ -1159,4 +1188,8 @@ def label_limb(obj, vertex_label, weight_thresh=0.2, name='label',
         bpy.ops.object.editmode_toggle()  #Go in edit mode
         bpy.ops.object.material_slot_assign() #QAssign the material on the selected vertices
         bpy.ops.object.editmode_toggle()  #Return in object mode
-    return [v for v in vertices if v.select]
+    if return_vertices:
+        # Change this to coordinates? 
+        return [v for v in vertices if v.select]
+    else:
+        return
