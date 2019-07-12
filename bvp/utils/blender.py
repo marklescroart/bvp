@@ -273,9 +273,9 @@ def get_cursor():
     if bpy.app.version < (2, 80, 0):
         vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
         vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
-        return vw_area.spaces[0].cursor_location
+        return vw_area.spaces[0].cursor.location
     else:
-        return bpy.context.scene.cursor_location
+        return bpy.context.scene.cursor.location
 
 def set_cursor(location):
     """Sets 3D cursor to specified location in VIEW_3D window
@@ -291,10 +291,10 @@ def set_cursor(location):
     if bpy.app.version < (2, 80, 0):
         vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
         vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
-        vw_area.spaces[0].cursor_location = location
+        vw_area.spaces[0].cursor.location = location
     else:
         # SO MUCH SIMPLER. Deprecate this function it's so simple.
-        bpy.context.scene.cursor_location = location
+        bpy.context.scene.cursor.location = location
 
 def grab_only(ob):
     """Selects the input object `ob` and and deselects everything else
@@ -458,7 +458,10 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
     me = obj.to_mesh(scn, True, 'RENDER')
     me.transform(obj.matrix_world)
     dup = bpy.data.objects.new('dup', me)
-    scn.objects.link(dup)
+    if bpy.app.version < (2, 80, 0):
+        scn.objects.link(dup)
+    else:
+        scn.collection.objects.link(dup)
     dup.dupli_type = 'VERTS'
     scn.objects.active = dup
 
@@ -737,6 +740,10 @@ def set_up_group(ob_list=None, scn=None):
     verbosity_level > 3
     if not scn:
         scn = bpy.context.scene # (NOTE: think about making this an input!)
+    if bpy.app.version < (2, 80, 0):
+        update = scn.update
+    else:
+        update = bpy.context.view_layer.update        
     if not ob_list:
         for o in scn.objects:
             # Clear out cameras and (ungrouped) 
@@ -746,7 +753,7 @@ def set_up_group(ob_list=None, scn=None):
                 og = o.users_collection
             if o.type in ['CAMERA', 'LAMP'] and not og:
                 scn.objects.unlink(o)
-                scn.update()
+                update()
         ob_list = list(scn.objects)
     ToSet_Size = 10.0
     ToSet_Loc = (0.0, 0.0, 0.0)
@@ -785,7 +792,7 @@ def set_up_group(ob_list=None, scn=None):
         o.location = ToSet_Loc
         bpy.ops.object.transform_apply(rotation=True, scale=True, location=True)
 
-    scn.update()
+    update()
     # Re-parent everything
     for o in np:
         grab_only(p)
@@ -948,8 +955,13 @@ def add_camera_with_target(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixN
     bpy.ops.object.add(type='EMPTY', location=FixPos)
     # Is this legit? Is there another way to do this??
     Fix = [o for o in scn.objects if o.type=='EMPTY'][0]
-    Fix.empty_draw_type = 'SPHERE'
-    Fix.empty_draw_size = .33
+    if bpy.app.version < (2, 80, 0):
+        Fix.empty_draw_type = 'SPHERE'
+        Fix.empty_draw_size = .33
+    else:
+        Fix.empty_display_type = 'SPHERE'
+        Fix.empty_display_size = .33
+
     Fix.name = FixName
     # Add camera constraint
     grab_only(Cam)
@@ -984,6 +996,10 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
     AllowedTypes = ['LAMP'] # No curves for now...'CURVE', 
     # ESTABLISH SCENE TO WHICH STUFF MUST BE ADDED, STATE OF .blend FILE
     scn = bpy.context.scene # (NOTE: think about making this an input!)
+    if bpy.app.version < (2, 80, 0):
+        update = scn.update
+    else:
+        update = bpy.context.view_layer.update
     # This is dumb too... ???
     ScnNum = len(bpy.data.scenes)
     ScnListOld = [s.name for s in bpy.data.scenes]
@@ -1005,11 +1021,14 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
     # Make parent / master object the first object in the list: 
     Lampct = 1
     for L in LampOb:
-        scn.objects.link(L)
+        if bpy.app.version < (2, 80, 0):
+            scn.objects.link(L)
+        else:
+            scn.collection.objects.link(L)
         LampOut.append(L)
         Lampct += 1
     scn.world = nScn.world
-    scn.update()
+    update()
     bpy.data.scenes.remove(nScn)
     bpy.ops.object.select_all(action = 'DESELECT')
     for L in LampOut:
@@ -1144,8 +1163,11 @@ def make_cube(name, mn, mx):
     ob = bpy.data.objects.new(name, mesh)
      
     #Set location and scene of object
-    #ob.location = bpy.context.scene.cursor_location
-    bpy.context.scene.objects.link(ob)
+    #ob.location = bpy.context.scene.cursor.location
+    if bpy.app.version < (2, 80, 0):
+        bpy.context.scene.objects.link(ob)
+    else:
+        bpy.context.scene.collection.objects.link(ob)
      
     #Create mesh
     mesh.from_pydata(verts, [], faces)

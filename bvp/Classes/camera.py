@@ -120,7 +120,11 @@ class Camera(MappedClass):
         cam_data = bpy.data.cameras.new('cam_{}'.format(name))
         cam = bpy.data.objects.new('cam_{}'.format(name), cam_data)
         # Make camera object present in scene
-        scn.objects.link(cam)
+        if bpy.app.version < (2, 80, 0):
+            link = scn.objects.link
+        else: 
+            link = scn.collection.objects.link
+        link(cam)
         self.blender_camera = cam
         # Set as active camera
         scn.camera = cam
@@ -144,9 +148,15 @@ class Camera(MappedClass):
             # Set camera fixation target location
             fix = bpy.data.objects.new('camtarget_{}'.format(name), None)
             fix.location = self.fix_location[0]
-            fix.empty_draw_type = 'SPHERE'
-            fix.empty_draw_size = draw_size
-            scn.objects.link(fix)
+            if bpy.app.version < (2, 80, 0):
+                fix.empty_draw_type = 'SPHERE'
+                fix.empty_draw_size = draw_size
+            else:
+                fix.empty_display_type = 'SPHERE'
+                fix.empty_display_size = draw_size
+
+
+            link(fix)
             # Add camera constraints to look at target
             trk2 = cam.constraints.new('TRACK_TO')
             trk2.target = fix

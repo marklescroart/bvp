@@ -32,7 +32,10 @@ mx = []
 for fr in range(st, fin):
     # Update scene frame 
     scn.frame_set(fr)
-    scn.update()
+    if bpy.app.version < (2, 80, 0):
+        scn.update()
+    else:
+        bpy.context.view_layer.update()
     # Re-visit me
     mntmp, mxtmp = bvp.utils.blender.get_group_bounding_box(ob_list)
     mn.append(mntmp)

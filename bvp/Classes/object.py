@@ -133,6 +133,10 @@ class Object(MappedClass):
             instance = len(self.blender_object)
         # Optionally link to a specific scene
         scn = utils.blender.set_scene(scn)
+        if bpy.app.version < (2, 80, 0):
+            update = scn.update
+        else:
+            update = bpy.context.view_layer.update
         # Get object (parent of group / proxy)
         if self.name is None:
             # Default object
@@ -229,14 +233,14 @@ class Object(MappedClass):
             self.armature.append(new_armature)
             self.proxy.append(proxy)
 
-        scn.update()
+        update()
         # Switch frame & update again, because some poses 
         # and other effects don't seem to take effect until 
         # the frame changes
         scn.frame_current += 1
-        scn.update()
+        update()
         scn.frame_current -= 1
-        scn.update()
+        update()
         return self.blender_object
 
     def apply_action(self, armature, action):

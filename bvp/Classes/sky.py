@@ -164,6 +164,11 @@ class Sky(MappedClass):
         lamp_ob = []
         if scn is None:
             scn = bpy.context.scene # Get current scene if input not supplied
+        if bpy.app.version < (2, 80, 0):
+            update = scn.update
+        else:
+            update = bpy.context.view_layer.update
+
         if not self.name in [None, 'default_indoor', 'default_outdoor', 'none']:
             # Add proxies of mesh objects
             sky_ob = utils.blender.add_group(self.name, self.fname, self.path, proxy=proxy)
@@ -205,8 +210,7 @@ class Sky(MappedClass):
                 l.name = 'BG_Lamp%04d'%(number)
             # Add world
             world = self.add_world() # Relies on world being named same thing as sky group... Could be problematic, but anything else is a worse pain
-            scn.update()
-            
+            update()            
         else:
             # Clear other lamps
             for ob in scn.objects: 
@@ -230,9 +234,13 @@ class Sky(MappedClass):
                 setattr(scn.world.light_settings, k, v)
         
         # (TEMP?) Over-ride of Ambient Occlusion (AO) for more efficient renders:
-        scn.world.light_settings.gather_method = 'RAYTRACE'
-        scn.world.light_settings.use_ambient_occlusion = False 
-        scn.update()
+        if bpy.app.version < (2, 80, 0):
+            scn.world.light_settings.gather_method = 'RAYTRACE'
+            scn.world.light_settings.use_ambient_occlusion = False
+        else:
+            scn.eevee.use_gtao = False
+
+        update()
         # (/TEMP?) Over-ride of AO
         
     def add_world(self, scn=None):

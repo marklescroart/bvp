@@ -328,7 +328,10 @@ class Scene(MappedClass):
         for fr in range(st, fin):
             # Update scene frame 
             scn.frame_set(fr)
-            scn.update()
+            if bpy.app.version < (2, 80, 0):
+                scn.update()
+            else:
+                bpy.context.view_layer.update()
             # Calculate global position
             positions.append(ta.matrix_world * bone.matrix * bone.location)
             object_locations.append(ta.location)

@@ -200,7 +200,12 @@ class RenderOptions(object):
             self.BVPopts['Motion'] = False
         scn.use_nodes = True
         # Set only first layer to be active
-        scn.layers = [True]+[False]*19
+        if bpy.app.version < (2, 80, 0):
+            scn.layers = [True]+[False]*19
+        else:
+            # NEED TO FIGURE OUT WHAT TO DO HERE
+            pass 
+        
         # Get all non-function attributes
         ToSet = [x for x in self.__dict__.keys() if not hasattr(self.__dict__[x], '__call__') and not x in ['BVPopts', 'DefaultLayerOpts', 'image_settings']]
         for s in ToSet:
@@ -232,10 +237,14 @@ class RenderOptions(object):
         # Decide whether we're only rendering one type of output:
         single_output = sum([self.BVPopts['Image'], self.BVPopts['ObjectMasks'], self.BVPopts['Zdepth'], 
                         self.BVPopts['Contours'], self.BVPopts['Axes'], self.BVPopts['Normals']])==1
+        if bpy.app.version < (2, 80, 0):
+            update = scn.update
+        else:
+            update = bpy.context.view_layer.update
         # Add compositor nodes for optional outputs:
         if self.BVPopts['Voxels']:
             self.SetUpVoxelization()
-            scn.update()
+            update()
             return # Special case! no other node-based options can be applied!
         if self.BVPopts['ObjectMasks']:
             self.add_object_masks(single_output=single_output)
@@ -278,7 +287,7 @@ class RenderOptions(object):
             scn.render.layers.remove(RL)
             # Turn off raytracing??
 
-        scn.update()
+        update()
     """
     Notes on nodes: The following functions add various types of compositor nodes to a scene in Blender.
     These allow output of other image files that represent other "meta-information" (e.g. Z depth, 

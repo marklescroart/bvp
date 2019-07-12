@@ -141,7 +141,10 @@ class Action(MappedClass):
         fin = int(np.ceil(act.frame_range[1]))
         for fr in range(st, fin):
             scn.frame_set(fr)
-            scn.update()
+            if bpy.app.version < (2, 80, 0):
+                scn.update()
+            else:
+                bpy.context.view_layer.update()
             # Re-visit me
             mntmp, mxtmp = bvpu.blender.get_group_bounding_box(ob_list)
             mn.append(mntmp)

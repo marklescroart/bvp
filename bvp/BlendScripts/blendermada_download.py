@@ -9,7 +9,10 @@ import bpy
 import bvp
 
 scn = bpy.context.scene
-
+if bpy.app.version < (2, 80, 0):
+    vl = context.view_layer
+else:
+    vl = scn
 # Get all latest materials
 scn.render.engine = 'CYCLES'
 bpy.ops.bmd.update()
@@ -33,7 +36,7 @@ for cat_idx in range(len(scn.bmd_category_list)):
         mat_name = scn.bmd_material_list[mat_idx].name
         # Import material
         bpy.ops.bmd.importmat()
-        scn.update()
+        vl.update()
         mat = ob.material_slots[0].material
         # Incorporate category into name, set up fake user to keep material through close of file
         mat.name = '{}_{}'.format(cat_name.lower(), mat_name.lower())

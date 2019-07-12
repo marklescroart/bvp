@@ -735,7 +735,10 @@ def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
     TODO: 
     Camera focal length and clipping plane should be determined by "RealWorldSize" property 
     """
-
+    if bpy.app.version < (2, 80,0):
+        dtype = 'empty_draw_type'
+    else:
+        dtype = 'empty_display_type'
     # Get camera constraints
     ConstrType = [['cam', 'fix'], ['ob']]
     theta_offset = 270
@@ -756,9 +759,9 @@ def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
                 cParams[0]['Sz'] = [None, None, None, None]
             for sz in SzConstr:
                 # obsize should be done with spheres! (min/max only for now!)
-                if sz.empty_draw_type=='SPHERE' and '_min' in sz.name:
+                if getattr(sz, dtype)=='SPHERE' and '_min' in sz.name:
                     cParams[0]['Sz'][2] = sz.scale[0]
-                elif sz.empty_draw_type=='SPHERE' and '_max' in sz.name:
+                elif getattr(sz, dtype)=='SPHERE' and '_max' in sz.name:
                     cParams[0]['Sz'][3] = sz.scale[0]   
             # Cartesian position constraints (object, camera)
             XYZconstr = [n for n in ConstrOb if 'xyz' in n.name.lower()]
@@ -769,7 +772,7 @@ def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
             for iE, xyz in enumerate(XYZconstr):
                 for ii, dim in enumerate(['X', 'Y', 'Z']):
                     cParams[iE][dimAdd+dim] = [None, None, None, None]
-                    if xyz.empty_draw_type=='CUBE':
+                    if getattr(xyz, dtype)=='CUBE':
                         # Interpret XYZ cubes as minima / maxima
                         if dim=='Z' and cType=='ob' and LockZtoFloor:
                             # Lock to height of bottom of cube
@@ -780,7 +783,7 @@ def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
                             cParams[iE][dimAdd+dim][2] = xyz.location[ii]-xyz.scale[ii] # min
                             cParams[iE][dimAdd+dim][3] = xyz.location[ii]+xyz.scale[ii] # max
                             cParams[iE]['origin'][ii] = xyz.location[ii]
-                    elif xyz.empty_draw_type=='SPHERE':
+                    elif getattr(xyz, dtype)=='SPHERE':
                         # Interpret XYZ spheres as mean / std
                         cParams[iE][dimAdd+dim][0] = xyz.location[ii] # mean
                         cParams[iE][dimAdd+dim][1] = xyz.scale[0] # std # NOTE! only 1 dim for STD for now!
@@ -806,19 +809,19 @@ def get_constraint(grp, LockZtoFloor=True): #self, bgLibDir='/auto/k6/mark/Blend
                     ob = [o for o in ConstrOb if dim in o.name.lower()]
                     for o in ob:
                         # interpret spheres or arrows w/ "_min" or "_max" in their name as limits
-                        if '_min' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
+                        if '_min' in o.name.lower() and getattr(o, dtype)=='SINGLE_ARROW':
                             cParams[iE][dimAdd+dim][2] = xyz2constr(list(o.location), dim, rptOrigin)
                             if dim=='theta':
                                 cParams[iE][dimAdd+dim][2] = circ_dst(cParams[iE][dimAdd+dim][2]-theta_offset, 0.)
-                        elif '_min' in o.name.lower() and o.empty_draw_type=='SPHERE':
+                        elif '_min' in o.name.lower() and getattr(o, dtype)=='SPHERE':
                             cParams[iE][dimAdd+dim][2] = o.scale[0]
-                        elif '_max' in o.name.lower() and o.empty_draw_type=='SINGLE_ARROW':
+                        elif '_max' in o.name.lower() and getattr(o, dtype)=='SINGLE_ARROW':
                             cParams[iE][dimAdd+dim][3] = xyz2constr(list(o.location), dim, rptOrigin)
                             if dim=='theta':
                                 cParams[iE][dimAdd+dim][3] = circ_dst(cParams[iE][dimAdd+dim][3]-theta_offset, 0.)
-                        elif '_max' in o.name.lower() and o.empty_draw_type=='SPHERE':
+                        elif '_max' in o.name.lower() and getattr(o, dtype)=='SPHERE':
                             cParams[iE][dimAdd+dim][3] = o.scale[0]
-                        elif o.empty_draw_type=='SPHERE':
+                        elif getattr(o, dtype)=='SPHERE':
                             # interpret sphere w/out "min" or "max" as mean+std
                             ## Interpretation of std here is a little fucked up: 
                             ## the visual display of the sphere will NOT correspond 
@@ -911,6 +914,10 @@ _empty_mapping = dict(SPHERE=_constraint_from_sphere,
 
 
 def get_constraints(grp):
+    if bpy.app.version < (2, 80,0):
+        dtype = 'empty_draw_type'
+    else:
+        dtype = 'empty_display_type'
     constraints = dict(cam={}, fix={}, ob={})
     empties = [m for m in _get_group_objects(grp) if m.type=='EMPTY']
     # TODO: insert check for both spherical and cartesian constraints on objects, camera, or fixation
@@ -918,7 +925,7 @@ def get_constraints(grp):
         ctype, param, constr = ce.name.split('_')
         # e.g.: 'cam', 'theta', 'min'
         prefix = 'fix' if ctype=='fix' else ''
-        constraints[ctype] = _empty_mapping[ce.empty_draw_type](ce, constraints[ctype], param, constr, prefix=prefix)
+        constraints[ctype] = _empty_mapping[getattr(ce, dtype)](ce, constraints[ctype], param, constr, prefix=prefix)
     if isempty(constraints['ob']):
         ob = None
     else:

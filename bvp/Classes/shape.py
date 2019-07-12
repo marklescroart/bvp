@@ -811,7 +811,10 @@ class Shape(object):
         if not self.ob.name in bpy.context.scene.objects:
             bpy.context.scene.objects.link(self.ob)
         grab_only(self.ob)
-        bpy.context.scene.update() # unnecessary?
+        if bpy.app.version < (2, 80, 0):
+            bpy.context.scene.update() # unnecessary?
+        else:
+            bpy.context.view_layer.update() # unnecessary?
         # Create & apply modifier
         self.ob.modifiers.new('tri', 'TRIANGULATE')
         self.ob.modifiers['tri'].quad_method = 'BEAUTY' # do it the slow, pretty way
