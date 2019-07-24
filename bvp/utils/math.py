@@ -28,9 +28,23 @@ def circ_avg(a, b):
 
 def circ_dist(a, b, degrees=True):
     """Compute angle between two angles w/ circular statistics
+
+    Parameters
+    ----------
+    a : scalar or array
+        angle(s) TO WHICH to compute angular (aka rotational) distance
+    b : scalar or array
+        angle(s) FROM WHICH to compute angular (aka rotational) distance
+    degrees : bool
+        Whether a and b are in degrees (defaults to True; False means they are in radians)
     """
-    phase = np.e**(1j*a/180*np.pi) / np.e**(1j*b/180*np.pi)
-    dist = np.degrees(np.arctan2(phase.imag, phase.real))
+    if degrees:
+        a = np.radians(a)
+        b = np.radians(b)
+    phase = np.e**(1j*a) / np.e**(1j*b)
+    dist = np.arctan2(phase.imag, phase.real)
+    if degrees:
+        dist = np.degrees(dist)
     return dist
 
 

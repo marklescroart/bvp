@@ -244,7 +244,8 @@ def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_nod
         raise Exception('Slurm job submission failed! %s'%stderr)
     return job_id, stderr
 
-def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=False, **kwargs):
+def blend(script, blend_file=None, is_local=True, blender_binary=None,
+          tmpdir='/tmp/', is_verbose=False, **kwargs):
     """Run Blender with a given script.
 
     Parameters
@@ -256,6 +257,10 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
         File path to Blender file
     is_local : bool
         True = run locally, False = run on cluster (if available)
+    blender_binary : str
+        path to executable file for blender. Useful if you want to sometimes
+        use experimental versions of blender. If None, defaults to the 
+        `blender_cmd` option in your config file.
 
     Other Parameters
     ----------------
@@ -279,8 +284,9 @@ def blend(script, blend_file=None, is_local=True, tmpdir='/tmp/', is_verbose=Fal
         script = '\n'.join(lines)
 
     # Run 
-    blender = config.get('path', 'blender_cmd') #Settings['Paths']['BlenderCmd']
-    blender_cmd = [blender, '-b', blend_file, '--python-expr', script]
+    if blender_binary is None:
+        blender_binary = config.get('path', 'blender_cmd') #Settings['Paths']['BlenderCmd']
+    blender_cmd = [blender_binary, '-b', blend_file, '--python-expr', script]
     if is_local:
         proc = subprocess.Popen(blender_cmd,
             stdin=subprocess.PIPE,
