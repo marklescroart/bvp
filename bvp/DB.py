@@ -110,28 +110,6 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             for f in ff:
                 os.unlink(os.path.join(root, f))
 
-    def export_json(self, fname, qdict=None):
-        """Exports some or all documents in this database """
-        if qdict is None:
-            ddict = [dict(doc) for doc in self.get_all_documents() if not '_design' in doc.id]
-        elif isinstance(qdict, (list, tuple)):
-            ddict = []
-            for q in qdict:
-                ddict += self.query_documents(**q) # no fancy queries...
-        elif isinstance(qdict, dict):
-            ddict = self.query_documents(**qdict)
-        else:
-            raise Exception("Bad type for qdict argument!")
-        json.dump(ddict, open(fname, mode='w'))
-        
-    def import_json(self, fname):
-        """Import all library header files from a json document.
-
-        This function is for updating an extant database; see classmethod 
-
-        """
-        raise NotImplementedError("Not yet!") 
-
     def posed_object_list(self):
         """Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
         """

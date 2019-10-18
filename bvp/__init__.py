@@ -74,32 +74,12 @@ def set_scn(fname='bvp_test', ropts=None, cam=None, sky=None):
     return scn
 
 ## -- Useful functions -- ##
-def _getuuid():
+def _get_uuid():
     """Overkill for unique file names"""
     import uuid
     uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
     return uu
     
-def _cluster_orig(cmd, logfile='SlurmLog_node_%N.out', mem=30000, ncpus=3):
-    """Run a job on the cluster."""
-    # Command to write to file to execute
-    cmd = ' '.join(cmd)
-    cmd = '#!/bin/sh\n#SBATCH\n'+cmd
-    print(cmd)
-    # Command to 
-    slurm_cmd = ['sbatch', '-c', str(ncpus), '-p', 'regular', '--mem', str(mem), '-o', logfile]
-    clust = subprocess.Popen(slurm_cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    if six.PY3:
-        cmd = cmd.encode()
-    stdout, stderr = clust.communicate(cmd)
-    print(stdout)
-    print(stderr)
-    jobid = re.findall('(?<=Submitted batch job )[0-9]*', stdout)[0]
-    return jobid, stderr
-
 def _get_uuid():
     return str(uuid.uuid4()).replace('-','')
 
@@ -108,7 +88,7 @@ def _get_uuid():
 bvp_cluster_script = """
 import bvp
 tmp_script = '''{script}'''
-stdout, stderr = bvp.blend(tmp_script, is_local=True, blend_file="{blend_file}", is_verbose={is_verbose})
+stdout, stderr = bvp.blend(tmp_script, is_local=True, blend_file="{blend_file}", blender_binary="{blender_binary}", is_verbose={is_verbose})
 done = False
 if stderr:
     break_str = '='*50
@@ -138,8 +118,24 @@ if stderr:
 
 """
 
-def _cluster(script, logdir='/auto/k1/mark/SlurmLog/', slurm_out='bvp_render_node_%N_job_%j.out',
-    slurm_err=True, job_name=None, dep=None, mem=30, ncpus=3, partition='regular', instant_buffer_write=True):
+from vm_tools.slurm_utils import run_script as _cluster
+#def _cluster(script, blender_binary=None, **kwargs):
+#    """Run cluster render job"""
+#    kwargs.update(blender_binary=blender_binary,
+#                  cmd=cmd)
+
+
+
+def _cluster_deprecated(script, 
+             logdir='~/slurm_log/', 
+             slurm_out='bvprender_node_%N_job_%j.out',
+             slurm_err=True, 
+             job_name=None, 
+             dep=None, 
+             mem=30,
+             ncpus=3,
+             partition='regular',
+             instant_buffer_write=True):
     """Run a python script on the cluster.
     
     Parameters
@@ -307,11 +303,14 @@ def blend(script, blend_file=None, is_local=True, blender_binary=None,
         #    print('Calling via cluster: %s'%(' '.join(blender_cmd)))
         #jobid, stderr = _cluster_orig(blender_cmd, **kwargs)
         #if instant_buffer_write:
-        pyscript = bvp_cluster_script.format(script=script, blend_file=blend_file, is_verbose=is_verbose)
+        print(script)
+        pyscript = bvp_cluster_script.format(script=script, blend_file=blend_file, is_verbose=is_verbose, blender_binary=blender_binary)
         #else:
         #    pyscript = script
-        jobid, stderr = _cluster(pyscript, **kwargs)
-        return jobid, stderr
+        #jobid, stderr = _cluster(pyscript, **kwargs)
+        #cmd = ' '.join(blender_cmd[:-1])
+        jobid = _cluster(pyscript, **kwargs)
+        return jobid
 
 __all__ = ['Action', 'Background', 'Camera', 'ObConstraint', 'CamConstraint', 'Material', 
            'Object', 'RenderOptions', 'Scene', 'Shadow', 'Sky', 'DBInterface',
