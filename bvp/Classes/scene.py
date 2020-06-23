@@ -204,11 +204,11 @@ class Scene(MappedClass):
             return False
 
     
-    def populate_scene(self, object_list, 
+    def populate(self, object_list, 
                        reset_camera=True, 
                        image_position_count=None, 
-                       EdgeDist=0., 
-                       ObOverlap=0.50, 
+                       edge_dist=0., 
+                       object_overlap=0.50, 
                        MinSz2D=0, 
                        raise_error=False, 
                        n_iter=50):
@@ -257,9 +257,9 @@ class Scene(MappedClass):
                             raise Exception('Action' + new_ob.action.name +'is incompatible with bg' + self.background.name)
                         pass
                 if self.background.obstacles:
-                    Obst = self.background.obstacles + objects_to_add
+                    obstacles = self.background.obstacles + objects_to_add
                 else:
-                    Obst = objects_to_add
+                    obstacles = objects_to_add
                 if not ob.semantic_category:
                     # Sample semantic category based on bg??
                     pass
@@ -272,7 +272,7 @@ class Scene(MappedClass):
                     new_ob.rot3D = oc.sampleRot(self.camera)
                 if not ob.pos3D:
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
-                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, Obst=Obst, EdgeDist=EdgeDist, ObOverlap=ObOverlap, raise_error=False, image_position_count=image_position_count, MinSz2D=MinSz2D)
+                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, obstacles=obstacles, edge_dist=edge_dist, object_overlap=object_overlap, raise_error=False, image_position_count=image_position_count, MinSz2D=MinSz2D)
                     if new_ob.pos3D is None:
                         fail = True
                         break

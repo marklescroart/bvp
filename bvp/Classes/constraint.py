@@ -20,13 +20,19 @@ class Constraint(object):
         """
         self.X = X
 
-    def sample_w_constr(self, inpt=None):
+    def sample_w_constr(self, mu=None, sigma=None, mn=None, mx=None):
         """Get random sample given mean, std, min, max.
 
         Parameters
         ----------
-        inpt : list-like
-            (Mean, Std, Min, Max)
+        mu : scalar
+            mean of distribution
+        sigma : scalar
+            standard deviation of distribution
+        mn : scalar
+            minimum of distribution
+        mx : scalar
+            max of distribution
         
         Notes
         -----
@@ -34,32 +40,19 @@ class Constraint(object):
         If Mean is not None, returns x ~N(Mean, Std), Min <= x <= Max
 
         """
-        if inpt is None:
-            inpt = self.X
-        if not inpt:
-            # Raise error??
-            print('Insufficient constraints!')
-            return None
-        mu, sigma, mn, mx = inpt
-        if mu is not None:
-            if (sigma is not None) and (sigma!=0):
-                # Raise error??
-                print('Insufficient constraints!')
-                return None
-            n = np.random.randn() * sigma + mu
-            if mx:
-                n = min([n, mx])
-            if mn:
-                n = max([n, mn])
+        if all([mu is None, mn is None, mx is None]):
+            raise ValueError('Insufficient constraints specified')
+        if mu is None:
+            n = np.random.uniform(low=mn, high=mx)
         else:
-            if mx is not None:
-                if not mx==0:
-                    # Raise error??
-                    print('Insufficient constraints!')
-                    return None
-            if not mn:
-                mn=0
-            n = np.random.rand()*(mx-mn)+mn
+            if mx is None:
+                mx = np.inf
+            if mn is None:
+                mn = -np.inf
+            if sigma is None:
+                sigma = 1.0
+            n = np.random.normal(loc=mu, scale=sigma)
+            n = np.clip(n, mn, mx)
         return n
 
 class PosConstraint(Constraint):
@@ -97,9 +90,9 @@ class PosConstraint(Constraint):
             if not self.theta:
                 theta = np.random.rand()*360.
             else:
-                theta = self.sample_w_constr(self.theta)+theta_offset
-            phi = self.sample_w_constr(self.phi)
-            r = self.sample_w_constr(self.r)
+                theta = self.sample_w_constr(*self.theta)+theta_offset
+            phi = self.sample_w_constr(*self.phi)
+            r = self.sample_w_constr(*self.r)
             # Constrain position
             x, y, z = bvpu.math.sph2cart(r, theta, phi) # w/ theta, phi in degrees
             x = x+self.origin[0]
@@ -107,9 +100,9 @@ class PosConstraint(Constraint):
             z = z+self.origin[2]
         else:
             # Use XYZ constraints:
-            x = self.sample_w_constr(self.X)
-            y = self.sample_w_constr(self.Y)
-            z = self.sample_w_constr(self.Z)
+            x = self.sample_w_constr(*self.X)
+            y = self.sample_w_constr(*self.Y)
+            z = self.sample_w_constr(*self.Z)
         # Check for obstacles! 
         return x, y, z      
 
@@ -518,7 +511,7 @@ class ObConstraint(PosConstraint):
         """
         sample size from self.Sz
         """
-        Sz = self.sample_w_constr(self.Sz)
+        Sz = self.sample_w_constr(*self.Sz)
         return Sz
     def sampleRot(self, Cam=None):
         """
@@ -539,17 +532,26 @@ class ObConstraint(PosConstraint):
             zRot = z + np.random.rand()*90.*posNeg
             zRot = bvpu.math.bnp.radians(zRot)
         else:
-            zRot = self.sample_w_constr(self.zRot)
+            zRot = self.sample_w_constr(*self.zRot)
         return (0, 0, zRot)
 
 
 class CamConstraint(PosConstraint):
-    ## Camera position (spherical constraints)
-    ## Fixation position (X, Y, Z constraints)
-    def __init__(self, r=(30., 3., 20., 40.), theta=(0., 60., -135., 135.), phi=(17.5, 2.5, 12.5, 45.5), 
-                origin=(0., 0., 0.), X=None, Y=None, Z=None, fixX=(0., 1., -3., 3.), 
-                fixY=(0., 3., -3., 3.), fixZ=(2., .5, .0, 3.5), 
-                speed=(3., 1., 0., 6.), pan=True, zoom=True):
+    """Constraints to specify camera & fixation position"""
+    def __init__(self, 
+        r=(30., 3., 20., 40.), 
+        theta=(0., 60., -135., 135.), 
+        phi=(17.5, 2.5, 12.5, 45.5), 
+        origin=(0., 0., 0.), 
+        X=None, 
+        Y=None, 
+        Z=None, 
+        fixX=(0., 1., -3., 3.), 
+        fixY=(0., 3., -3., 3.), 
+        fixZ=(2., .5, .0, 3.5), 
+        speed=(3., 1., 0., 6.), 
+        pan=True, 
+        zoom=True):
         """
         Extension of PosConstraint to have:/
         *camera speed (measured in Blender Units*) per second (assumes 15 fps)
@@ -572,15 +574,16 @@ class CamConstraint(PosConstraint):
                       (-y)
         THUS: to achieve 0 at dead-on (top position from -y), subtract 270 from all thetas
         """
-        super(CamConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
         inpt = locals()
         for k, v in inpt.items():
             if not k=='self':
                 setattr(self, k, v)
+
     def __repr__(self):
         S = 'CamConstraint:\n'+self.__dict__.__repr__()
         return(S)
-    def sample_fix_location(self, frames=None, obj=None):
+
+    def sample_fixation_location(self, frames=None, obj=None):
         """
         Sample fixation positions. Returns a list of (X, Y, Z) position tuples, nFrames long
 
@@ -593,26 +596,26 @@ class CamConstraint(PosConstraint):
         for ii in range(len(frames)):
             # So far: No computation of how far apart the frames are, so no computation of how fast the fixation point is moving. ADD??
             if not obj:
-                Tmpfix_location = (self.sample_w_constr(self.fixX), self.sample_w_constr(self.fixY), self.sample_w_constr(self.fixZ))
+                Tmpfix_location = (self.sample_w_constr(*self.fixX), self.sample_w_constr(*self.fixY), self.sample_w_constr(*self.fixZ))
             else:
                 if method == 'mean':
                     ObPos = [o.bounding_box_center for o in obj]
                     ObDims = [o.bounding_box_dimensions for o in obj]
                     posX = sum([x[0]*y[0] for x,y in zip(ObPos, ObDims)])/sum([y[0] for y in ObDims])
                     posY = sum([x[1]*y[1] for x,y in zip(ObPos, ObDims)])/sum([y[1] for y in ObDims])
-                    Tmpfix_location = (posX, posY, self.sample_w_constr(self.fixZ))
+                    Tmpfix_location = (posX, posY, self.sample_w_constr(*self.fixZ))
                 else:
                     ObPos = [o.pos3D for o in obj]
                     ObPosX = [None, None, min([x[0] for x in ObPos]), max([x[0] for x in ObPos])] # (Mean, Std, Min, Max) for sample_w_constr
                     ObPosY = [None, None, min([x[1] for x in ObPos]), max([x[1] for x in ObPos])]
                     #ObPosZ = [None, None, min([x[2] for x in ObPos]), max([x[2] for x in ObPos])] # use if we ever decide to do floating objects??
-                    Tmpfix_location = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(self.fixZ))
+                    Tmpfix_location = (self.sample_w_constr(ObPosX), self.sample_w_constr(ObPosY), self.sample_w_constr(*self.fixZ))
             # Necessary??
             #Tmpfix_location = tuple([a+b for a, b in zip(Tmpfix_location, self.origin)])
             fix_location.append(Tmpfix_location)
         return fix_location
 
-    def sample_cam_pos(self, frames=None):
+    def sample_camera_location(self, frames=None):
         """
         Sample nFrames positions (X, Y, Z) from position distribution given spherical / XYZ position constraints, 
         as well as camera motion constraints (speed, pan/zoom, nFrames)
@@ -644,7 +647,7 @@ class CamConstraint(PosConstraint):
                     if self.speed:
                         # Compute n_samples positions in a circle around last position
                         # If speed has a distribution, this will potentially allow for multiple possible positions
-                        Rad = [self.sample_w_constr(self.speed) * (fr-frames[ifr-1])/fps for x in range(n_samples)]
+                        Rad = [self.sample_w_constr(*self.speed) * (fr-frames[ifr-1])/fps for x in range(n_samples)]
                         # cpos will give potential new positions at allowable radii around original position
                         cpos = bvpu.math.circle_pos(Rad, n_samples, TmpPos[0], TmpPos[1]) # Gives x, y; z will be same
                         if self.X:
