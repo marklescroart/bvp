@@ -334,6 +334,12 @@ def find_group_parent(group):
         obs = group
     no_parent = [o for o in obs if o.parent is None]
     if len(no_parent)>1:
+        # Get rid of empties, see if that helps:
+        no_parent = [o for o in no_parent if not ((o.type == 'EMPTY') and (o.dupli_group is None))]
+        print('Look I tried your bullshit, OK?')
+        print(no_parent)
+        if len(no_parent) == 1:
+            return no_parent[0]
         # OK, try for an armature:
         armatures = [o for o in obs if o.type=='ARMATURE']
         if len(armatures) == 1:
@@ -1208,21 +1214,29 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
     if not isinstance(vertex_label, (list, tuple)):
         vertex_label = (vertex_label,)
     for label in vertex_label:
-        vertex_groups = [x for x in vertex_groups if label in x.name]
-    vertex_indices = [vg.index for vg in vertex_groups]
+        # Implement ANDing across labels provided (e.g. for left AND hand)
+        vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
+    vertex_group_indices = [vg.index for vg in vertex_groups]
 
-    # Make new materials for fg and bg
-    fg_mat = bpy.data.materials.new(name)
-    fg_mat.diffuse_color = color
-    fg_mat.diffuse_intensity = 1.0
-    fg_mat.use_shadeless = True
+    # Make new materials for fg and bg if necessary
+    if name in bpy.data.materials:
+        fg_mat = bpy.data.materials[name]
+    else:
+        print('o Creating new material for %s'%name)
+        fg_mat = bpy.data.materials.new(name)
+        fg_mat.diffuse_color = color
+        fg_mat.diffuse_intensity = 1.0
+        fg_mat.use_shadeless = True
 
     # Create & assign background color only if provided
     if bg_color is not None:
-        bg_mat = bpy.data.materials.new(name)
-        bg_mat.diffuse_color = bg_color
-        bg_mat.diffuse_intensity = 1.0
-        bg_mat.use_shadeless = True
+        if (name + '_bg') in bpy.data.materials:
+            bg_mat = bpy.data.materials[name + '_bg']
+        else:
+            bg_mat = bpy.data.materials.new(name + '_bg')
+            bg_mat.diffuse_color = bg_color
+            bg_mat.diffuse_intensity = 1.0
+            bg_mat.use_shadeless = True
 
         #Assign first material on all the mesh
         obj.data.materials.clear(update_data=True)
@@ -1236,26 +1250,61 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
 
     # Select vertices in specified group
     vertices = []
-    for vg_idx in vertex_indices:
+    for vg_idx in vertex_group_indices:
         vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
         vertices += vs
 
     # Set up list to keep
     any_vertex = False
+    n_vertices = 0
     for v in vertices:
         for vg in v.groups:
-            if vg.group in vertex_indices:
+            if vg.group in vertex_group_indices:
                 #print(vg.weight)
                 if vg.weight > weight_thresh:
                     v.select = True
+                    n_vertices += 1
                     any_vertex = True
     if any_vertex:
-        #Assign first material on all the mesh
-        bpy.ops.object.material_slot_add() #Add a material slot
-        obj.material_slots[-1].material = fg_mat
-        bpy.ops.object.editmode_toggle()  #Go in edit mode
-        bpy.ops.object.material_slot_assign() #QAssign the material on the selected vertices
-        bpy.ops.object.editmode_toggle()  #Return in object mode
+        islot = -1
+        if len(obj.material_slots) == 0:
+            #print('WITHIN LABEL_VERTEX_GROUP: Creating first material slot')
+            bpy.ops.object.material_slot_add() # Add a material slot
+            
+        empty_slot_count = 0
+        for i, mslot in enumerate(obj.material_slots):
+            if mslot.material is None:
+                empty_slot_count += 1
+                if empty_slot_count == 2:
+                    islot = i
+                    break
+            elif mslot.material.name == name:
+                islot = i
+                break
+        if islot == -1:
+            # Create new material slot
+            #print('WITHIN LABEL_VERTEX_GROUP: Creating second material slot')
+            bpy.ops.object.material_slot_add() # Add a material slot
+            obj.material_slots[-1].link = 'DATA'
+            islot = len(obj.material_slots) - 1
+
+        #print("> Using material slot %d"%islot)
+        mslot = obj.material_slots[islot]
+        mslot.material = fg_mat
+        obj.active_material_index = islot
+        #print("Active material is: ", obj.material_slots[islot].material.name)
+        bpy.ops.object.editmode_toggle()  # Go into edit mode
+
+        print("> Assigning %d vertices!"%n_vertices)
+        bpy.ops.object.material_slot_assign() # Assign the material on the selected vertices
+        bpy.ops.object.editmode_toggle()  # Return to object mode
+        # One-of BS for Ironman rig, which animates differently than
+        # other rigs
+        if obj.draw_type == 'WIRE':
+            obj.draw_type = 'TEXTURED'
+    else:
+        print("-- no vertices detected. --")
+
     if return_vertices:
         # Change this to coordinates? 
         return [v for v in vertices if v.select]

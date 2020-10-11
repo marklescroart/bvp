@@ -383,7 +383,7 @@ class Scene(MappedClass):
         if bpy.app.version < (2, 80, 0):
             scn.layers = [True] + [False] * 19
         # set cursort to center
-        utils.blender.set_cursor((0, 0, 0))
+        scn.cursor_location = (0, 0, 0)
         # Background
         if self.background is not None:
             self.background.place(proxy=proxy)
