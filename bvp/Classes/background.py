@@ -99,6 +99,10 @@ class Background(MappedClass):
             # Add group of mesh object(s)
             #print('{}, {}'.format(self.path, self.name))
             bg_ob = add_group(self.name, self.fname, self.path, proxy=proxy)
+            # Next clause is a HACK because some background groups are not 
+            # stored with a parent. Remove me when library is fixed.
+            if isinstance(bg_ob, (list, tuple)):
+                bg_ob = bg_ob[0]
             if not proxy:
                 if bpy.app.version < (2, 80, 0):
                     bg_grp = bg_ob.users_group[0]

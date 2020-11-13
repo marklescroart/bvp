@@ -703,7 +703,7 @@ def apply_material(obj, mat, material_slot=None, uv=True):
         #except:
         #    # Unclear what to do with this. 
         #    obj.data.materials.append(mat)
-    if uv:
+    if uv and obj.type == 'MESH':
         bpy.ops.object.mode_set(mode='EDIT')
         bpy.ops.uv.smart_project()
         bpy.ops.object.mode_set(mode='OBJECT')
@@ -1123,8 +1123,14 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         autoselect=True, 
         **kw)
     new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
-    ob  = find_group_parent(new_obs)
-    grab_only(ob)
+    try:
+        ob  = find_group_parent(new_obs)
+        grab_only(ob)
+    except:
+        # HACK library objects in a group should have one parent
+        # object in that group. Some are broken. So fudge things
+        # for now. This should be changed when library is fixed.
+        ob = new_obs[0]
     return ob
 
 # Belongs in Object or Shape
@@ -1181,7 +1187,7 @@ def make_cube(name, mn, mx):
 
 def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
                color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
-               return_vertices=False):
+               return_vertices=False, is_verbose=False):
     """Highlight all vertices in a group with some color
     
     Parameters
@@ -1208,7 +1214,8 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         whether to return blender vertices for the group that was
         labeled.
     """
-    
+    if obj.hide:
+        return
     # Get vertex group indices
     vertex_groups = obj.vertex_groups
     if not isinstance(vertex_label, (list, tuple)):
@@ -1221,8 +1228,11 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
     # Make new materials for fg and bg if necessary
     if name in bpy.data.materials:
         fg_mat = bpy.data.materials[name]
+        if not np.all(np.array(fg_mat.diffuse_color) == np.array(color)):
+           fg_mat.diffuse_color = color
     else:
-        print('o Creating new material for %s'%name)
+        if is_verbose:
+            print('o Creating new material for %s'%name)
         fg_mat = bpy.data.materials.new(name)
         fg_mat.diffuse_color = color
         fg_mat.diffuse_intensity = 1.0
@@ -1232,6 +1242,8 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
     if bg_color is not None:
         if (name + '_bg') in bpy.data.materials:
             bg_mat = bpy.data.materials[name + '_bg']
+            if not np.all(np.array(bg_mat.diffuse_color) == np.array(bg_color)):
+                bg_mat.diffuse_color = bg_color
         else:
             bg_mat = bpy.data.materials.new(name + '_bg')
             bg_mat.diffuse_color = bg_color
@@ -1239,8 +1251,10 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
             bg_mat.use_shadeless = True
 
         #Assign first material on all the mesh
-        obj.data.materials.clear(update_data=True)
-        bpy.ops.object.material_slot_add() #Add a material slot
+        if len(obj.material_slots) == 0:
+            bpy.ops.object.material_slot_add() # Add a material slot
+        #obj.data.materials.clear(update_data=True)
+        #bpy.ops.object.material_slot_add() #Add a material slot
         obj.material_slots[0].material = bg_mat
 
     # Deselect all
@@ -1295,13 +1309,16 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         #print("Active material is: ", obj.material_slots[islot].material.name)
         bpy.ops.object.editmode_toggle()  # Go into edit mode
 
-        print("> Assigning %d vertices!"%n_vertices)
+        if is_verbose:
+            print("> Assigning %d vertices!"%n_vertices)
         bpy.ops.object.material_slot_assign() # Assign the material on the selected vertices
         bpy.ops.object.editmode_toggle()  # Return to object mode
         # One-of BS for Ironman rig, which animates differently than
         # other rigs
         if obj.draw_type == 'WIRE':
             obj.draw_type = 'TEXTURED'
+        # Un-hide objects with vertices that have been labeled
+        obj.hide_render = False
     else:
         print("-- no vertices detected. --")
 

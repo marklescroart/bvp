@@ -118,10 +118,6 @@ if stderr:
 
 """
 
-try:
-    from vm_tools.slurm_utils import run_script as _cluster
-except:
-    print("No cluster code available. Fix dependency on vm_tools.")
 #def _cluster(script, blender_binary=None, **kwargs):
 #    """Run cluster render job"""
 #    kwargs.update(blender_binary=blender_binary,
@@ -301,6 +297,11 @@ def blend(script, blend_file=None, is_local=True, blender_binary=None,
         return stdout, stderr
         
     else:
+        try:
+            from vm_tools.slurm_utils import run_script as _cluster
+        except:
+            print("No cluster code available. Fix dependency on vm_tools.")
+
         # Call via cluster
         #if is_verbose:
         #    print('Calling via cluster: %s'%(' '.join(blender_cmd)))
