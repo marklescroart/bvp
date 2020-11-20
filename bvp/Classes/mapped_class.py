@@ -301,7 +301,11 @@ class MappedClass(object):
             # Nothing to see here (possibly raise exception?)
             return
         if not os.path.exists(self.path):
-            import cottoncandy as cc
+            try:
+                import cottoncandy as cc
+            except ImportError:
+                print("File ({}) not found locally, cannot attempt to download without cottoncandy".format(self.fpath))
+                raise
             if 'gdrive/' in self.path:
                 gcci = cc.get_interface(backend='gdrive')
                 cloud_dir = self.path.split('gdrive/')[-1]

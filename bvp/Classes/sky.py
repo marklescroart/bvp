@@ -217,8 +217,11 @@ class Sky(MappedClass):
                 if ob.type=='LAMP':
                     scn.objects.unlink(ob)
             if self.light_type is not None:
-                # TO DO: Multiple lamps for defaults? 
-                new_lamp = bpy.data.lamps.new('Default lamp', self.light_type)
+                # TO DO: Multiple lamps for defaults?
+                if bpy.app.version < (2, 80, 0):
+                    new_lamp = bpy.data.lamps.new('Default lamp', self.light_type)
+                else:
+                    new_lamp = bpy.data.lights.new('Default lamp', self.light_type)
                 lamp_ob = bpy.data.objects.new('Default lamp', new_lamp)
                 lamp_ob.rotation_euler = self.light_rotation
                 lamp_ob.location = self.light_location

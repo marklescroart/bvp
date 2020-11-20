@@ -381,9 +381,13 @@ class Scene(MappedClass):
         scn = utils.blender.set_scene(scn)
         # set layers to correct setting
         if bpy.app.version < (2, 80, 0):
+            # Legacy 2.79 compatibility
             scn.layers = [True] + [False] * 19
-        # set cursort to center
-        scn.cursor_location = (0, 0, 0)
+            # set cursort to center
+            scn.cursor_location = (0, 0, 0)
+        else:
+            # set cursort to center
+            scn.cursor.location = (0, 0, 0)
         # Background
         if self.background is not None:
             self.background.place(proxy=proxy)
