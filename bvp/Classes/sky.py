@@ -229,17 +229,17 @@ class Sky(MappedClass):
         if not scn.world:
             scn.world = bpy.data.worlds.new('world')
 
-        if self.world_params is not None:
-            for k, v in self.world_params.items():
-                setattr(scn.world, k, v)
-        if self.world_lighting is not None:
-            for k, v in self.world_lighting.items():
-                setattr(scn.world.light_settings, k, v)
-        
         # (TEMP?) Over-ride of Ambient Occlusion (AO) for more efficient renders:
         if bpy.app.version < (2, 80, 0):
             scn.world.light_settings.gather_method = 'RAYTRACE'
             scn.world.light_settings.use_ambient_occlusion = False
+            # Need some version of ability to apply world parameters in 2.8+
+            if self.world_params is not None:
+                for k, v in self.world_params.items():
+                    setattr(scn.world, k, v)
+            if self.world_lighting is not None:
+                for k, v in self.world_lighting.items():
+                    setattr(scn.world.light_settings, k, v)
         else:
             scn.eevee.use_gtao = False
 

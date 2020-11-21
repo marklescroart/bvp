@@ -52,9 +52,29 @@ class Material(MappedClass):
 
     @classmethod
     def from_blender(cls, name, dbi=None, **kwargs):
+        """Generate a bvp Material class from a blender material name
+        
+        Called from inside blender. 
+
+        Parameters
+        ----------
+        name : string
+            Name for the blender material (this will look for `bpy.data.materials[name]`
+            within the .blend file)
+        dbi : DBInterface class
+            database interface (necessary if you want to save the resulting bvp Material)
+
+        """
         fname = bpy.data.filepath
         ob = cls.__new__(cls)
-        ob.__init__(dbi=dbinterface, name=name, fname=fname, **kwargs)
+        # TO DO: figure out if the material is a cycles material or not
+        # This is a so-so way to do this; there is probably a better one.
+        if 'is_cycles' in kwargs:
+            hrm = kwargs.pop('is_cycles')
+            print("Ignoring input value ({}) for `is_cycles`".format(is_cycles))
+        mat = bpy.data.materials[name]
+        is_cycles = mat.node_tree is not None
+        ob.__init__(dbi=dbi, name=name, fname=fname, is_cycles=is_cycles, **kwargs)
         return ob
 
     @classmethod

@@ -5,10 +5,10 @@ except ImportError:
     import ConfigParser as configparser
 # Find appropriate directories for config files 
 # in each OS (*nix, windows, whatever). 
-from . import appdirs
+import appdirs
 
 cwd = os.path.dirname(__file__)
-userdir = appdirs.user_data_dir("bvp", appauthor="MarkLescroart") #(not sure if args here are right)
+userdir = appdirs.user_config_dir("bvp", appauthor="MarkLescroart") #(not sure if args here are right)
 usercfg = os.path.join(userdir, "options.cfg")
 
 config = configparser.ConfigParser()

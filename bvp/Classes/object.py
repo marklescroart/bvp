@@ -79,7 +79,7 @@ class Object(MappedClass):
         self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose', 'materials']
         self._temp_fields = ['min_xyz_pos', 'max_xyz_pos', 'bounding_box_center', 
                              'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory',
-                             'blender_object', 'blender_group', 'proxy']
+                             'min_xyz_trajectory', 'blender_object', 'blender_group', 'proxy']
         # Extras
         self.blender_object = None
         self.blender_group = None
@@ -496,10 +496,15 @@ class Object(MappedClass):
         """Unlink an object from a scene"""
         if scn is None:
             scn = bpy.context.scene
-        scn.objects.unlink(self.blender_object[instance])
-        for o in self.blender_group[instance].objects:
-            if o.name in scn.objects:
-                scn.objects.unlink(o)
+        if bpy.app.version < (2, 80, 0):
+            scn.objects.unlink(self.blender_object[instance])
+            for o in self.blender_group[instance].objects:
+                if o.name in scn.objects:
+                    scn.objects.unlink(o)
+        else:
+            # Assumption here that top-level scene collection is called "Collection"
+            # May want to re-visit this. 
+            scn.collection.children['Collection'].children.unlink(self.blender_group[instance])
         _ = self.blender_object.pop(instance)
         _ = self.blender_group.pop(instance)
         _ = self.armature.pop(instance)

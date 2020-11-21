@@ -21,7 +21,7 @@ except ImportError:
 class Background(MappedClass):
     """Backgrounds for scenes"""
     def __init__(self, name='DummyBackground', fname=None, n_vertices=None, n_faces=None, 
-        type='Background', wordnet_label=None, real_world_size=None, lens=50., 
+        type='Background', wordnet_label=None, real_world_size=None, lens=50., is_cycles=None,
         semantic_category=None, object_semantic_category='all', sky_semantic_category='all',
         camera_constraints=None, object_constraints=None, obstacles=None, materials=None,
         _id=None, _rev=None, dbi=None): 

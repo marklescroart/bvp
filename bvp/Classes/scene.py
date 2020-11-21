@@ -333,7 +333,11 @@ class Scene(MappedClass):
             else:
                 bpy.context.view_layer.update()
             # Calculate global position
-            positions.append(ta.matrix_world * bone.matrix * bone.location)
+            try:
+                positions.append(ta.matrix_world * bone.matrix * bone.location)
+            except TypeError:
+                # Fancy new matrix multiplication operator
+                positions.append(ta.matrix_world @ bone.matrix @ bone.location)
             object_locations.append(ta.location)
         if fix_offset is not None:
             # Shift position of fixation 
