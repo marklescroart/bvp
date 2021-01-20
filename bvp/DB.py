@@ -33,18 +33,18 @@ import json
 from .options import config
 from . import dbqueries
 
-from .Classes.Action import Action
-from .Classes.Background import Background
-from .Classes.Camera import Camera
-#from .Classes.Constraint import  ObConstraint, CamConstraint
-from .Classes.Material import Material
-from .Classes.Object import Object
-#from .Classes.RenderOptions import RenderOptions
-#from .Classes.Scene import Scene
-#from .Classes.SceneList import SceneList
-from .Classes.Shadow import Shadow
+from .Classes.action import Action
+from .Classes.background import Background
+from .Classes.camera import Camera
+#from .Classes.constraint import  ObConstraint, CamConstraint
+from .Classes.material import Material
+from .Classes.object import Object
+#from .Classes.render_options import RenderOptions
+#from .Classes.scene import Scene
+#from .Classes.scene_list import SceneList
+from .Classes.shadow import Shadow
 #from .Classes.Shape import Shape # Move to Object...?
-from .Classes.Sky import Sky
+from .Classes.sky import Sky
 
 try:
     import docdb_lite as docdb
@@ -65,7 +65,7 @@ try:
     # add db queries for bvp stuff
     setattr(docdb.dbqueries, 'bvp', dbqueries)
 except ImportError:
-    print("No docdb_lite present! WTF!") # Make me a better error message
+    print("No docdb_lite present! Database functionality won't work!") # Make me a better error message
 
 # Defaults
 dbhost = config.get('db','dbhost')
@@ -77,7 +77,7 @@ verbosity_level = 3
 
 # Make sure that all files in these directories contain objects / backgrounds / skies that you want to use. Otherwise, modify the lists of objects / bgs / skies below.
 class DBInterface(docdb.couchclient.CouchDocDBClient):
-    def __init__(self, dbhost=dbhost, dbname=dbname, queries=('basic', 'bvp'), 
+    def __init__(self, dbhost=dbhost, dbname=dbname, user=None, password=None, queries=('basic', 'bvp'), 
         is_verbose=is_verbose, return_objects=return_objects):
         """Class to interface with bvp elements stored in couch db
         
@@ -94,7 +94,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         dbname : string
             Database name. Read from config file. Config default is intialized to be 'bvp_1.0'
         """
-        super(DBInterface, self).__init__(dbhost, dbname, queries=queries, 
+        super(DBInterface, self).__init__(dbhost, dbname, user=user, password=password, queries=queries, 
             is_verbose=is_verbose, return_objects=return_objects)
         # Set database root dir
         try:
@@ -109,28 +109,6 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
             ff = [f for f in files if 'blend1' in f or 'blend2' in f]
             for f in ff:
                 os.unlink(os.path.join(root, f))
-
-    def export_json(self, fname, qdict=None):
-        """Exports some or all documents in this database """
-        if qdict is None:
-            ddict = [dict(doc) for doc in self.get_all_documents() if not '_design' in doc.id]
-        elif isinstance(qdict, (list, tuple)):
-            ddict = []
-            for q in qdict:
-                ddict += self.query_documents(**q) # no fancy queries...
-        elif isinstance(qdict, dict):
-            ddict = self.query_documents(**qdict)
-        else:
-            raise Exception("Bad type for qdict argument!")
-        json.dump(ddict, open(fname, mode='w'))
-        
-    def import_json(self, fname):
-        """Import all library header files from a json document.
-
-        This function is for updating an extant database; see classmethod 
-
-        """
-        raise NotImplementedError("Not yet!") 
 
     def posed_object_list(self):
         """Get a list of posed objects as bvpObjects - duplicate each object for however many poses it has
@@ -245,7 +223,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                     print('Found it!')
                     # Only append scenes to render that DO NOT have previews already rendered!
                     continue                
-                Cam = Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+                Cam = Camera(location=BG.CamConstraint.sample_cam_pos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
                 Sky = Sky('*'+BG.sky_semantic_category[0], Lib=self)
                 if Sky.semantic_category:
                     if 'dome' in Sky.semantic_category:
@@ -314,7 +292,7 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
                     print('Found it!')
                     # Only append scenes to render that DO NOT have previews already rendered!
                     continue                
-                Cam = Camera(location=BG.CamConstraint.sampleCamPos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
+                Cam = Camera(location=BG.CamConstraint.sample_cam_pos(frames), fixPos=BG.CamConstraint.sampleFixPos(frames), frames=frames)
                 S = Scene(Num=BGCt, BG=BG, Sky=Sky, Obj=None, 
                                     Shadow=None, Cam=Cam, FrameRange=(1, 1), 
                                     fpath=fpath, 
@@ -415,6 +393,8 @@ class DBInterface(docdb.couchclient.CouchDocDBClient):
         dbi.set_up_db()
         if fname is not None:
             docs = json.load(open(fname))
+            # Exclude config file, we did that already. Shouldn't be here anyway...
+            docs = [d for d in docs if not d['_id'] == 'config']
             print("Uploading documents...")
             dbi.put_documents(docs)
         print("Done!")

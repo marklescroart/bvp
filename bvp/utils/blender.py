@@ -9,51 +9,48 @@ import subprocess
 import warnings
 import copy
 import re
-import math as bnp
+import numpy as np
 from six import string_types
-from .bvpMath import circ_dst # 
 
-#from ..Classes.Constraint import CamConstraint
 from ..options import config
 
 try:
     import bpy
-    import mathutils as bmu
     is_blender = True
 except ImportError: 
     is_blender = False
 
 verbosity_level = 3 # Get rid of me? Implement in a better way?
 
-def xyz2constr(xyz, ConstrType, originXYZ=(0., 0., 0.)):
+def xyz2constr(xyz, constraint_type, origin_xyz=(0., 0., 0.)):
     """
     Convert a cartesian (xyz) location to a constraint on azimuth 
     angle (theta), elevation angle (phi) or radius (rho).
     
-    originXYZ is the origin of the coordinate system (default=(0, 0, 0))
+    origin_xyz is the origin of the coordinate system (default=(0, 0, 0))
 
     Returns angles in degrees.
     """
     X, Y, Z = xyz
-    oX, oY, oZ = originXYZ
+    oX, oY, oZ = origin_xyz
     X = X-oX
     Y = Y-oY
     Z = Z-oZ
-    if ConstrType.lower() == 'phi':
-        Out = bnp.degrees(bnp.atan2(Z, bnp.sqrt(X**2+Y**2)))
-    elif ConstrType.lower() == 'theta':
-        Out = bnp.degrees(bnp.atan2(Y, X))
-    elif ConstrType.lower() == 'r':
-        Out = (X**2+Y**2+Z**2)**.5
-    return Out
+    if constraint_type.lower() == 'phi':
+        out = np.degrees(np.arctan2(Z, np.sqrt(X**2 + Y**2)))
+    elif constraint_type.lower() == 'theta':
+        out = np.degrees(np.arctan2(Y, X))
+    elif constraint_type.lower() == 'r':
+        out = (X**2 + Y**2 + Z**2)**0.5
+    return out
 
-def make_location_animation(location_list, frames, action_name='ObjectMotion', handle_type='VECTOR'):
-    """Create a location-changing action in Blender from a list of frames and XYZ coordinates.
-    
+
+def make_locrotscale_animation(frames, action_name='ObjectMotion',
+                               handle_type='VECTOR', **kwargs):
+    """Create an action in Blender from a list of frames and values
+
     Parameters
     ----------
-    location_list : list 
-        List of [x, y, z] coordinates for each frames
     frames : list of ints
         Keyframes at which to fix locations
     action_name : string
@@ -61,67 +58,152 @@ def make_location_animation(location_list, frames, action_name='ObjectMotion', h
     handle_type : string | list
         string name to specify the types of handles on the Bezier splines
         that govern how animation interpolation is accomplished. One of:
-        'VECTOR', ... [[TODO LOOK THIS UP IN BLENDER]]. A list can be 
+        'VECTOR', ... [[TODO LOOK THIS UP IN BLENDER]]. A list can be
         provided if you want different handles for different frames (must
         be on handle type per frame)
+    kwargs : animation_type = values pairs
+        list of which values to set for animation. Keys should be
+        locrotscale type keys, e.g. `location=...` ,
+        `rotation_euler=...`, `scale=...` etc
+        For example: location=[(x1,y1,z1), (x2, y2, z2), ...]
     """
-    # Make handle_type input into a list of lists for use below
-    if isinstance(handle_type, string_types):
-        handle_type = [handle_type]*len(frames)
-    for ih, h in enumerate(handle_type):
-        if isinstance(h, string_types): 
-            handle_type[ih] = [h]*2
-        elif isinstance(h, (list,tuple)):
-            if len(h)==1:
-                handle_type[ih] = h*2
-    a = bpy.data.actions.new(action_name)
-    for iXYZ in range(3):
-        a.fcurves.new('location', index=iXYZ, action_group="LocRotScale")
-        a.fcurves[iXYZ].extrapolation = 'LINEAR'
-        for ifr, fr in enumerate(frames):
-            a.fcurves[iXYZ].keyframe_points.insert(fr, location_list[ifr][iXYZ])
-            a.fcurves[iXYZ].keyframe_points[ifr].handle_left_type = handle_type[ifr][0]
-            a.fcurves[iXYZ].keyframe_points[ifr].handle_right_type = handle_type[ifr][1]
-        a.fcurves[iXYZ].extrapolation = 'CONSTANT'
-    return a
+    def _reconcile_handles(handle_type, frames):
+        """Make handle_type input into a list of lists of appropriate length"""
+        htype = copy.copy(handle_type)
+        if isinstance(htype, string_types):
+            htype = [htype] * len(frames)
+        for ih, h in enumerate(htype):
+            if isinstance(h, string_types):
+                htype[ih] = [h] * 2
+            elif isinstance(h, (list, tuple)):
+                if len(h) == 1:
+                    htype[ih] = h * 2
+        return htype
 
-def AddSelectedToGroup(gNm):
-    """
-    Adds all selected objects to group named gNm
+    # Create new action
+    act = bpy.data.actions.new(action_name)
+    for k, v in kwargs.items():
+        n_curves = len(act.fcurves)
+        # Reconcile length of `frames` w/ length of input list
+        if len(v) == len(frames):
+            frames_ = copy.copy(frames)
+        else:
+            if len(frames)==1:
+                raise ValueError('Only one frame provided for animation w/ multiple keyframes!')
+            elif len(frames)==2:
+                # Start and end frame only provided - interpolate
+                frames_ = np.linspace(frames[0], frames[1], len(v))
+            else:
+                raise ValueError('Number of frames does not match number of keyframes!')
+        # match handles to frames
+        handles = _reconcile_handles(handle_type, frames_)
+        for iXYZ in range(3):
+            act.fcurves.new(k, index=iXYZ, action_group="LocRotScale")
+            act.fcurves[iXYZ].extrapolation = 'LINEAR'
+            for ifr, fr in enumerate(frames_):
+                ii = iXYZ + n_curves
+                act.fcurves[ii].keyframe_points.insert(fr, v[ifr][iXYZ])
+                act.fcurves[ii].keyframe_points[ifr].handle_left_type = handles[ifr][0]
+                act.fcurves[ii].keyframe_points[ifr].handle_right_type = handles[ifr][1]
+            act.fcurves[iXYZ].extrapolation = 'CONSTANT'
+    return act
+
+
+def add_selected_to_group(group_name):
+    """Adds all selected objects to group named `group_name`
     """
     scn = bpy.context.scene
-    G = bpy.data.groups[gNm]
+    grp = bpy.data.groups[group_name]
     ob = [o for o in scn.objects if o.select]
     for o in ob:
-        G.objects.link(o)
+        grp.objects.link(o)
 
-def GetScenesToRender(SL):
-    """Check on which scenes within a scene list have already been rendered.
 
-    DEPRECATED?? Overlapping in function with something else? 
+def clear_scene(scn=None):
+    """Resets scene to empty, ready for next.
+
+    Removes all objects, lights, background; resets world settings; clears
+    all nodes; readies scene for next import /render. This is essential for
+    memory saving in long render runs. Use with caution. Highly likely to
+    crash Blender.
+
+    Parameters
+    ----------
+    scn : string scene name
+        Scene to clear of all elements.
+
+    Notes
+    -----
+    Only removes meshes for now; cameras too?? Worlds??
+    Clears out entire file - not just scene.
     """
-    # Get number of scenes to render in one job:
-    RenderGrpSize = SL.RenderOptions.BVPopts['RenderGrpSize']
-    # Check on which scenes have been rendered:
-    fpath, PathEnd = os.path.split(SL.RenderOptions.filepath[:-1]) # Leave out ending "/"
-    # Modify PathEnd to accomodate all render types
-    
-    for iChk in range(1, SL.nScenes, RenderGrpSize):
-        # For now: Only check images. Need to check masks, zdepth, etc...
-        if not os.path.exists(os.path.join(fpath, PathEnd, 'Sc%04d_01.png'%(iChk))):
-            ScnToRender = range(iChk-1, iChk+RenderGrpSize-1)
-            return ScnToRender
 
-def SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False):
-    """
-    Usage: SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False)
-    During rendering, sets mode to no undos, allows how many threads 
-    to specify for rendering (default = auto detect, maybe not the 
-    nicest thing to do if rendering is being done on a cluster)
-    Setting Revert=True undoes the changes.
+    ### --- Removing objects for next scene: --- ### 
+    scn = bvpu.blender.set_scene(scn)
+    # Enumerate mesh objects to remove
+    mesh_objects = list()
+    for o in bpy.data.objects:
+        if o.type=='MESH': 
+            mesh_objects.append(o.data)
+        if o.name in scn.objects:
+            scn.objects.unlink(o)
+        o.user_clear()
+        bpy.data.objects.remove(o)      
+    # Remove mesh objects
+    for m in mesh_objects:
+        m.user_clear()
+        bpy.data.meshes.remove(m)
+    # Remove all textures:
+    # To come
+    # Remove all images:
+    # To come
+    # Remove all worlds:
+    # To come
+    # Remove all actions/poses:
+    for act in bpy.data.actions:
+        act.user_clear()
+        bpy.data.actions.remove(act)
+    # Remove all armatures:
+    for arm in bpy.data.armatures:
+        arm.user_clear()
+        bpy.data.armatures.remove(arm)
+    # Remove all groups:
+    for g in bpy.data.groups:
+        g.user_clear()
+        bpy.data.groups.remove(g)
+    # Remove all rendering nodes
+    for n in scn.node_tree.nodes:
+        scn.node_tree.nodes.remove(n)
+    # Re-set (delete) all render layers
+    RL = bpy.context.scene.render.layers.keys()
+    bpy.ops.scene.render_layer_add()
+    for ii, n in enumerate(RL):
+        bpy.context.scene.render.layers.active_index = 0
+        bpy.ops.scene.render_layer_remove()
+    # Rename newly-added layer (with default properties) to default name:
+    bpy.context.scene.render.layers[0].name = 'RenderLayer'
+    # Set only first layer to be active
+    scn.layers = [True] + [False] * 19
+
+def set_no_memory_mode(n_threads=None, n_parts_xy=6, revert=False):
+    """Set to conservative memory mode. 
+
+    Useful during rendering: sets mode to no undos, allows how many threads 
+
+    Parameters
+    ----------
+    n_threads : scalar
+        number of threads for rendering; None auto-detects available threads.
+        Auto-detect is not necessarily optimal for cluster renders (can 
+        monopolize available CPUs)
+    n_parts_xy : scalar
+        Number of tiles across image in x and y dims to render independently
+    revert : bool
+        If True, reverts file toan assumed default (global undo on, 32 undo
+        steps)
     """
     scn = bpy.context.scene
-    if not Revert:
+    if not revert:
         bpy.context.user_preferences.edit.use_global_undo = False
         bpy.context.user_preferences.edit.undo_steps = 0
     else:
@@ -129,46 +211,54 @@ def SetNoMemoryMode(nThreads=None, nPartsXY=6, Revert=False):
         bpy.context.user_preferences.edit.undo_steps = 32
 
     # Set threading to 1 for running multiple threads on multiple machines:
-    if not nThreads:
+    if not n_threads:
         scn.render.threads_mode = 'AUTO'
     else: 
         scn.render.threads_mode = 'FIXED'
-        scn.render.threads = nThreads
+        scn.render.threads = n_threads
     # More parts to break up rendering...
-    scn.render.tile_x = nPartsXY
-    scn.render.tile_y = nPartsXY
+    scn.render.tile_x = n_parts_xy
+    scn.render.tile_y = n_parts_xy
 
-def RemoveMeshFromMemory(MeshName):
-    """
-    Removes meshes from memory. Be careful with the use of this function; it can crash Blender to have meshes removed with objects that still rely on them.
-    """
-    Mesh = bpy.data.meshes[MeshName]
-    Mesh.user_clear()
-    bpy.data.meshes.remove(Mesh)
+def remove_mesh_from_memory(mesh_name):
+    """Removes meshes from memory. 
 
-def RemoveActionFromMemory(ActionName):
+    Be careful with the use of this function; it can crash Blender to have 
+    meshes removed with objects that still rely on them.
     """
-    Removes actions from memory. Called to clear scenes between loading / rendering scenes. Be careful, this can crash Blender! 
-    """
-    Act = bpy.data.actions[ActionName]
-    Act.user_clear()
-    bpy.data.actions.remove(Act)
+    mesh = bpy.data.meshes[mesh_name]
+    mesh.user_clear()
+    bpy.data.meshes.remove(mesh)
 
-def set_layers(ob, LayerList):
-    """ 
-    Convenience function to set layers. Note that active layers affect what will be selected with bpy select_all commands. 
-    ob = blender object data structure
-    LayerList = list of numbers of layers you want the object to appear on, e.g. [0, 9] (ZERO-BASED)
+def remove_action_from_memory(action_name):
+    """
+    Removes actions from memory. Called to clear scenes between loading / 
+    rendering scenes. Be careful, this can crash Blender! 
+    """
+    act = bpy.data.actions[action_name]
+    act.user_clear()
+    bpy.data.actions.remove(act)
+
+def set_layers(ob, layer_list):
+    """Convenience function to set layers. 
+
+    Note that active layers affect what will be selected with bpy 
+    select_all commands. 
+
+    Parameters
+    ----------
+    ob : blender object
+        object for which to set layers
+    layer_list : list
+        list of numbers of layers on which you want the object to appear,
+        e.g. [0, 9] (ZERO-BASED)
     """
     if not is_blender:
-        print("Sorry, won't run outside of Blender!")
-        return
-    LL = [False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False, False]
-    for L in LayerList:
-        LL[L] = True
-    LL = tuple(LL)
+        raise Exception("Can't run outside of Blender!")
+    n_tot_layers = 20
+    layers = tuple([x in layer_list for x in range(n_tot_layers)])
     grab_only(ob)
-    bpy.ops.object.move_to_layer(layers=LL)
+    bpy.ops.object.move_to_layer(layers=layers)
 
 def get_cursor():
     """Convenience function to get 3D cursor position in Blender (3D cursor marker, not mouse)
@@ -178,9 +268,14 @@ def get_cursor():
     location : blender Vector
         X, Y, Z location of 3D cursor
     """
-    # Now this is some serious bullshit. Look where Blender hides the cursor information. Just look.
-    V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
-    return V.spaces[0].cursor_location
+    # Now this is some serious bullshit. Look where Blender hides the cursor 
+    # information. Just look.
+    if bpy.app.version < (2, 80, 0):
+        vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+        vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+        return vw_area.spaces[0].cursor.location
+    else:
+        return bpy.context.scene.cursor.location
 
 def set_cursor(location):
     """Sets 3D cursor to specified location in VIEW_3D window
@@ -193,8 +288,13 @@ def set_cursor(location):
     location : list or bpy Vector
         Desired position of the cursor
     """
-    V = [x for x in bpy.data.window_managers[0].windows[0].screen.areas if x.type=='VIEW_3D'][0]
-    V.spaces[0].cursor_location = location
+    if bpy.app.version < (2, 80, 0):
+        vw_area = [x for x in bpy.data.window_managers[0].windows[0].screen.areas]
+        vw_area = [x for x in vw_area if x.type == 'VIEW_3D'][0]
+        vw_area.spaces[0].cursor.location = location
+    else:
+        # SO MUCH SIMPLER. Deprecate this function it's so simple.
+        bpy.context.scene.cursor.location = location
 
 def grab_only(ob):
     """Selects the input object `ob` and and deselects everything else
@@ -208,19 +308,38 @@ def grab_only(ob):
         if bpy.context.active_object.mode != 'OBJECT':
             bpy.ops.object.mode_set(mode='OBJECT', toggle=False)
     bpy.ops.object.select_all(action='DESELECT')
-    if isinstance(ob, bpy.types.Group):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection    
+    if isinstance(ob, btype):
         ob = find_group_parent(ob)
-    ob.select = True
-    bpy.context.scene.objects.active = ob    
+    if bpy.app.version < (2, 80, 0):
+        ob.select = True
+        bpy.context.scene.objects.active = ob
+    else:
+        ob.select_set(True)
+        bpy.context.view_layer.objects.active = ob
+    
 
 def find_group_parent(group):
     """Find parent object among group objects"""
-    if isinstance(group, bpy.types.Group):
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection    
+    if isinstance(group, btype):
         obs = group.objects
     else:
         obs = group
     no_parent = [o for o in obs if o.parent is None]
     if len(no_parent)>1:
+        # Get rid of empties, see if that helps:
+        no_parent = [o for o in no_parent if not ((o.type == 'EMPTY') and (o.dupli_group is None))]
+        print('Look I tried your bullshit, OK?')
+        print(no_parent)
+        if len(no_parent) == 1:
+            return no_parent[0]
         # OK, try for an armature:
         armatures = [o for o in obs if o.type=='ARMATURE']
         if len(armatures) == 1:
@@ -231,27 +350,33 @@ def find_group_parent(group):
     return no_parent[0]
 
 def get_mesh_objects(scn=None, select=True):
-    """Returns a list of - and optionally, selects - all mesh objects in a scene
+    """Returns a list of mesh objects in a scene
+
+    Parameters
+    ----------
+    scn : 
     """
     if scn is None:
         scn = bpy.context.scene
     bpy.ops.object.select_all(action='DESELECT')
-    MeOb = [ob for ob in scn.objects if ob.type=='MESH']
+    mesh_objects = [ob for ob in scn.objects if ob.type=='MESH']
     if select:
-        for ob in MeOb:
-            ob.select = True
-    return MeOb
+        for ob in mesh_objects:
+            if bpy.app.version < (2, 80, 0):
+                ob.select = True
+            else:
+                ob.select_set(True)
+    return mesh_objects
 
-def CommitModifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
-    """
-    Commits mirror / subsurf / other modifiers to meshes (use before joining meshes)
+def commit_modifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
+    """Commits modifiers to meshes (use before joining meshes)
     
     Modifier types to commit are specified in "mTypes"
 
     NOTE: This is shitty and probably broken. Fix me.
     ALSO: deprecated. The point here should be to get a pointwise mesh, and
     there are better ways to do that than this. Leaving here temporarily, will
-    delete or replace soon.
+    eventually delete or replace.
     """
     Flag = {'Verbose':False}
     print('Committing modifiers...')
@@ -281,7 +406,7 @@ def CommitModifiers(ObList, mTypes=['Mirror', 'EdgeSplit']):
                 print("Applying Subsurf modifier to %s"%(o.name))
             bpy.ops.object.modifier_apply(modifier=m.name)
 
-def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
+def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=False):
     """
     Returns a list of surface point locations for a given object (or group of objects) in a regular grid. 
     Grid size is specified by "size" input.
@@ -298,35 +423,39 @@ def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
     ## Get current scene:
     scn = bpy.context.scene
     # Set up no memory mode: 
-    if not showVox:
+    if not show_vox:
         if verbosity_level>5:
             print('Setting no memory mode!')
-        SetNoMemoryMode()
+        set_no_memory_mode()
     # Recursive call to deal with groups with multiple objects:
-    if isinstance(obj, bpy.types.Group):
-        Ct = 0
+    if bpy.app.version < (2, 80, 0):
+        btype = bpy.types.Group
+    else:
+        btype = bpy.types.Collection
+    if isinstance(obj, btype):
+        ct = 0
         verts = []
         norms = []
         for o in obj.objects:
-            v, n = getVoxelizedVertList(o, size=size, smooth=smooth, showVox=showVox)
+            v, n = get_voxelized_vert_list(o, size=size, smooth=smooth, show_vox=show_vox)
             verts += v
             norms += n
-        if fNm:
-            if Ct==0:
+        if fname:
+            if ct==0:
                 todo = 'w' # create / overwrite
             else:
                 todo = 'a' # append
-            with open(fNm, todo) as fid:
+            with open(fname, todo) as fid:
                 for v in verts:
                     fid.write('%.5f, %.5f, %.5f\n'%(v[0], v[1], v[2]))
             # Skip normal output! These are fucked anyway!
-            #with open(fNm, todo) as fid:
+            #with open(fname, todo) as fid:
             #   for n in norms:
             #       fid.write('%.5f, %.5f, %.5f\n'%(n[0], n[1], n[2]))
-            Ct+=1
+            ct+=1
         return verts, norms
     ## fix all transforms & modifiers:
-    if showVox:
+    if show_vox:
         obj.hide = obj.hide_render = True
     if not obj.type in ('MESH', 'CURVE', 'SURFACE'):
         # Skip any non-mesh(able) objects
@@ -335,7 +464,10 @@ def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
     me = obj.to_mesh(scn, True, 'RENDER')
     me.transform(obj.matrix_world)
     dup = bpy.data.objects.new('dup', me)
-    scn.objects.link(dup)
+    if bpy.app.version < (2, 80, 0):
+        scn.objects.link(dup)
+    else:
+        scn.collection.objects.link(dup)
     dup.dupli_type = 'VERTS'
     scn.objects.active = dup
 
@@ -386,28 +518,25 @@ def getVoxelizedVertList(obj, size=10/96., smooth=1, fNm=None, showVox=False):
     bpy.ops.object.mode_set()
     verts = [list(x.co) for x in dup.data.vertices]
     norms = [list(x.normal) for x in dup.data.vertices]
-    if fNm:
-        with open(fNm, 'w') as fid:
+    if fname:
+        with open(fname, 'w') as fid:
             for v in verts:
                 fid.write('%.5f, %.5f, %.5f\n'%(v[0], v[1], v[2]))
         # Skip normal write-out - these are fucked anyway!
-        #with open(fNm+'_Normals.txt', 'w') as fid:
+        #with open(fname+'_Normals.txt', 'w') as fid:
         #   for n in norms:
         #       fid.write('%.5f, %.5f, %.5f\n'%(n[0], n[1], n[2]))
-    if not showVox:
+    if not show_vox:
         scn.objects.unlink(dup)
-        RemoveMeshFromMemory(me.name)
-        #SetNoMemoryMode(Revert=True)
+        remove_mesh_from_memory(me.name)
+        #set_no_memory_mode(revert=True)
     if verbosity_level>4:
         t1=time.time()
-        print('getVoxelizedVertList took %d mins, %.2f secs'%divmod((t1-t0), 60))
+        print('get_voxelized_vert_list took %d mins, %.2f secs'%divmod((t1-t0), 60))
     return verts, norms
 
 def add_img_material(name, imfile, imtype):
     """Add a texture containing an image to Blender.
-
-    Is this optimal? May require different materials/textures w/ different uv mappings 
-    to fully paint all the shit in a scene. Better to just load an image?
 
     Parameters
     ----------
@@ -438,13 +567,62 @@ def add_img_material(name, imfile, imtype):
     tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
     tex.image = img
     if imtype.upper()=='MOVIE':
+        print("== YO I HAVE %d FRAMES!! =="%img.frame_duration)
         tex.image_user.use_cyclic = True
-        bpy.ops.image.match_movie_length()
+        tex.image_user.frame_duration = img.frame_duration
     # Link texture to new material
     mat = bpy.data.materials.new(name=name)
     mat.texture_slots.create(0)
     mat.texture_slots[0].texture = tex
     return mat
+
+def add_vcolor(hemis, mesh=None, name='color'):
+    """Seems like `hemis` is color you wish to apply to currently selected mesh."""
+    from bpy import context as C
+    from bpy import data as D
+    if mesh is None:
+        mesh = C.scene.objects.active.data
+    elif isinstance(mesh, str):
+        mesh = D.meshes[mesh]
+
+    bpy.ops.object.mode_set(mode='OBJECT')
+
+    color = hemis
+    if len(hemis) == 2:
+        color = hemis[0]
+        if len(mesh.vertices) == len(hemis[1]):
+            color = hemis[1]
+
+    vcolor = mesh.vertex_colors.new(name)
+    if hasattr(mesh, "loops"):
+        loopidx = [0]*len(mesh.loops)
+        mesh.loops.foreach_get('vertex_index', loopidx)
+
+        if not isinstance(color[0], (list, tuple)):
+            for i, j in enumerate(loopidx):
+                vcolor.data[i].color = [color[j]]*3
+        else:
+            for i, j in enumerate(loopidx):
+                vcolor.data[i].color = color[j]
+    else:
+        # older blender version, need to iterate faces instead
+        print("older blender found...")
+        if not isinstance(color[0], (list, tuple)):
+            for i in range(len(mesh.faces)):
+                v = mesh.faces[i].vertices
+                vcolor.data[i].color1 = [color[v[0]]] * 3
+                vcolor.data[i].color2 = [color[v[1]]] * 3
+                vcolor.data[i].color3 = [color[v[2]]] * 3
+        else:
+            for i in len(vcolor):
+                v = mesh.faces[i].vertices
+                vcolor.data[i].color1 = color[v[0]]
+                vcolor.data[i].color2 = color[v[1]]
+                vcolor.data[i].color3 = color[v[2]]
+
+    print("Successfully added vcolor '%s'"%name)
+    return vcolor
+
 
 # LAZY SHIT MOVE ME
 RLayerNode = 'CompositorNodeRLayers' 
@@ -486,13 +664,18 @@ def add_img_background(imfile, imtype='FILE', scn=None):
         img = bpy.data.images[imfile]
     else:
         from bpy_extras.image_utils import load_image
-        img = load_image(imfile)
-        img.source = imtype.upper()    
+        if isinstance(imfile, list):
+            img = load_image(imfile[0])
+        else:
+            img = load_image(imfile)
+        img.source = imtype.upper()
     # Base node
     RL = scn.node_tree.nodes.new(type=RLayerNode)
     # Image node
     img_node = scn.node_tree.nodes.new(type=ImageNode)
     img_node.image = img
+    if imtype=='SEQUENCE':
+        img_node.frame_duration = len(imfile)
     # Mix node
     mix_node = scn.node_tree.nodes.new(type=MixNode)
     # Output
@@ -503,18 +686,27 @@ def add_img_background(imfile, imtype='FILE', scn=None):
     scn.node_tree.links.new(img_node.outputs['Image'], mix_node.inputs[1])
     scn.node_tree.links.new(mix_node.outputs['Image'], compositor_output.inputs['Image'])
 
-def set_material(proxy_ob, mat):
-    """Creates proxy objects for all sub-objects in a group & assigns a specific material to each"""
-    for g in proxy_ob.dupli_group.objects:
-        grab_only(proxy_ob)
-        if not g.type=='MESH':
-            continue
-        bpy.ops.object.proxy_make(object=g.name)
-        o = bpy.context.object
-        for ms in o.material_slots:
+def apply_material(obj, mat, material_slot=None, uv=True):
+    """Apply a material to an object"""
+    # Get object
+    grab_only(obj)
+    # assure at least one material slot
+    if len(obj.material_slots) == 0:
+        bpy.ops.object.material_slot_add()
+    # Apply to object
+    if material_slot is None:
+        for ms in obj.material_slots:
             ms.material = mat
-        # Get rid of proxy now that material is set
-        bpy.context.scene.objects.unlink(o)
+    else:
+        #try:
+        obj.material_slots[material_slot].material = mat
+        #except:
+        #    # Unclear what to do with this. 
+        #    obj.data.materials.append(mat)
+    if uv and obj.type == 'MESH':
+        bpy.ops.object.mode_set(mode='EDIT')
+        bpy.ops.uv.smart_project()
+        bpy.ops.object.mode_set(mode='OBJECT')
 
 def set_scene(scene_name=None):
     """Sets all blender screens in an open Blender session to scene_name
@@ -539,7 +731,7 @@ def apply_action(target_object, action_file, action_name):
     # get list of matching bones
     # for all matching bones, apply (matrix? position?) of first frame
 
-def set_up_group(ObList=None, scn=None):
+def set_up_group(ob_list=None, scn=None):
     """    
     Set a group of objects to canonical position (centered, facing forward, max dimension = 10)
     Position is defined relative to the BOTTOM, CENTER of the object (defined by the  bounding 
@@ -554,23 +746,31 @@ def set_up_group(ObList=None, scn=None):
     verbosity_level > 3
     if not scn:
         scn = bpy.context.scene # (NOTE: think about making this an input!)
-    if not ObList:
+    if bpy.app.version < (2, 80, 0):
+        update = scn.update
+    else:
+        update = bpy.context.view_layer.update        
+    if not ob_list:
         for o in scn.objects:
             # Clear out cameras and (ungrouped) 
-            if o.type in ['CAMERA', 'LAMP'] and not o.users_group:
+            if bpy.app.version < (2, 80, 0):
+                og = o.users_group
+            else:
+                og = o.users_collection
+            if o.type in ['CAMERA', 'LAMP'] and not og:
                 scn.objects.unlink(o)
-                scn.update()
-        ObList = list(scn.objects)
+                update()
+        ob_list = list(scn.objects)
     ToSet_Size = 10.0
     ToSet_Loc = (0.0, 0.0, 0.0)
     ToSet_Rot = 0.0
     # FIRST: Clear parent relationships
-    p = [o for o in ObList if not o.parent and not 'ChildOf' in o.constraints.keys()]
+    p = [o for o in ob_list if not o.parent and not 'ChildOf' in o.constraints.keys()]
     if len(p)>1:
         raise Exception('More than one parent in group! Now I commit Seppuku! Hi-YA!')
     else:
         p = p[0]
-    np = [o for o in ObList if o.parent or 'ChildOf' in o.constraints.keys()]
+    np = [o for o in ob_list if o.parent or 'ChildOf' in o.constraints.keys()]
     if p:
         for o in np:
             grab_only(o)
@@ -579,7 +779,7 @@ def set_up_group(ObList=None, scn=None):
                 o.constraints.remove(o.constraints['ChildOf'])
     
     # SECOND: Reposition all object origins 
-    (MinXYZ, MaxXYZ) = get_group_bounding_box(ObList)
+    (MinXYZ, MaxXYZ) = get_group_bounding_box(ob_list)
     BotMid = [(MaxXYZ[0]+MinXYZ[0])/2, (MaxXYZ[1]+MinXYZ[1])/2, MinXYZ[2]]
     set_cursor(BotMid)
     
@@ -591,23 +791,33 @@ def set_up_group(ObList=None, scn=None):
     if verbosity_level > 3: 
         print('resizing to %.2f; scale factor %.2f x orig. size %.2f'%(ToSet_Size, ScaleF, max(SzXYZ)))
     
-    for o in ObList:
+    for o in ob_list:
         grab_only(o)
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         o.scale = o.scale * ScaleF
         o.location = ToSet_Loc
         bpy.ops.object.transform_apply(rotation=True, scale=True, location=True)
 
-    scn.update()
+    update()
     # Re-parent everything
     for o in np:
         grab_only(p)
-        o.select = True
+        if bpy.app.version < (2, 80, 0):
+            o.select = True
+        else:
+            o.select_set(True)
         bpy.ops.object.parent_set()
     # Create group (if necessary) and name group
-    if not ObList[0].users_group:
-        for o in ObList:
-            o.select=True
+    if bpy.app.version < (2, 80, 0):
+        olg = ob_list[0].users_group
+    else:
+        olg = ob_list[0].users_collection
+    if not olg:
+        for o in ob_list:
+            if bpy.app.version < (2, 80, 0):
+                o.select = True
+            else:
+                o.select_set(True)
         bpy.ops.group.create(name=scn.name)
 
 def get_group_bounding_box(ob_list=None):
@@ -626,7 +836,10 @@ def get_group_bounding_box(ob_list=None):
     """
     bb_types = ['MESH', 'LATTICE', 'ARMATURE'] 
     if ob_list is None:
-        ob_list = [o for o in bpy.context.scene.objects if o.select]
+        if bpy.app.version < (2, 80, 0):
+            ob_list = [o for o in bpy.context.scene.objects if o.select]
+        else:
+            ob_list = [o for o in bpy.context.scene.objects if o.select_get()]
     BBx = list()
     BBy = list()
     BBz = list()
@@ -731,9 +944,9 @@ def get_collada_action(collada_file, act_name=None, scale=1.0):
 ### ---       Adding BVP elements to a scene        --- ###
 ###########################################################
 
-def AddCameraWithTarget(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.], Lens=50., Clip=(.1, 300.)):
+def add_camera_with_target(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.], Lens=50., Clip=(.1, 300.)):
     """
-    Usage: AddCameraWithTarget(scn, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.])
+    Usage: add_camera_with_target(scn, CamName='CamXXX', CamPos=[25, -25, 5], FixName='CamTarXXX', FixPos=[0., 0., 0.])
     Adds a camera to a scene with an empty named <FixName> 
     This is a bit quick & dirty - make sure it grabs the right "camera" data, that it's not duplicating names; also that the scene is handled well
     ML 2011.06.16
@@ -748,8 +961,13 @@ def AddCameraWithTarget(scn=None, CamName='CamXXX', CamPos=[25, -25, 5], FixName
     bpy.ops.object.add(type='EMPTY', location=FixPos)
     # Is this legit? Is there another way to do this??
     Fix = [o for o in scn.objects if o.type=='EMPTY'][0]
-    Fix.empty_draw_type = 'SPHERE'
-    Fix.empty_draw_size = .33
+    if bpy.app.version < (2, 80, 0):
+        Fix.empty_draw_type = 'SPHERE'
+        Fix.empty_draw_size = .33
+    else:
+        Fix.empty_display_type = 'SPHERE'
+        Fix.empty_display_size = .33
+
     Fix.name = FixName
     # Add camera constraint
     grab_only(Cam)
@@ -784,13 +1002,17 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
     AllowedTypes = ['LAMP'] # No curves for now...'CURVE', 
     # ESTABLISH SCENE TO WHICH STUFF MUST BE ADDED, STATE OF .blend FILE
     scn = bpy.context.scene # (NOTE: think about making this an input!)
+    if bpy.app.version < (2, 80, 0):
+        update = scn.update
+    else:
+        update = bpy.context.view_layer.update
     # This is dumb too... ???
     ScnNum = len(bpy.data.scenes)
     ScnListOld = [s.name for s in bpy.data.scenes]
     # APPEND SCENE CONTAINING LAMPS TO BE ADDED
     bpy.ops.wm.link_append(
-        directory=fpath+fname+"\\Scene\\", # i.e., directory WITHIN .blend file (Scenes / Objects)
-        filepath="//"+fname+"\\Scene\\"+scname, # local filepath within .blend file to the scene to be imported
+        directory=fpath+fname+"/Scene/", # i.e., directory WITHIN .blend file (Scenes / Objects)
+        filepath="//"+fname+"/Scene/"+scname, # local filepath within .blend file to the scene to be imported
         filename=scname, # "filename" being the name of the data block, i.e. the name of the scene.
         link=False, 
         relative_path=False, 
@@ -803,13 +1025,16 @@ def add_lamp(fname, scname, fpath=os.path.join(config.get('path', 'db_dir'), 'sk
 
     LampOut = list()
     # Make parent / master object the first object in the list: 
-    LampCt = 1
+    Lampct = 1
     for L in LampOb:
-        scn.objects.link(L)
+        if bpy.app.version < (2, 80, 0):
+            scn.objects.link(L)
+        else:
+            scn.collection.objects.link(L)
         LampOut.append(L)
-        LampCt += 1
+        Lampct += 1
     scn.world = nScn.world
-    scn.update()
+    update()
     bpy.data.scenes.remove(nScn)
     bpy.ops.object.select_all(action = 'DESELECT')
     for L in LampOut:
@@ -825,7 +1050,7 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
         print('Action already exists!')
     else:
         blendfile = os.path.join(fpath, fname)
-        section = "\\Action\\"
+        section = "/Action/"
         print('directory = '+ blendfile + section)
         print('filepath = ' + blendfile + section + action_name)
         print('filename = ' + action_name)
@@ -840,10 +1065,14 @@ def add_action(action_name, fname, fpath=os.path.join(config.get('path','db_dir'
     return a
 
 def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Object'), proxy=True):
-    """Add a proxy object for a Blender group to the current scene. 
+    """Add a Blender group to the current scene. 
 
     Add a group of Blender objects (all the parts of a single object, most likely) from another 
-    file to the current scene. 
+    file to the current scene. Optionally, add as a proxy object (all objects in the group 
+    lumped into a single object)
+
+    Use proxy = False if you wish to do any editing of the object
+    Use proxy = True if you just want the object as is in the original file
 
     Parameters
     ----------
@@ -853,42 +1082,56 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
         Name of group to import 
     fpath : string
         Path of directory in which .blend file resides
+    proxy : bool
+        Whether to add a proxy object (True) or full group (False)
     
     Notes
     -----
     Counts objects currently in scene and increments count.
     """ 
 
-    if name in bpy.data.groups:
-        
-        # TO DO: add:
-        # if proxy:
-        # else:
-
-        # Group already exists in file, for whatever reason
-        print('Found group! adding new object...')
-        # Add empty
-        bpy.ops.object.add() 
-        # Fill empty with dupli-group object of desired group
-        G = bpy.context.object
-        G.dupli_type = "GROUP"
-        G.dupli_group = bpy.data.groups[name]
-        G.name = name
+    #if (name in bpy.data.groups): # and proxy:
+    #    # Only add a dupli group if past group is proxy object?
+    #    
+    #    # Group already exists in file, for whatever reason
+    #    print('Found group! Adding new dupligroup object.')
+    #    # Add empty
+    #    bpy.ops.object.add() 
+    #    # Fill empty with dupli-group object of desired group
+    #    ob = bpy.context.object
+    #    ob.dupli_type = "GROUP"
+    #    ob.dupli_group = bpy.data.groups[name]
+    #    ob.name = name
+    #else:
+    #    print('Did not find group! Adding group to file.')
+    old_obs = list(bpy.context.scene.objects)
+    if bpy.app.version[1] < 80:
+        import_type = '/Group/'
+        kw = dict(instance_groups=proxy)
     else:
-        print('Did not find group! adding...')
-        old_obs = list(bpy.context.scene.objects)
-        bpy.ops.wm.append(
-            directory=os.path.join(fpath, fname)+"\\Group\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
-            filepath="//"+fname+"\\Group\\"+name, # local filepath within .blend file to the scene to be imported
-            filename=name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
-            link=proxy, 
-            #relative_path=False, 
-            autoselect=True, 
-            instance_groups=proxy)
-        new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
-        G  = find_group_parent(new_obs)
-        grab_only(G)
-    return G
+        import_type = '/Collection/'
+        kw = dict(instance_collections=proxy)
+    bpy.ops.wm.append(
+        directory=os.path.join(fpath, fname) + import_type, # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
+        filepath="//"+fname+import_type+name, # local filepath within .blend file to the scene to be imported
+        filename=name, 
+        # NOTE: "filename" is not the name of the file but the name 
+        # of the data block, i.e. the name of the group. 
+        # This stupid naming convention is due to Blender's API.
+        link=proxy, 
+        #relative_path=False, 
+        autoselect=True, 
+        **kw)
+    new_obs = [x for x in list(bpy.context.scene.objects) if not x in old_obs]
+    try:
+        ob  = find_group_parent(new_obs)
+        grab_only(ob)
+    except:
+        # HACK library objects in a group should have one parent
+        # object in that group. Some are broken. So fudge things
+        # for now. This should be changed when library is fixed.
+        ob = new_obs[0]
+    return ob
 
 # Belongs in Object or Shape
 def meshify(ob):
@@ -932,10 +1175,155 @@ def make_cube(name, mn, mx):
     ob = bpy.data.objects.new(name, mesh)
      
     #Set location and scene of object
-    #ob.location = bpy.context.scene.cursor_location
-    bpy.context.scene.objects.link(ob)
+    #ob.location = bpy.context.scene.cursor.location
+    if bpy.app.version < (2, 80, 0):
+        bpy.context.scene.objects.link(ob)
+    else:
+        bpy.context.scene.collection.objects.link(ob)
      
     #Create mesh
     mesh.from_pydata(verts, [], faces)
     mesh.update(calc_edges=True)
 
+def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
+               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
+               return_vertices=False, is_verbose=False):
+    """Highlight all vertices in a group with some color
+    
+    Parameters
+    ----------
+    obj : blender object
+        Object to be colorized
+    vertex_label : string or list/tuple of strings
+        Names (or parts of names) of vertex groups to colorize. 
+        These names must be IN the name of the vertex group (e.g. 
+        'Leg' will select vertex groups called "Right Leg" and 
+        "Right Lower Leg"). For tuples with more than one string,
+        logical AND is assumed.
+    weight_thresh : scalar  
+        threshold for vertex weights (some weights for vertex groups
+        are continuous from 0 to 1; this binarizes for labeling)
+    name : string
+        name of resulting material
+    color : 3-tuple
+        R,G,B values for color. 
+    bg_color : 3-tuple
+        background color. If provided, all materials are cleared
+        and whole mesh is set to bg_color at outset.
+    return_vertices : bool
+        whether to return blender vertices for the group that was
+        labeled.
+    """
+    if obj.hide:
+        return
+    # Get vertex group indices
+    vertex_groups = obj.vertex_groups
+    if not isinstance(vertex_label, (list, tuple)):
+        vertex_label = (vertex_label,)
+    for label in vertex_label:
+        # Implement ANDing across labels provided (e.g. for left AND hand)
+        vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
+    vertex_group_indices = [vg.index for vg in vertex_groups]
+
+    # Make new materials for fg and bg if necessary
+    if name in bpy.data.materials:
+        fg_mat = bpy.data.materials[name]
+        if not np.all(np.array(fg_mat.diffuse_color) == np.array(color)):
+           fg_mat.diffuse_color = color
+    else:
+        if is_verbose:
+            print('o Creating new material for %s'%name)
+        fg_mat = bpy.data.materials.new(name)
+        fg_mat.diffuse_color = color
+        fg_mat.diffuse_intensity = 1.0
+        fg_mat.use_shadeless = True
+
+    # Create & assign background color only if provided
+    if bg_color is not None:
+        if (name + '_bg') in bpy.data.materials:
+            bg_mat = bpy.data.materials[name + '_bg']
+            if not np.all(np.array(bg_mat.diffuse_color) == np.array(bg_color)):
+                bg_mat.diffuse_color = bg_color
+        else:
+            bg_mat = bpy.data.materials.new(name + '_bg')
+            bg_mat.diffuse_color = bg_color
+            bg_mat.diffuse_intensity = 1.0
+            bg_mat.use_shadeless = True
+
+        #Assign first material on all the mesh
+        if len(obj.material_slots) == 0:
+            bpy.ops.object.material_slot_add() # Add a material slot
+        #obj.data.materials.clear(update_data=True)
+        #bpy.ops.object.material_slot_add() #Add a material slot
+        obj.material_slots[0].material = bg_mat
+
+    # Deselect all
+    bpy.ops.object.editmode_toggle()  #Go in edit mode
+    bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
+    bpy.ops.object.editmode_toggle()  #Return in object mode
+
+    # Select vertices in specified group
+    vertices = []
+    for vg_idx in vertex_group_indices:
+        vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
+        vertices += vs
+
+    # Set up list to keep
+    any_vertex = False
+    n_vertices = 0
+    for v in vertices:
+        for vg in v.groups:
+            if vg.group in vertex_group_indices:
+                #print(vg.weight)
+                if vg.weight > weight_thresh:
+                    v.select = True
+                    n_vertices += 1
+                    any_vertex = True
+    if any_vertex:
+        islot = -1
+        if len(obj.material_slots) == 0:
+            #print('WITHIN LABEL_VERTEX_GROUP: Creating first material slot')
+            bpy.ops.object.material_slot_add() # Add a material slot
+            
+        empty_slot_count = 0
+        for i, mslot in enumerate(obj.material_slots):
+            if mslot.material is None:
+                empty_slot_count += 1
+                if empty_slot_count == 2:
+                    islot = i
+                    break
+            elif mslot.material.name == name:
+                islot = i
+                break
+        if islot == -1:
+            # Create new material slot
+            #print('WITHIN LABEL_VERTEX_GROUP: Creating second material slot')
+            bpy.ops.object.material_slot_add() # Add a material slot
+            obj.material_slots[-1].link = 'DATA'
+            islot = len(obj.material_slots) - 1
+
+        #print("> Using material slot %d"%islot)
+        mslot = obj.material_slots[islot]
+        mslot.material = fg_mat
+        obj.active_material_index = islot
+        #print("Active material is: ", obj.material_slots[islot].material.name)
+        bpy.ops.object.editmode_toggle()  # Go into edit mode
+
+        if is_verbose:
+            print("> Assigning %d vertices!"%n_vertices)
+        bpy.ops.object.material_slot_assign() # Assign the material on the selected vertices
+        bpy.ops.object.editmode_toggle()  # Return to object mode
+        # One-of BS for Ironman rig, which animates differently than
+        # other rigs
+        if obj.draw_type == 'WIRE':
+            obj.draw_type = 'TEXTURED'
+        # Un-hide objects with vertices that have been labeled
+        obj.hide_render = False
+    else:
+        print("-- no vertices detected. --")
+
+    if return_vertices:
+        # Change this to coordinates? 
+        return [v for v in vertices if v.select]
+    else:
+        return

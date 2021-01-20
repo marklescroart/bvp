@@ -78,7 +78,6 @@ if __name__ == "__main__":
                     'bvp.BlendFiles'],
           requires=['numpy', 'couchdb',],
           package_data={'bvp':[ 
-                            'options.cfg', # This may cause problems if it is not created yet.
                             'defaults.cfg',
                             ],
                         'bvp.BlendFiles':['*blend'],

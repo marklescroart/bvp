@@ -3,23 +3,22 @@ try:
     import configparser
 except ImportError:
     import ConfigParser as configparser
-# Fancier way of finding appropriate directories for config files 
-# in each OS (*nix, windows, whatever). Not done for now.
-#from . import appdirs
+# Find appropriate directories for config files 
+# in each OS (*nix, windows, whatever). 
+import appdirs
 
-cfg_dir = os.path.dirname(__file__)
-usercfg = os.path.join(cfg_dir, "options.cfg")
-# For fancy way:
-# userdir = appdirs.user_data_dir("bvp", "MarkLescroart") #(not sure if args here are right)
-# usercfg = os.path.join(userdir, "options.cfg")
+cwd = os.path.dirname(__file__)
+userdir = appdirs.user_config_dir("bvp", appauthor="MarkLescroart") #(not sure if args here are right)
+usercfg = os.path.join(userdir, "options.cfg")
 
 config = configparser.ConfigParser()
-config.readfp(open(os.path.join(cfg_dir, 'defaults.cfg')))
+config.read(os.path.join(cwd, 'defaults.cfg'))
 
-# the config.read(usercfg) call, even though it is an if statement,
-# reads in user-specific configuration file and overwrites defaults
-if len(config.read(usercfg)) == 0:
-    # For fancy way:
-    #os.makedirs(userdir)
+# Update defaults with user-sepecifed values in user config
+files_successfully_read = config.read(usercfg)
+
+# If user config doesn't exist, create it
+if len(files_successfully_read) == 0:
+    os.makedirs(userdir)
     with open(usercfg, 'w') as fp:
         config.write(fp)
