@@ -17,6 +17,7 @@ from .background import Background
 from .object import Object
 from .sky import Sky
 from .shadow import Shadow
+from .constraint import ObConstraint, CamConstraint
 from .. import utils
 from ..options import config
 
@@ -161,8 +162,8 @@ class Scene(MappedClass):
         act_contains_z_origin = act.max_xyz[2] >= 0 >= act.min_xyz[2]
         tmp_ob = Object()
         tmp_ob.action = act
-        const = bg.obConstraints
-        tmp_ob.size3D = min(bg.obConstraints.Sz[2],bg.obConstraints.Sz[3])
+        const = bg.object_constraints
+        tmp_ob.size3D = min(bg.object_constraints.Sz[2],bg.object_constraints.Sz[3])
         max_pos = tmp_ob.max_xyz_pos
         min_pos = tmp_ob.min_xyz_pos
         X_OK, Y_OK, Z_OK, r_OK = [True,True,True, True]
@@ -205,13 +206,13 @@ class Scene(MappedClass):
 
     
     def populate(self, object_list, 
-                       reset_camera=True, 
-                       image_position_count=None, 
-                       edge_dist=0., 
-                       object_overlap=0.50, 
-                       MinSz2D=0, 
-                       raise_error=False, 
-                       n_iter=50):
+                reset_camera=True, 
+                image_position_count=None, 
+                edge_dist=0., 
+                object_overlap=0.50, 
+                min_size_2d=0, 
+                raise_error=False, 
+                n_iter=50):
         """Choose positions for all objects in "object_list" input within the scene, 
         according to constraints provided by scene background.
         
@@ -225,34 +226,40 @@ class Scene(MappedClass):
 
         from random import shuffle
         if not image_position_count:
-            image_position_count = utils.math.ImPosCount(0, 0, ImSz=1., nBins=5, e=1)
-        attempt = 1
+            image_position_count = utils.math.ImPosCount(0, 0, image_size=1., n_bins=5, e=1)
+        attempt = 0
         done = False
-        while attempt<=n_iter and not done:
+        while (attempt <= n_iter) and not done:
             fail = False
             objects_to_add = []
-            #if verbosity_level > 3:
-            #    print('### --- Running populate_scene, attempt %d --- ###'%attempt)
+            print('### --- Running populate_scene, attempt %d --- ###'%attempt)
             if reset_camera:
                 # Start w/ random camera, fixation position
-                cPos = self.background.CamConstraint.sample_cam_pos(self.frame_range) #TODO fix
-                fPos = self.background.CamConstraint.sample_fix_location(self.frame_range,obj=objects_to_add)
+                camera_location = self.background.CamConstraint.sample_camera_location(self.frame_range) #TODO fix
+                fixation_location = self.background.CamConstraint.sample_fixation_location(self.frame_range, obj=objects_to_add)
+                self.camera = Camera(location=camera_location, 
+                                     fix_location=fixation_location, 
+                                     frames=self.frame_range, 
+                                     lens=self.background.lens)
             # Multiple object constraints for moving objects
-            OC = []
+            current_object_constraints = []
             for ob in object_list:
                 # Randomly cycle through object constraints (in case there are multiple exclusive possible locations for an object)
-                self.camera = Camera(location=cPos, fix_location=fPos, frames=self.frame_range, lens=self.background.lens)
-                if not OC:
-                    if type(self.background.obConstraints) is list:
-                        OC = copy.copy(self.background.obConstraints)
+                
+                if not current_object_constraints:
+                    if type(self.background.object_constraints) is list:
+                        current_object_constraints = copy.copy(self.background.object_constraints)
                     else:
-                        OC = [copy.copy(self.background.obConstraints)]
-                    shuffle(OC)
-                oc = OC.pop()
-                new_ob = copy.copy(ob) # resets size each iteration as well as position
+                        current_object_constraints = [copy.copy(self.background.object_constraints)]                    
+                    shuffle(current_object_constraints)
+                    current_object_constraints = [ObConstraint(**x) for x in current_object_constraints]
+                this_constraint = current_object_constraints.pop()
+                # reset size each iteration as well as position
+                new_ob = copy.copy(ob)
                 if new_ob.action is not None:
                     is_compatible = self.check_compatibility(self.background, new_ob.action, raise_error=raise_error)
-                    if not is_compatible: #Check if it is even possible to use the action
+                    # Check if it is even possible to use the action
+                    if not is_compatible: 
                         if raise_error:
                             raise Exception('Action' + new_ob.action.name +'is incompatible with bg' + self.background.name)
                         pass
@@ -266,13 +273,13 @@ class Scene(MappedClass):
                 if not ob.size3D:
                     # OR: Make real-world size the default??
                     # OR: Choose objects by size??
-                    new_ob.size3D = oc.sampleSize()
+                    new_ob.size3D = this_constraint.sampleSize()
                 if not ob.rot3D:
                     # NOTE: This is fixing rotation of objects to be within 90 deg of facing camera
-                    new_ob.rot3D = oc.sampleRot(self.camera)
+                    new_ob.rot3D = this_constraint.sampleRot(self.camera)
                 if not ob.pos3D:
                     # Sample position last (depends on camera position, It may end up depending on pose, rotation, (or action??)
-                    new_ob.pos3D, new_ob.pos2D = oc.sampleXY(new_ob, self.camera, obstacles=obstacles, edge_dist=edge_dist, object_overlap=object_overlap, raise_error=False, image_position_count=image_position_count, MinSz2D=MinSz2D)
+                    new_ob.pos3D, new_ob.pos2D = this_constraint.sampleXY(new_ob, self.camera, obstacles=obstacles, edge_dist=edge_dist, object_overlap=object_overlap, raise_error=False, image_position_count=image_position_count, min_size_2d=min_size_2d)
                     if new_ob.pos3D is None:
                         fail = True
                         break
@@ -289,8 +296,8 @@ class Scene(MappedClass):
         self.objects = objects_to_add
         # Make sure last fixation hasn't "wandered" away from objects: 
         
-        # fPosFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
-        # self.camera.fix_location = self.camera.fix_location[:-1]+[fPosFin[0], ]
+        # fixation_locationFin = self.background.CamConstraint.sample_fix_location((1, ), obj=self.objects)
+        # self.camera.fix_location = self.camera.fix_location[:-1]+[fixation_locationFin[0], ]
 
     def get_occlusion(self):
         """

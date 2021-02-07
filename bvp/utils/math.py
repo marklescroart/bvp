@@ -340,8 +340,6 @@ def get_camera_matrix(camera_location,
             [0., 0., 1.]])
 
     camera_matrix = x_rot * y_rot * z_rot
-    #print("Camera matrix:")
-    #print(camera_matrix)
     return camera_matrix    
 
 def perspective_projection(location, 
@@ -523,66 +521,71 @@ def aim_camera(object_location,
     
 
 class ImPosCount(object):
-    """
-    Class to store a count of how many times objects have appeared in each of (n x n) bins in an image
-    Counts are used to draw new positions (the probability of drawing a given position is inversely 
-    proportional to the number of times that position has occurred already)
+    def __init__(self, x_bin_edges, y_bin_edges, image_size, n_bins=None, e=1):
+        """
+        Class to store a count of how many times objects have appeared in each of (n x n) bins in an image
+        Counts are used to draw new positions (the probability of drawing a given position is inversely 
+        proportional to the number of times that position has occurred already)
 
-    Inputs:
-    xBin - x bin edges (or, r bin edges)
-    yBin - y bin edges (or, theta bin edges)
+        Parameters
+        ----------
+        x_bin_edges : list
+            x bin edges (or, r bin edges, for polar coordinates)
+        y_bin_edges : list
+            y bin edges (or, theta bin edges, for polar coordinates)
+        image_size : scalar
+            size of each dimesion of the image (scalar) (thus, the image is assumed to be square)
+        n_bins : scalar
+            number of bins per dimension of image (scalar) (image is assumed to be square)
+        e : scalar
+            am't (exponent) by which to increase the probability of drawing an under-represented location
 
-    image_size - size of each dimesion of the image (scalar) (thus, the image is assumed to be square)
-    nBins - number of bins per dimension of image (scalar) (image is assumed to be square)
-    e - am't (exponent) by which to increase the probability of drawing an under-represented location
-
-    NOTES: 
-    * for now, nBins and image_size are both scalar** 2012.03.15
-    * it seems that this could be used for radial bins as well with some minor modification
-    ** i.e., just by specifying r and theta values for xBin, yBin instead of x, y values
-    """
-    def __init__(self, xBin, yBin, image_size, nBins=None, e=1):
-        if nBins:
-            self.xBin = np.linspace(0, image_size, nBins+1)
-            self.yBin = np.linspace(0, image_size, nBins+1)
-            self.nBins = nBins**2
+        Notes
+        -----
+        * for now, n_bins and image_size are both scalar** 2012.03.15
+        * it seems that this could be used for radial bins as well with some minor modification
+        ** i.e., just by specifying r and theta values for x_bin_edges, y_bin_edges instead of x, y values
+        """        
+        if n_bins:
+            self.x_bin_edges = np.linspace(0, image_size, n_bins+1)
+            self.y_bin_edges = np.linspace(0, image_size, n_bins+1)
+            self.n_bins = n_bins**2
         else:
-            self.nBins = (len(xBin)-1)*(len(yBin)-1)
-            self.xBin = xBin
-            self.yBin = yBin
+            self.n_bins = (len(x_bin_edges)-1)*(len(y_bin_edges)-1)
+            self.x_bin_edges = x_bin_edges
+            self.y_bin_edges = y_bin_edges
         self.e = e
-        self.hst = np.zeros((len(self.xBin)-1, len(self.yBin)-1))
+        self.hst = np.zeros((len(self.x_bin_edges)-1, len(self.y_bin_edges)-1))
 
     def updateXY(self, X, Y):
-        """
-        Update 2D histogram count with one X, Y value pair
+        """Update 2D histogram count with one X, Y value pair
         """
         if not isinstance(X, list):
             X = [X]
         if not isinstance(Y, list):
             Y = [Y]
-        hstNew = np.histogram2d(Y, X, (self.xBin, self.yBin))[0]
+        hstNew = np.histogram2d(Y, X, (self.x_bin_edges, self.y_bin_edges))[0]
         self.hst += hstNew
 
     def sampleXY(self):
         # One: pull one random sample within each spatial bin
         # NOTE: This won't work with non-uniform bins! fix??
-        xp = np.random.rand()*(self.xBin[1]-self.xBin[0])
-        yp = np.random.rand()*(self.yBin[1]-self.yBin[0])
+        xp = np.random.rand()*(self.x_bin_edges[1]-self.x_bin_edges[0])
+        yp = np.random.rand()*(self.y_bin_edges[1]-self.y_bin_edges[0])
         # Two: Choose one of those values with probability self.<one of the p values>
         # (look up efficient sampling of multinomial distributions:)
         # http://psiexp.ss.uci.edu/research/teachingP205C/205C.pdf
         # Take cumulative dist:
-        #cumP = np.cumsum(self.pInv)
+        #cumP = np.cumsum(self.p_inv)
         #cumP = np.cumsum(self.adjPinv)
-        idx = np.arange(self.nBins) # necessary?
+        idx = np.arange(self.n_bins) # necessary?
         cumP = np.cumsum(self.noisyAdjPinv)
         # ... and sample that:
         r = np.random.rand()
         i = min(np.nonzero(r<cumP)[0])
         keep = idx[i]
-        yAdd = self.yBin[int( np.floor(keep/(len(self.yBin)-1)) )]
-        xAdd = self.xBin[int( np.mod(keep, len(self.xBin)-1) )]
+        yAdd = self.y_bin_edges[int( np.floor(keep/(len(self.y_bin_edges)-1)) )]
+        xAdd = self.x_bin_edges[int( np.mod(keep, len(self.x_bin_edges)-1) )]
         x = xp+xAdd
         y = yp+yAdd
         return make_blender_safe(x, 'float'), make_blender_safe(y, 'float')
@@ -590,18 +593,18 @@ class ImPosCount(object):
     @property
     def p(self):
         if np.all(self.hst==0):
-            #return make_blender_safe(np.ones(self.hst.shape)/float(np.sum(np.ones(self.hst.shape))))
-            return np.ones(self.hst.shape)/float(np.sum(np.ones(self.hst.shape)))
+            return np.ones(self.hst.shape) / float(np.sum(np.ones(self.hst.shape)))
         else:
-            return self.hst/float(np.sum(self.hst))
+            return self.hst / float(np.sum(self.hst))
+
     @property
-    def pInv(self):
+    def p_inv(self):
         pI = np.max(self.p)-self.p
         if np.all(pI==0):
-            return np.ones(self.hst.shape)/float(self.nBins)
+            return np.ones(self.hst.shape)/float(self.n_bins)
         else:
-            pInv = pI/np.sum(pI)
-            return pInv
+            p_inv = pI/np.sum(pI)
+            return p_inv
 
     @property
     def adjP(self):
@@ -616,17 +619,19 @@ class ImPosCount(object):
 
     @property
     def adjPinv(self):
-        aa = (self.pInv**self.e)
-        bb = np.sum(self.pInv**self.e)
+        aa = (self.p_inv**self.e)
+        bb = np.sum(self.p_inv**self.e)
         return aa/bb
 
     @property
     def noisy_posinv(self):
-        # Add noise to allow not exactly flat distribution
-        # (A flat distribution would REQUIRE filling in one of each bin each iteration
-        # through the bins, which would be too strict a condition for scenes with stuff
-        # in them.)
-        p = self.pInv + np.random.randn(self.nBins**.5, self.nBins**.5)*.001
+        """Add noise to allow not exactly flat distribution
+
+        (A flat distribution would REQUIRE filling in one of each bin each iteration
+         through the bins, which would be too strict a condition for scenes with stuff
+         in them.)
+        """
+        p = self.p_inv + np.random.randn(self.n_bins**.5, self.n_bins**.5)*.001
         p -= np.min(p)
         p /= np.sum(p)
         return p
@@ -635,7 +640,7 @@ class ImPosCount(object):
     def noisyAdjPinv(self):
         p = self.adjPinv #.flatten()
         # The minimum here effectively sets the minimum likelihood for drawing a position.
-        n = np.random.randn(int(self.nBins**.5), int(self.nBins**.5))*.001
+        n = np.random.randn(int(self.n_bins**.5), int(self.n_bins**.5))*.001
         p += n
         p -= np.min(p)
         p /= np.sum(p)
@@ -645,13 +650,20 @@ class ImPosCount(object):
 def line_plane_intersection(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
     """Find intersection of line with a plane.
 
-    Line is specified by two points L0 and L1, each of which is a
-    list / tuple of (x, y, z) values.
-    P0 is a point on the plane, and n is the normal of the plane.
-    default is a flat floor at z=0 (P0 = (0, 0, 0), n = (0, 0, 1))
+    Parameters
+    ----------
+    L0 : array-like (list or tuple)
+        First point on the line, (x, y, z)
+    L1 : array-like (list or tuple)
+        Second point on the line, (x, y, z)
+    P0 : array-like (list or tuple)
+        Point on the plane, (x, y, z)
+    n : array-like (list or tuple)
+        the normal of the plane, (x, y, z)
 
     Notes
     -----
+    default is a flat floor at z=0 (P0 = (0, 0, 0), n = (0, 0, 1))
     For formulas / more description, see:
     http://en.wikipedia.org/wiki/Line-plane_intersection
     """
