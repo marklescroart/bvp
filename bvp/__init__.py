@@ -298,9 +298,9 @@ def blend(script, blend_file=None, is_local=True, blender_binary=None,
         
     else:
         try:
-            from vm_tools.slurm_utils import run_script as _cluster
+            from slurm_utils import run_script as _cluster
         except:
-            print("No cluster code available. Fix dependency on vm_tools.")
+            print("No cluster code available. Please install slurm_utils (https://github.com:piecesofmindlab/slurm_utils).")
 
         # Call via cluster
         #if is_verbose:
