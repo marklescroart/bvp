@@ -71,7 +71,7 @@ def atand(theta):
     return np.degrees(np.arctan(theta))
 
 
-def sph2cart(r, az, elev):
+def sph2cart(r, az, elev, origin=None):
     """Convert spherical to cartesian coordinates
 
     Parameters
@@ -82,15 +82,22 @@ def sph2cart(r, az, elev):
         azimuth angle in degrees
     elev : scalar or array-like
         elevation angle in degrees
+    origin : array-like
+        [x,y,z] coordinates for origin around which r, az, & el are specified
     """
-    z = r * sind(elev);
-    rcoselev = r * cosd(elev);
-    x = rcoselev * cosd(az);
-    y = rcoselev * sind(az);
+    z = r * sind(elev)
+    rcoselev = r * cosd(elev)
+    x = rcoselev * cosd(az)
+    y = rcoselev * sind(az)
+    if origin is not None:
+        xo, yo, zo = origin
+        x += xo
+        y += yo
+        z += zo
     return x, y, z
 
 
-def cart2sph(x, y, z, degrees=True):
+def cart2sph(x, y, z, degrees=True, origin=None):
     """Convert cartesian to spherical coordinates
 
     Parameters
@@ -99,7 +106,14 @@ def cart2sph(x, y, z, degrees=True):
         X, Y, and Z coordinates to be converted
     degrees : bool
         whether to convert radians to degrees (True= result in degrees, False = result in radians)
+    origin : array-like
+        x, y, z coordinates of origin around which to give r, theta, and phi
     """
+    if origin is not None:
+        xo, yo, zo = origin
+        x -= xo
+        y -= yo
+        z -= zo
     r = (x**2 + y**2 + z**2)**0.5
     theta = np.arctan2(y, x)
     phi = np.arcsin(z / r)
@@ -109,6 +123,31 @@ def cart2sph(x, y, z, degrees=True):
         return r, theta, phi
 
 
+def arc_pos(radius, n_points, theta_start, theta_fin, x_center=0, y_center=0):
+    """Return linearly spaced points along an arc of a circle
+    
+    Parameters
+    ----------
+    radius : scalar
+        radius of arc
+    n_points : int
+        number of points along the arc
+    theta_start : scalar
+        angle to start 
+    theta_fin : scalar
+        angle to finish
+    x_center : scalar
+        x center of arc
+    y_center : scalar
+        y center of arc
+    """
+    theta = np.linspace(np.radians(theta_start),
+                        np.radians(theta_fin), n_points)
+    x = radius * np.sin(theta) + x_center
+    y = radius * np.cos(theta) + y_center
+    return np.vstack([x, y]).T
+
+    
 def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
     '''Return points in a circle. 
     
@@ -677,8 +716,8 @@ def line_plane_intersection(L0, L1, P0=(0., 0., 0.), n=(0., 0., 1.)):
     d = np.dot((P0 - L0).T, n) / np.dot(L.T, n)
     # Intersection should be at [0, -2, -0]...
     # Take that, multiply it by L, add it to L0
-    Intersection = lst(L*d + L0)
-    return Intersection
+    intersection = lst(L*d + L0)
+    return intersection
 
 
 def mat2eulerXYZ(mat):

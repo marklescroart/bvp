@@ -4,6 +4,7 @@ Class for general constraints on random distributions.
 # Imports
 import sys
 import copy
+import random
 import numpy as np
 import bvp.utils as bvpu
 from bvp.Classes.object import Object # Should this be here...? Unclear. 
@@ -363,7 +364,7 @@ class ObConstraint(PosConstraint):
                         value[3]-=Sz/2. # decrease max by Sz/2
                 print(pNm + '='+ str(value))
                 setattr(tmpC, pNm, value)
-            TmpPos = tmpC.sampleXYZ()
+            tmp_pos = tmpC.sampleXYZ()
             bound_ok_3d, ob_dist_ok_3d = self.checkXYZS_3D(obj, obstacles=obstacles)
             edge_ok_2d, ob_dist_ok_2d = self.checkXYZS_2D(obj, camera, obstacles=obstacles, edge_dist=edge_dist, object_overlap=object_overlap)
             SzOK_2D = self.check_size_2d(obj, camera, min_size_2d)
@@ -372,14 +373,14 @@ class ObConstraint(PosConstraint):
                 tmp_ob = obj
                 tmp_ip_top, tmp_ip_bot, tmp_ip_L, tmp_ip_r = bvpu.math.perspective_projection(tmp_ob, camera, image_size=(1., 1.))
                 image_position = [np.mean([tmp_ip_r[0], tmp_ip_L[0]]), np.mean([tmp_ip_bot[1], tmp_ip_top[1]])]
-                return TmpPos, image_position
+                return tmp_pos, image_position
             else:
                 if verbosity_level > 9:
                     Reason = ''
                     if not all(ob_dist_ok_3d):
                         Add = 'Bad 3D Dist!\n'
                         for iO, O in enumerate(obstacles):
-                            Add += 'Dist %d = %.2f, Sz = %.2f\n'%(iO, bvpu.math.vecDist(TmpPos, O.pos3D), O.size3D)
+                            Add += 'Dist %d = %.2f, Sz = %.2f\n'%(iO, bvpu.math.vecDist(tmp_pos, O.pos3D), O.size3D)
                         Reason += Add
                     if not all(ob_dist_ok_2d):
                         Add = 'Bad 2D Dist!\n'
@@ -462,9 +463,9 @@ class ObConstraint(PosConstraint):
                                                          camera_fov=None,
                                                          camera_lens=camera.lens,)
             oPosUp = bvpu.math.line_plane_intersection(camera.location[0], oPosZ, P0=(0, 0, Zbase+Sz/2.))
-            TmpPos = oPosUp
-            TmpPos[2] -= Sz/2.
-            tmp_ob = Object(pos3D=TmpPos, size3D=Sz, action = obj.action)
+            tmp_pos = oPosUp
+            tmp_pos[2] -= Sz/2.
+            tmp_ob = Object(pos3D=tmp_pos, size3D=Sz, action = obj.action)
             # Check on 3D bounds
             bound_ok_3d, ob_dist_ok_3d = self.checkXYZS_3D(tmp_ob, obstacles=obstacles)
            # bound_ok_3d = [True for i in bound_ok_3d] #Adding these for debugging purposes. Make sure to remove later
@@ -478,20 +479,20 @@ class ObConstraint(PosConstraint):
 
             if all(ob_dist_ok_3d) and all(ob_dist_ok_2d) and edge_ok_2d and all(bound_ok_3d) and SzOK_2D:
                 TooClose = False
-                TmpPos = bvpu.basics.make_blender_safe(TmpPos, 'float')
+                tmp_pos = bvpu.basics.make_blender_safe(tmp_pos, 'float')
                 if verbosity_level > 7:
                     print('\nFinal image positions:')
                     for ii, dd in enumerate(obstPos2D_List):
                         print('ObPosX, Y=(%.2f, %.2f), ObstPosX, Y=%.2f, %.2f, D=%.2f'%(Tmpimage_position[1], Tmpimage_position[0], dd[1], dd[0], Dist_List[ii]))
                         print('ObSz = %.2f, ObstSz = %.2f, Dthresh = %.2f\n'%(ObjSz2D, ObstSz_List[ii], Dthresh_List[ii]))
-                return TmpPos, image_position
+                return tmp_pos, image_position
             else:
                 if verbosity_level > 9000: #TODO: Temporarily disabled because it is outdated, and breaks things
                     Reason = ''
                     if not all(ob_dist_ok_3d):
                         Add = 'Bad 3D Dist!\n'
                         for iO, O in enumerate(obstacles):
-                            Add += 'Dist %d = %.2f, Sz = %.2f\n'%(iO, bvpu.math.vecDist(TmpPos, O.pos3D), O.size3D)
+                            Add += 'Dist %d = %.2f, Sz = %.2f\n'%(iO, bvpu.math.vecDist(tmp_pos, O.pos3D), O.size3D)
                         Reason += Add
                     if not all(ob_dist_ok_2d):
                         Add = 'Bad 2D Dist!\n'
@@ -559,11 +560,12 @@ class CamConstraint(PosConstraint):
         fixY=(0., 3., -3., 3.), 
         fixZ=(2., .5, .0, 3.5), 
         speed=(3., 1., 0., 6.), 
+        max_path_angle=30,
         pan=True, 
         zoom=True):
         """
         Extension of PosConstraint to have:/
-        *camera speed (measured in Blender Units*) per second (assumes 15 fps)
+        *camera speed (measured in Blender Units*) per second, takes fps as input
         *pan / zoom constraints (True/False for whether pan/zoom are allowed)
 
         for pan, constrain radius
@@ -592,7 +594,7 @@ class CamConstraint(PosConstraint):
         S = 'CamConstraint:\n'+self.__dict__.__repr__()
         return(S)
 
-    def sample_fixation_location(self, frames=None, obj=None):
+    def sample_fixation_location(self, frames=None, obj=None, method='mean'):
         """
         Sample fixation positions. Returns a list of (X, Y, Z) position tuples, nFrames long
 
@@ -600,7 +602,6 @@ class CamConstraint(PosConstraint):
         More constraints? max angle to change wrt camera? fixation change speed constraints?
         """
         #TODO : Why did this break?
-        method = 'mean'
         fix_location = list()
         for ii in range(len(frames)):
             # So far: No computation of how far apart the frames are, so no computation of how fast the fixation point is moving. ADD??
@@ -624,20 +625,29 @@ class CamConstraint(PosConstraint):
             fix_location.append(Tmpfix_location)
         return fix_location
 
-    def sample_camera_location(self, frames=None):
-        """
-        Sample nFrames positions (X, Y, Z) from position distribution given spherical / XYZ position constraints, 
-        as well as camera motion constraints (speed, pan/zoom, nFrames)
+    def sample_camera_location(self, frames=None, fps=15, n_attempts=1000, n_samples=500):
+        """Sample a new camera position given constraints on position and movement
 
-        Returns a list of (x, y, z) positions for each keyframe in "frames"
+        Parameters
+        ----------
+        frames : list
+            list of frames at which to sample a new camera location
+        fps : scalar, int
+            desired frame rate of movie
+        n_attempts : scalar, int
+            number of attempts to try to get a whole trajectory
+        n_samples : scalar, int
+            number of positions to sample for each frame to find an acceptable next frame within the constraints
 
-        NOTE: 
-        ONLY tested up to 2 frames (i.e., len(frames)==2) as of 2012.02.15
+        Returns
+        -------
+        List of (x, y, z) positions for each keyframe in "frames"
+
+        Notes
+        -----
+        Only tested up to 2 frames (i.e., len(frames)==2) as of 2012.02.15
         """
-        fps = 15.
         theta_offset = 270.
-        n_attempts = 1000 # Number of times to try to get whole trajectory
-        n_samples = 500 # Number of positions to sample for each frame to find an acceptable next frame (within constraints)
         failed = True
         ct = 0
         while failed and ct < n_attempts:
@@ -646,29 +656,39 @@ class CamConstraint(PosConstraint):
             for ifr, fr in enumerate(frames):
                 if ifr==0: 
                     # For first frame, simply get a position
-                    TmpPos = self.sampleXYZ()
+                    tmp_pos = self.sampleXYZ()
                 else:
-                    newR, newTheta, newPhi = bvpu.math.cart2sph(TmpPos[0]-self.origin[0], TmpPos[1]-self.origin[1], TmpPos[2]-self.origin[2])
-                    if verbosity_level > 5: print('computed first theta to be: %.3f'%(newTheta))
-                    newTheta = bvpu.math.circ_dist(newTheta-270., 0.) # account for offset
-                    if verbosity_level > 5: print('changed theta to: %.3f'%(newTheta))
+                    newR, newTheta, newPhi = bvpu.math.cart2sph(tmp_pos[0]-self.origin[0], tmp_pos[1]-self.origin[1], tmp_pos[2]-self.origin[2])
+                    if verbosity_level > 5: 
+                        print('computed first theta to be: %.3f'%(newTheta))
+                    newTheta = bvpu.math.circ_dist(newTheta - theta_offset, 0.)
+                    if verbosity_level > 5: 
+                        print('changed theta to: %.3f'%(newTheta))
                     """ All bvpu.math.cart2sph need update with origin!! """
-                    if self.speed:
+                    if self.speed is not None:
                         # Compute n_samples positions in a circle around last position
                         # If speed has a distribution, this will potentially allow for multiple possible positions
-                        Rad = [self.sample_w_constr(*self.speed) * (fr-frames[ifr-1])/fps for x in range(n_samples)]
+                        radii_from_original_pos = [self.sample_w_constr(*self.speed) * (fr-frames[ifr-1]) / fps for x in range(n_samples)]
                         # cpos will give potential new positions at allowable radii around original position
-                        cpos = bvpu.math.circle_pos(Rad, n_samples, TmpPos[0], TmpPos[1]) # Gives x, y; z will be same
+                        cpos = bvpu.math.circle_pos(radii_from_original_pos, n_samples, tmp_pos[0], tmp_pos[1]) # Gives x, y; z will be same
+                        if (self.max_path_angle is not None) and (ifr > 1):
+                            # Optionally smooth angle trajectory
+                            vector = np.array(location[ifr-1]) - np.array(location[ifr-2])
+                            current_angle = np.degrees(np.arctan2(*vector[:2]))
+                            theta_min = current_angle - self.max_path_angle
+                            theta_max = current_angle + self.max_path_angle
+                            cpos = bvpu.math.arc_pos(radii_from_original_pos, n_samples, theta_min, theta_max, tmp_pos[0], tmp_pos[1]) # Gives x, y; z will be same
                         if self.X:
-                            # Clip new positions if they don't satisfy original Cartesian constraints:
-                            nPosXYZ = [xx+[location[ifr-1][2]] for xx in cpos if (self.X[2]<=xx[0]<=self.X[3]) and (self.Y[2]<=xx[1]<=self.Y[3])]
+                            # Remove sampled new positions if they don't satisfy original Cartesian constraints:
+                            old_pos = location[ifr-1]
+                            new_xyz = [np.hstack([xy, old_pos[2]]) for xy in cpos if (self.X[2]<=xy[0]<=self.X[3]) and (self.Y[2]<=xy[1]<=self.Y[3])]
                             # Convert to spherical coordinates for later computations to allow zoom / pan
-                            nPosSphBl = [bvpu.math.cart2sph(xx[0]-self.origin[0], xx[1]-self.origin[1], xx[2]-self.origin[2]) for xx in nPosXYZ]
+                            nPosSphBl = [bvpu.math.cart2sph(*xyz, origin=self.origin) for xyz in new_xyz]
                             nPosSphCs = [[xx[0], bvpu.math.circ_dist(xx[1]-theta_offset, 0.), xx[2]] for xx in nPosSphBl]
                         elif self.theta:
                             # Convert circle coordinates to spherical coordinates (for each potential new position)
                             # "Bl" denotes un-corrected Blender coordinate angles (NOT intuitive angles, which are the units for constraints)
-                            nPosSphBl = [bvpu.math.cart2sph(cpos[ii][0]-self.origin[0], cpos[ii][1]-self.origin[1], location[ifr-1][2]-self.origin[2]) for ii in range(n_samples)]
+                            nPosSphBl = [bvpu.math.cart2sph(cpos[ii][0], cpos[ii][1], location[ifr-1][2], origin=self.origin) for ii in range(n_samples)]
                             # returns r, theta, phi
                             # account for theta offset in original conversion from spherical to cartesian
                             # "Cs" means this is now converted to units of constraints
@@ -679,8 +699,8 @@ class CamConstraint(PosConstraint):
                             # correct distance away and in permissible positions wrt the original constraints
                     else: 
                         # If no speed is specified, just sample from original distribution again
-                        nPosXYZ = [self.sampleXYZ() for x in range(n_samples)]
-                        nPosSphBl = [bvpu.math.cart2sph(xx[0]-self.origin[0], xx[1]-self.origin[1], xx[2]-self.origin[2]) for xx in nPosXYZ]
+                        new_xyz = [self.sampleXYZ() for x in range(n_samples)]
+                        nPosSphBl = [bvpu.math.cart2sph(*xyz, origin=self.origin) for xyz in new_xyz]
                         nPosSphCs = [[xx[0], bvpu.math.circ_dist(xx[1]-theta_offset, 0.), xx[2]] for xx in nPosSphBl]
                     
                     # Now filter sampled positions (nPosSphCs) by pan/zoom constraints
@@ -702,17 +722,17 @@ class CamConstraint(PosConstraint):
                         rDist = [abs(newR-xx[0]) for xx in nPosSphCs]
                         pPosSphCs = [nPosSphCs[ii] for ii, xx in enumerate(rDist) if xx < WiggleThresh]             
                     else:
-                        raise Exception('Something done got fucked up. This line should never be reached.')
-                    if not pPosSphCs:
+                        raise Exception('This is a sad state of affairs. This line should never be reached.')
+                    
+                    # Keep one sampled position or loop again if no samples
+                    if len(pPosSphCs) == 0:
                         # No positions satisfy constraints!
                         break
                     else:
                         # Sample pPos (spherical coordinates for all possible new positions)    
-                        TmpPosSph = pPosSphCs[np.random.randint(0, len(pPosSphCs)-1)]
-                        r1, theta1, phi1 = TmpPosSph;
-                        TmpPos = bvpu.math.sph2cart(r1, theta1+theta_offset, phi1)
-                        TmpPos = [aa+bb for (aa, bb) in zip(TmpPos, self.origin)]
-                location.append(TmpPos)
+                        r1, theta1, phi1 = random.choice(pPosSphCs)
+                        tmp_pos = bvpu.math.sph2cart(r1, theta1+theta_offset, phi1, origin=self.origin)
+                location.append(tmp_pos)
                 if fr==frames[-1]:
                     failed=False
         if failed:
