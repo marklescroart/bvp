@@ -112,12 +112,7 @@ class ObConstraint(PosConstraint):
     def __init__(self, X=None, Y=None, Z=None, 
                 theta=(None, None, 0., 360.), phi=(0., 0., 0., 0.), r=(0., 5., -25., 25.), 
                 origin=(0., 0., 0.), sz=(6., 1., 3., 10.), Zrot=(None, None, -180., 180.)):
-        """
-        Usage: ObConstraint(X=None, Y=None, Z=None, 
-                theta=(None, None, 0., 360.), phi=(0., 0., 0., 0.), r=(0., 5., -25., 25.), 
-                origin=(0., 0., 0.), Sz=(6., 1., 3., 10.), zRot=(None, None, -180., 180.))
-
-        Class to store 3D position constraints for objects
+        """Class to store 3D position constraints for objects
 
         All inputs (X, Y, ...) are 4-element lists: [Mean, Std, Min, Max]
         For rectangular X, Y, Z constraints, only specify X, Y, and Z
@@ -131,10 +126,10 @@ class ObConstraint(PosConstraint):
         self.type = 'ObConstraint'
         super(ObConstraint, self).__init__(X=X, Y=Y, Z=Z, theta=theta, phi=phi, r=r, origin=origin)
         # Set all inputs as class properties
-        Inputs = locals()
-        for i in Inputs.keys():
+        inpt = locals()
+        for i in inpt.keys():
             if not i=='self':
-                setattr(self, i, Inputs[i])
+                setattr(self, i, inpt[i])
     
     def checkXYZS_3D(self, obj, obstacles=None, check_bounds=True):
         """Verify that a particular position and size is acceptable given 
