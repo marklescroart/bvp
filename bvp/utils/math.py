@@ -194,7 +194,7 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
     return circ_pos
 
 
-def perspective_projection_bounds():
+def perspective_projection_bounds(sensor_size=36):
     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
@@ -226,18 +226,17 @@ def perspective_projection_bounds():
     # corresponding values for fov (computed by Blender)
     fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
     # Assumed by Blender
-    image_dist = 32.
+    sensor_size = 32.
     # Focal length equation, from:
     # http://kmp.bdimitrov.de/technology/fov.html
     # http://www.bobatkins.com/photography/technical/field_of_view.html
-    fov_computed = 2 * atand(image_dist. / (2 * focal_len)) 
+    fov_computed = 2 * atand(sensor_size. / (2 * focal_len)) 
     plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
     """
-    image_dist = 32. # Blender assumption - see above!
     if cam_lens is not None:
-        fov = 2*atand(image_dist/(2*cam_lens))
+        fov = 2*atand(sensor_size/(2*cam_lens))
     else:
-        fov = 2*atand(image_dist/(2*camera.lens))
+        fov = 2*atand(sensor_size/(2*camera.lens))
 
     objPos = bvp_object.pos3D
     if cam_location is not None:
@@ -331,15 +330,14 @@ def get_camera_matrix(camera_location,
                       camera_lens=None, 
                       image_size=(1., 1.),
                       handedness='right', # Blender default
-                      ):
+                      sensor_size=36):
     """Get 3 x 3 camera matrix. 
 
     Unclear if this is formally correct; works so far.
     """
-    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
-        camera_fov = 2*atand(image_dist/(2*camera_lens))
+        camera_fov = 2*atand(sensor_size/(2*camera_lens))
     
     # Convert to vector
     camera_location = vector_fn(camera_location)
@@ -388,7 +386,7 @@ def perspective_projection(location,
                            camera_lens=None, 
                            image_size=(1., 1.),
                            handedness='right', # Blender default
-                           ): 
+                           sensor_size=36): 
     """Maps a 3D location to its 2D location given camera parameters
     
     Parameters
@@ -419,11 +417,11 @@ def perspective_projection(location,
     # corresponding values for fov (computed by Blender)
     fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
     # Assumed by Blender
-    image_dist = 32.
+    sensor_size = 32.
     # Focal length equation, from:
     # http://kmp.bdimitrov.de/technology/fov.html
     # http://www.bobatkins.com/photography/technical/field_of_view.html
-    fov_computed = 2 * atand(image_dist. / (2 * focal_len)) 
+    fov_computed = 2 * atand(sensor_size. / (2 * focal_len)) 
     plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
 
     Also, look into this (for within Blender only): 
@@ -431,17 +429,16 @@ def perspective_projection(location,
     """
     location = vector_fn(location)
 
-    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
-        camera_fov = 2*atand(image_dist/(2*camera_lens))
+        camera_fov = 2*atand(sensor_size/(2*camera_lens))
     
     # Convert to vector
     location = vector_fn(location)
     camera_location = vector_fn(camera_location)
     camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
                                       camera_lens=camera_lens, image_size=image_size, 
-                                      handedness=handedness)
+                                      handedness=handedness, sensor_size=sensor_size)
     # Blender is Right-handed
     x_sz, y_sz = image_size
     #d = np.array(camera_matrix * (location - camera_location))
@@ -460,7 +457,8 @@ def perspective_projection_inv(image_location,
                                camera_fov=None, 
                                camera_lens=None, 
                                image_size=(1., 1.),
-                               handedness='right'): 
+                               handedness='right', 
+                               sensor_size=36.):
     """Compute object location from image location + distance using inverse perspective projection
 
     Parameters
@@ -478,18 +476,18 @@ def perspective_projection_inv(image_location,
     -----
     See `perspective_projection()` docstring for math
     """
-    image_dist = 32. # Blender assumption - see http://www.metrocast.net/~chipartist/BlensesSite/index.html and above calculations
+    
     if Z>0:
         Z = -Z # ensure that Z < 0
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
-        camera_fov = 2*atand(image_dist/(2*camera_lens))
+        camera_fov = 2*atand(sensor_size/(2*camera_lens))
         camera_lens = None
     
     # Get camera matrix
     camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
                                       camera_lens=camera_lens, image_size=image_size, 
-                                      handedness=handedness)
+                                      handedness=handedness, sensor_size=sensor_size)
 
     x_pos, y_pos = image_location
     x_sz, y_sz = image_size
@@ -566,8 +564,7 @@ def aim_camera(object_location,
         fix_location_image = [int(im_x_c + (sz_x / 2)), 
                               int(im_y_c + (sz_y / 2))]
     else:
-        im_loc_c = image_location - 0.5
-        fix_location_image = -im_loc_c + 0.5
+        fix_location_image = 1 - image_location
     Z = -np.linalg.norm(np.array(object_location) - np.array(camera_location))
     fix_location_3d = perspective_projection_inv(fix_location_image, 
                                                  camera_location, 
