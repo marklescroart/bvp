@@ -529,6 +529,27 @@ def aim_camera(object_location,
                image_size=(1., 1.),
                handedness='right'):
     """Place camera fixation to put an object at a specified 2D location
+    
+    Parameters
+    ----------
+    object_location : array-like
+        (x, y, z) location of object to use as reference for aim
+    image_location : array-like
+        (x, y ) coordinate of image at which object center should appear
+    camera_location : array-like
+        (x, y, z) coordinates of camera
+    camera_fov : scalar
+        field of view of camera (in degrees...?)
+        provide EITHER `camera_fov` or `camera_lens`, not both
+    camera_lens : scalar
+        camera lens in mm
+        provide EITHER `camera_fov` or `camera_lens`, not both
+    image_size : array-like
+        size of image in which `image_location` is specified
+    handedness : str
+        handedness ('left' or 'right') of the coordinate system for the camera
+        Blender default is 'right'
+
 
     Return 3D coordintes to place fixation for `object_location` to appear at `image_location`
     """
@@ -616,9 +637,9 @@ class ImPosCount(object):
         # http://psiexp.ss.uci.edu/research/teachingP205C/205C.pdf
         # Take cumulative dist:
         #cumP = np.cumsum(self.p_inv)
-        #cumP = np.cumsum(self.adjPinv)
+        #cumP = np.cumsum(self.adjusted_p_inv)
         idx = np.arange(self.n_bins) # necessary?
-        cumP = np.cumsum(self.noisyAdjPinv)
+        cumP = np.cumsum(self.noisy_adjusted_p_inv)
         # ... and sample that:
         r = np.random.rand()
         i = min(np.nonzero(r<cumP)[0])
@@ -646,7 +667,7 @@ class ImPosCount(object):
             return p_inv
 
     @property
-    def adjP(self):
+    def adjusted_p(self):
         """
         Adjusted p value (p is raised to exponent e and re-normalized). The 
         higher the exponent (1->5 is a reasonable range), the more the
@@ -657,7 +678,7 @@ class ImPosCount(object):
         return aa/bb
 
     @property
-    def adjPinv(self):
+    def adjusted_p_inv(self):
         aa = (self.p_inv**self.e)
         bb = np.sum(self.p_inv**self.e)
         return aa/bb
@@ -676,8 +697,8 @@ class ImPosCount(object):
         return p
 
     @property
-    def noisyAdjPinv(self):
-        p = self.adjPinv #.flatten()
+    def noisy_adjusted_p_inv(self):
+        p = self.adjusted_p_inv #.flatten()
         # The minimum here effectively sets the minimum likelihood for drawing a position.
         n = np.random.randn(int(self.n_bins**.5), int(self.n_bins**.5))*.001
         p += n

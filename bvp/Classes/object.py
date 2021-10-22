@@ -324,7 +324,10 @@ class Object(MappedClass):
         bpy.ops.transform.translate(value=(0, 0, blender_default_size / 2.))
         utils.blender.set_cursor((0, 0, 0))
         obj = bpy.context.object
-        grp = bpy.data.groups.new('dummy')
+        if bpy.app.version < (2, 80, 0):
+            grp = bpy.data.groups.new('dummy')
+        else:
+            grp = bpy.data.collections.new('dummy')
         grp.objects.link(obj)
         # Rotations don't matter; it's a sphere.
         return obj
