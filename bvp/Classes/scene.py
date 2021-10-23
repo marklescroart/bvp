@@ -319,7 +319,8 @@ class Scene(MappedClass):
 
         scn = utils.blender.set_scene(None)
         # Place objects
-        ob = target.place(proxy=False)
+        if (target.armature is None) or (len(target.armature) == 0):
+            ob = target.place(proxy=False)
         ta = target.armature[-1]
         # Find the bone to track
         bone = ta.pose.bones[bone] 

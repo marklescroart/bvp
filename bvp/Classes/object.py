@@ -509,9 +509,7 @@ class Object(MappedClass):
                 if o.name in scn.objects:
                     scn.objects.unlink(o)
         else:
-            # Assumption here that top-level scene collection is called "Collection"
-            # May want to re-visit this. 
-            scn.collection.children['Collection'].children.unlink(self.blender_group[instance])
+            list(scn.collection.children)[0].children.unlink(self.blender_group[instance])
         _ = self.blender_object.pop(instance)
         _ = self.blender_group.pop(instance)
         _ = self.armature.pop(instance)

@@ -1,5 +1,6 @@
 # Imports
 import numpy as np
+import copy
 from .mapped_class import MappedClass
 from .constraint import CamConstraint
 from .. import utils as bvpu
@@ -34,6 +35,7 @@ class Camera(MappedClass):
                  fix_location=FIX_LOCATION,
                  rotation_euler=None,
                  frames=None,
+                 fix_frames=None,
                  lens=LENS,
                  clip=CLIP,
                  ):
@@ -65,7 +67,7 @@ class Camera(MappedClass):
         self.type = 'Camera'
         self._db_fields = []
         self._data_fields = ['location', 'fix_location', 'rotation_euler', 
-                            'frames','lens','clip']
+                            'frames', 'fix_frames', 'lens','clip']
         self._temp_fields = ['blender_camera', 'blender_fixation']
         inpt = locals()
         for k, v in inpt.items():
@@ -73,6 +75,8 @@ class Camera(MappedClass):
                 setattr(self, k, v)
         if self.frames is None or all([x == 1 for x in self.frames]):
             self.frames = (1,)
+        if self.fix_frames is None:
+            self.fix_frames = copy.copy(self.frames)
         self.blender_camera = None
         self.blender_fixation = None
 
@@ -164,11 +168,20 @@ class Camera(MappedClass):
             trk2.up_axis = 'UP_Y'
 
             # Set camera motion (multiple camera positions for diff. frames)
+            # if (len(self.location) != len(self.frames)) and (len(self.location) == self.n_frames):
+            #     fr_cam = np.arange(self.frames[0], self.frames[-1]+1)
+            # else:
+            #     fr_cam = self.frames
             a = bvpu.blender.make_locrotscale_animation(self.frames,
                     action_name='CamMotion', handle_type='VECTOR',
                     location=self.location)
-            f = bvpu.blender.make_locrotscale_animation(self.frames,
-                    action_name='FixMotion', handle_type='VECTOR',
+            # if (len(self.fix_location) != len(self.frames)) and (len(self.fix_location) == self.n_frames):
+            #     fr_fix = np.arange(self.frames[0], self.frames[-1]+1)
+            # else:
+            #     fr_fix = self.frames
+            # # Smooth fixation, if necessary?
+            f = bvpu.blender.make_locrotscale_animation(self.fix_frames,
+                    action_name='FixMotion', handle_type='AUTO',
                     location=self.fix_location)
             fix.animation_data_create()
             fix.animation_data.action = f
@@ -185,7 +198,7 @@ class Camera(MappedClass):
         if self.blender_fixation is None:
             raise Exception("Only works within blender, with an already-instantiated camera!")
         fixation_action = bvpu.blender.make_locrotscale_animation(frames,
-                                                    action_name='FixMotion_update', handle_type='VECTOR',
+                                                    action_name='FixMotion_update', handle_type='AUTO',
                                                     location=locations)
         if self.blender_fixation.animation_data is None:
             self.blender_fixation.animation_data_create()
