@@ -194,134 +194,135 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
     return circ_pos
 
 
-def perspective_projection_bounds(sensor_size=36):
-    """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
-    Assumes that the origin of the object is at the center of its base (BVP convention!)
+# def perspective_projection_bounds(sensor_size=36):
+#     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
+#     Assumes that the origin of the object is at the center of its base (BVP convention!)
     
-    Parameters
-    ----------
-    bvp_object : Object class
-        Should contain object position (x, y, z) and size
-    camera : Camera class
-        Should contain a list of (x, y, z) camera and fixation positions for n frames
-    image_size : tuple or list
-        Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
-    frame_index : Int
-        Which frame in camera's frame list to compute the projection for
+#     Parameters
+#     ----------
+#     bvp_object : Object class
+#         Should contain object position (x, y, z) and size
+#     camera : Camera class
+#         Should contain a list of (x, y, z) camera and fixation positions for n frames
+#     image_size : tuple or list
+#         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
+#     frame_index : Int
+#         Which frame in camera's frame list to compute the projection for
 
-    Notes
-    -----
-    Blender seems to convert focal length in mm to FOV by assuming 
-    a particular (horizontal/diagonal) distance, in mm, across an 
-    image. This is not exactly correct, i.e. the rendering effects 
-    will not necessarily match with real rectilinear lenses, etc... 
-    See http://www.metrocast.net/~chipartist/BlensesSite/index.html
-    for more discussion.
+#     Notes
+#     -----
+#     Blender seems to convert focal length in mm to FOV by assuming 
+#     a particular (horizontal/diagonal) distance, in mm, across an 
+#     image. This is not exactly correct, i.e. the rendering effects 
+#     will not necessarily match with real rectilinear lenses, etc... 
+#     See http://www.metrocast.net/~chipartist/BlensesSite/index.html
+#     for more discussion.
 
-    # Code testing the above:
-    import numpy as np
-    import matplotlib.pyplot as plt
-    # different settings for focal length in Blender
-    focal_len  = [10 15 25 35 50 100 182.881]; 
-    # corresponding values for fov (computed by Blender)
-    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
-    # Assumed by Blender
-    sensor_size = 32.
-    # Focal length equation, from:
-    # http://kmp.bdimitrov.de/technology/fov.html
-    # http://www.bobatkins.com/photography/technical/field_of_view.html
-    fov_computed = 2 * atand(sensor_size. / (2 * focal_len)) 
-    plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
-    """
-    if cam_lens is not None:
-        fov = 2*atand(sensor_size/(2*cam_lens))
-    else:
-        fov = 2*atand(sensor_size/(2*camera.lens))
+#     # Code testing the above:
+#     import numpy as np
+#     import matplotlib.pyplot as plt
+#     # different settings for focal length in Blender
+#     focal_len  = [10 15 25 35 50 100 182.881]; 
+#     # corresponding values for fov (computed by Blender)
+#     fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
+#     # Assumed by Blender
+#     sensor_size = 32.
+#     # Focal length equation, from:
+#     # http://kmp.bdimitrov.de/technology/fov.html
+#     # http://www.bobatkins.com/photography/technical/field_of_view.html
+#     fov_computed = 2 * atand(sensor_size. / (2 * focal_len)) 
+#     plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
+#     """
+#     if cam_lens is not None:
+#         fov = 2*atand(sensor_size/(2*cam_lens))
+#     else:
+#         fov = 2*atand(sensor_size/(2*camera.lens))
 
-    objPos = bvp_object.pos3D
-    if cam_location is not None:
-        camPos = cam_location
-    else:
-        camPos = camera.location[0]
-    if cam_fix_location is not None:
-        fix_location = cam_fix_location
-    else:
-        fix_location = camera.fix_location[0]
+#     objPos = bvp_object.pos3D
+#     if cam_location is not None:
+#         camPos = cam_location
+#     else:
+#         camPos = camera.location[0]
+#     if cam_fix_location is not None:
+#         fix_location = cam_fix_location
+#     else:
+#         fix_location = camera.fix_location[0]
+
     
-    # Convert to vector
-    camera_location = vector_fn(camPos)
-    fix_location = vector_fn(fix_location)
-    oPos = vector_fn(objPos)
+#     # Convert to vector
+#     camera_location = vector_fn(camPos)
+#     fix_location = vector_fn(fix_location)
+#     oPos = vector_fn(objPos)
     
-    # Get other bounds...
-    oPos_Top = oPos + vector_fn([0, 0, bvp_object.size3D])
-    oPos_L = oPos - vector_fn([bvp_object.size3D / 2., 0, 0])
-    oPos_R = oPos + vector_fn([bvp_object.size3D / 2., 0, 0])
+#     # Get other bounds...
+#     oPos_Top = oPos + vector_fn([0, 0, bvp_object.size3D])
+#     oPos_L = oPos - vector_fn([bvp_object.size3D / 2., 0, 0])
+#     oPos_R = oPos + vector_fn([bvp_object.size3D / 2., 0, 0])
 
-    # Compute camera_euler (Euler angles (XYZ) of camera)
-    cVec = fix_location-camera_location
-    # Get anlge of camera in world coordinates 
-    camera_euler = vector_to_eulerxyz(cVec)
-    # Blender is Right-handed
-    handedness = 'right' 
-    x, y, z = 0, 1, 2
-    if handedness == 'left':
-        # (Here just in case)
-        # X rotation
-        x_rot = np.matrix([[1., 0., 0.], 
-            [0., cosd(camera_euler[x]), -sind(camera_euler[x])], 
-            [0., sind(camera_euler[x]), cosd(camera_euler[x])]])
-        # Y rotation
-        y_rot = np.matrix([[cosd(camera_euler[y]), 0., sind(camera_euler[y])], 
-            [0., 1., 0.], 
-            [-sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
-        # Z rotation
-        z_rot = np.matrix([[cosd(camera_euler[z]), -sind(camera_euler[z]), 0.], 
-            [sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
-            [0., 0., 1.]])
-    elif handedness == 'right':
-        # X rotation
-        x_rot = np.matrix([[1., 0., 0.], 
-            [0., cosd(camera_euler[x]), sind(camera_euler[x])], 
-            [0., -sind(camera_euler[x]), cosd(camera_euler[x])]])
-        # Y rotation
-        y_rot = np.matrix([[cosd(camera_euler[y]), 0., -sind(camera_euler[y])], 
-            [0., 1., 0.], 
-            [sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
-        # Z rotation
-        z_rot = np.matrix([[cosd(camera_euler[z]), sind(camera_euler[z]), 0.], 
-            [-sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
-            [0., 0., 1.]])
+#     # Compute camera_euler (Euler angles (XYZ) of camera)
+#     cVec = fix_location-camera_location
+#     # Get anlge of camera in world coordinates 
+#     camera_euler = vector_to_eulerxyz(cVec)
+#     # Blender is Right-handed
+#     handedness = 'right' 
+#     x, y, z = 0, 1, 2
+#     if handedness == 'left':
+#         # (Here just in case)
+#         # X rotation
+#         x_rot = np.matrix([[1., 0., 0.], 
+#             [0., cosd(camera_euler[x]), -sind(camera_euler[x])], 
+#             [0., sind(camera_euler[x]), cosd(camera_euler[x])]])
+#         # Y rotation
+#         y_rot = np.matrix([[cosd(camera_euler[y]), 0., sind(camera_euler[y])], 
+#             [0., 1., 0.], 
+#             [-sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
+#         # Z rotation
+#         z_rot = np.matrix([[cosd(camera_euler[z]), -sind(camera_euler[z]), 0.], 
+#             [sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
+#             [0., 0., 1.]])
+#     elif handedness == 'right':
+#         # X rotation
+#         x_rot = np.matrix([[1., 0., 0.], 
+#             [0., cosd(camera_euler[x]), sind(camera_euler[x])], 
+#             [0., -sind(camera_euler[x]), cosd(camera_euler[x])]])
+#         # Y rotation
+#         y_rot = np.matrix([[cosd(camera_euler[y]), 0., -sind(camera_euler[y])], 
+#             [0., 1., 0.], 
+#             [sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
+#         # Z rotation
+#         z_rot = np.matrix([[cosd(camera_euler[z]), sind(camera_euler[z]), 0.], 
+#             [-sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
+#             [0., 0., 1.]])
 
-    camera_matrix = x_rot * y_rot * z_rot
-    d = np.array(camera_matrix * (oPos - camera_location))
-    # Other positions:
-    d_Top = np.array(camera_matrix*(oPos_Top-camera_location))
-    d_L = np.array(camera_matrix*(oPos_L-camera_location))
-    d_R = np.array(camera_matrix*(oPos_R-camera_location))
-    xc = (x, 0)
-    yc = (y, 0)
-    zc = (z, 0)
+#     camera_matrix = x_rot * y_rot * z_rot
+#     d = np.array(camera_matrix * (oPos - camera_location))
+#     # Other positions:
+#     d_Top = np.array(camera_matrix*(oPos_Top-camera_location))
+#     d_L = np.array(camera_matrix*(oPos_L-camera_location))
+#     d_R = np.array(camera_matrix*(oPos_R-camera_location))
+#     xc = (x, 0)
+#     yc = (y, 0)
+#     zc = (z, 0)
 
-    ImX_Bot = image_size[x]/2. - d[xc]/d[zc] * (image_size[x]/2.) / (tand(fov/2.));
-    ImY_Bot = d[yc]/d[zc] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.;
+#     ImX_Bot = image_size[x]/2. - d[xc]/d[zc] * (image_size[x]/2.) / (tand(fov/2.));
+#     ImY_Bot = d[yc]/d[zc] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.;
 
-    ImX_Top = image_size[x]/2. - d_Top[xc]/d_Top[zc] * (image_size[x]/2.) / (tand(fov/2.))
-    ImY_Top = d_Top[yc]/d_Top[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
+#     ImX_Top = image_size[x]/2. - d_Top[xc]/d_Top[zc] * (image_size[x]/2.) / (tand(fov/2.))
+#     ImY_Top = d_Top[yc]/d_Top[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
-    ImX_L = image_size[x]/2. - d_L[xc]/d_L[zc] * (image_size[x]/2.) / (tand(fov/2.))
-    ImY_L = d_L[yc]/d_L[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
+#     ImX_L = image_size[x]/2. - d_L[xc]/d_L[zc] * (image_size[x]/2.) / (tand(fov/2.))
+#     ImY_L = d_L[yc]/d_L[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
-    ImX_R = image_size[x]/2. - d_R[xc]/d_R[zc] * (image_size[x]/2.) / (tand(fov/2.))
-    ImY_R = d_R[yc]/d_R[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
+#     ImX_R = image_size[x]/2. - d_R[xc]/d_R[zc] * (image_size[x]/2.) / (tand(fov/2.))
+#     ImY_R = d_R[yc]/d_R[z] * (image_size[y]/2.) / (tand(fov/2.)) + image_size[y]/2.
 
-    imPos_Bot = [ImX_Bot, ImY_Bot]
-    imPos_Top = [ImX_Top, ImY_Top]
-    imPos_L = [ImX_L, ImY_L]
-    imPos_R = [ImX_R, ImY_R]
+#     imPos_Bot = [ImX_Bot, ImY_Bot]
+#     imPos_Top = [ImX_Top, ImY_Top]
+#     imPos_L = [ImX_L, ImY_L]
+#     imPos_R = [ImX_R, ImY_R]
 
-    mbs = lambda x: make_blender_safe(x, 'float')
-    return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
+#     mbs = lambda x: make_blender_safe(x, 'float')
+#     return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
 
 
 def get_camera_matrix(camera_location, 

@@ -139,7 +139,7 @@ def clear_scene(scn=None):
     """
 
     ### --- Removing objects for next scene: --- ### 
-    scn = bvpu.blender.set_scene(scn)
+    scn = set_scene(scn)
     # Enumerate mesh objects to remove
     mesh_objects = list()
     for o in bpy.data.objects:

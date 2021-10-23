@@ -180,6 +180,17 @@ class Camera(MappedClass):
         # Set camera animation action
         cam.animation_data_create()
         cam.animation_data.action = a
+    def set_fixation_location(self, frames, locations):
+        """Set locations for fixation target (as an animation)"""
+        if self.blender_fixation is None:
+            raise Exception("Only works within blender, with an already-instantiated camera!")
+        fixation_action = bvpu.blender.make_locrotscale_animation(frames,
+                                                    action_name='FixMotion_update', handle_type='VECTOR',
+                                                    location=locations)
+        if self.blender_fixation.animation_data is None:
+            self.blender_fixation.animation_data_create()
+        self.blender_fixation.animation_data.action = fixation_action
+
 
     def place_stereo(self, disparity, layers=None, scn=None):
         """Add two cameras for stereo rendering.
