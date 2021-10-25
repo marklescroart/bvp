@@ -334,7 +334,8 @@ def get_camera_matrix(camera_location,
                       sensor_size=36):
     """Get 3 x 3 camera matrix. 
 
-    Unclear if this is formally correct; works so far.
+    This returns the top left 3x3 part of Blender's 4x4 camera matrix; 
+    do we need to bother with 4D camera matrix? Maybe.
     """
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
@@ -401,30 +402,6 @@ def perspective_projection(location,
     image_size : array-like
         Image size (e.g. [500, 500]) default = (1., 1.) (for pct of image computation)
 
-    Notes
-    -----
-    Blender seems to convert focal length in mm to FOV by assuming 
-    a particular (horizontal/diagonal) distance, in mm, across an 
-    image. This is not exactly correct, i.e. the rendering effects 
-    will not necessarily match with real rectilinear lenses, etc... 
-    See http://www.metrocast.net/~chipartist/BlensesSite/index.html
-    for more discussion.
-
-    # Code testing the above:
-    import numpy as np
-    import matplotlib.pyplot as plt
-    # different settings for focal length in Blender
-    focal_len  = [10 15 25 35 50 100 182.881]; 
-    # corresponding values for fov (computed by Blender)
-    fov = [115.989 93.695 65.232 49.134 35.489 18.181 10] 
-    # Assumed by Blender
-    sensor_size = 32.
-    # Focal length equation, from:
-    # http://kmp.bdimitrov.de/technology/fov.html
-    # http://www.bobatkins.com/photography/technical/field_of_view.html
-    fov_computed = 2 * atand(sensor_size. / (2 * focal_len)) 
-    plt.plot(focal_len, fov, 'bo', focal_len, fov_computed, 'r')
-
     Also, look into this (for within Blender only): 
     https://blender.stackexchange.com/questions/16472/how-can-i-get-the-cameras-projection-matrix
     """
@@ -433,6 +410,7 @@ def perspective_projection(location,
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
         camera_fov = 2*atand(sensor_size/(2*camera_lens))
+        camera_lens = None
     
     # Convert to vector
     location = vector_fn(location)
@@ -512,7 +490,7 @@ def perspective_projection_inv(image_location,
         y_pos = (y_pos - 0.5) / 0.5
     dx = -x_pos * tand(camera_fov / 2.) * (x_frac / 2.) * Z
     dy = y_pos * tand(camera_fov / 2.) * (y_frac / 2.) * Z
-    d = vector_fn([dx, dy, Z])
+    d = vector_fn([2 * dx, 2 * dy, Z])
     # d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN
     # d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
     # of the object in the world.

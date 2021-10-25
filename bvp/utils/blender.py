@@ -1185,9 +1185,54 @@ def make_cube(name, mn, mx):
     mesh.from_pydata(verts, [], faces)
     mesh.update(calc_edges=True)
 
+def set_simple_material_color(mat, color, is_cycles=True):
+    """Set a material color for a very basic material"""
+
+    if is_cycles or bpy.app.version > (2, 80, 0):
+        # If not, use nodes:
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        to_kill = []
+        for nn in nodes:
+            if nn.name != "Material Output":
+                to_kill.append(nn)
+        for nn in to_kill:
+            nodes.remove(nn)
+        emission = nodes.new('ShaderNodeEmission')
+        emission.inputs[0].default_value = color
+        mat_out = nodes['Material Output']
+        mat.node_tree.links.new(emission.outputs[0], mat_out.inputs[0])
+    else:
+        mat.diffuse_color = color
+        mat.diffuse_intensity = 1.0
+        mat.use_shadeless = True
+    return mat
+
+def blackout(scn, is_cycles=True):
+    if 'black' in [x.name for x in bpy.data.materials]:
+        black = bpy.data.materials['black']
+    else:
+        black = bpy.data.materials.new('black')
+    black = set_simple_material_color(black, (0., 0., 0., 1.0), is_cycles=is_cycles)
+    for o in scn.objects:
+        if len(o.particle_systems) > 0:
+            grab_only(o)
+            bpy.ops.object.particle_system_remove()
+        if is_cycles and (not o.visible_get()):
+            continue
+        if bpy.app.version < (2, 80, 0):
+            hidden = o.hide
+        else:
+            hidden = o.hide_viewport
+        if (not is_cycles) and hidden:
+            continue
+        if hasattr(o.data, 'materials'):
+            print(o.name)
+            apply_material(o, black)
+
 def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
                color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
-               return_vertices=False, is_verbose=False):
+               return_vertices=False, is_verbose=False, is_cycles=True):
     """Highlight all vertices in a group with some color
     
     Parameters
@@ -1214,7 +1259,9 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         whether to return blender vertices for the group that was
         labeled.
     """
-    if obj.hide:
+    if (bpy.app.version < (2, 80, 0)) and obj.hide:
+        return
+    elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
         return
     # Get vertex group indices
     vertex_groups = obj.vertex_groups
@@ -1234,9 +1281,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         if is_verbose:
             print('o Creating new material for %s'%name)
         fg_mat = bpy.data.materials.new(name)
-        fg_mat.diffuse_color = color
-        fg_mat.diffuse_intensity = 1.0
-        fg_mat.use_shadeless = True
+        fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
 
     # Create & assign background color only if provided
     if bg_color is not None:
@@ -1246,9 +1291,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
                 bg_mat.diffuse_color = bg_color
         else:
             bg_mat = bpy.data.materials.new(name + '_bg')
-            bg_mat.diffuse_color = bg_color
-            bg_mat.diffuse_intensity = 1.0
-            bg_mat.use_shadeless = True
+            bg_mat = set_simple_material_color(bg_mat, bg_color, is_cycles=is_cycles)
 
         #Assign first material on all the mesh
         if len(obj.material_slots) == 0:
@@ -1315,8 +1358,12 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         bpy.ops.object.editmode_toggle()  # Return to object mode
         # One-of BS for Ironman rig, which animates differently than
         # other rigs
-        if obj.draw_type == 'WIRE':
-            obj.draw_type = 'TEXTURED'
+        if bpy.app.version < (2, 80, 0):
+            if obj.draw_type == 'WIRE':
+                obj.draw_type = 'TEXTURED'
+        else:
+            if obj.display_type == 'WIRE':
+                obj.display_type = 'TEXTURED'
         # Un-hide objects with vertices that have been labeled
         obj.hide_render = False
     else:
