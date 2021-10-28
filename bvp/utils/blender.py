@@ -1275,24 +1275,20 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
     # Make new materials for fg and bg if necessary
     if name in bpy.data.materials:
         fg_mat = bpy.data.materials[name]
-        if not np.all(np.array(fg_mat.diffuse_color) == np.array(color)):
-           fg_mat.diffuse_color = color
     else:
         if is_verbose:
             print('o Creating new material for %s'%name)
         fg_mat = bpy.data.materials.new(name)
-        fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
+    fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
 
     # Create & assign background color only if provided
     if bg_color is not None:
         if (name + '_bg') in bpy.data.materials:
             bg_mat = bpy.data.materials[name + '_bg']
-            if not np.all(np.array(bg_mat.diffuse_color) == np.array(bg_color)):
-                bg_mat.diffuse_color = bg_color
         else:
             bg_mat = bpy.data.materials.new(name + '_bg')
-            bg_mat = set_simple_material_color(bg_mat, bg_color, is_cycles=is_cycles)
-
+        bg_mat = set_simple_material_color(
+            bg_mat, bg_color, is_cycles=is_cycles)
         #Assign first material on all the mesh
         if len(obj.material_slots) == 0:
             bpy.ops.object.material_slot_add() # Add a material slot
