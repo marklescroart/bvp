@@ -346,7 +346,7 @@ def get_camera_matrix(camera_location,
     fix_location = vector_fn(fix_location)
     # Prep for shift in L, R directions (wrt camera)
     camera_vector = fix_location - camera_location
-    # Get anlge of camera in world coordinates 
+    # Get angle of camera in world coordinates 
     camera_euler = vector_to_eulerxyz(camera_vector)
     # Blender is Right-handed
     x, y, z = 0, 1, 2
