@@ -68,106 +68,13 @@ def save_pik(d, pikFile, protocol=2):
     with open(pikFile, 'wb') as fid:
         pickle.dump(d, fid, protocol=2)
 
-
-def load_exr_depth(fname):
-    """load exr file that stores z (depth/distance) info"""
-
-
-def load_exr_normals(fname, xflip=True, yflip=True, zflip=True, clip=True):
-    """Load exr file with assumptions to map to surface normals
-    
-    clip : bool
-        Whether to clip normals to range 0-1
-    """
-    try:
-        import cv2
-    except:
-        raise ImportError('Need cv2 package to import exr files!')
-    img = cv2.imread(fname, cv2.IMREAD_UNCHANGED)
-    imc = img-1
-    y, z, x = imc.T
-    rev_x = xflip
-    rev_y = yflip
-    rev_z = zflip
-    if rev_x: 
-        x = -x
-    if rev_y:
-        y = -y
-    if rev_z:
-        z = -z
-    imc = np.dstack([x.T,y.T,z.T])
-    if clip:
-        imc = np.clip(imc, 0, 1)
-    return imc
-
-
-def readEXR(fNm, isZ=True):
-    """DEPRECATED. use load_exr_depth and load_exr_normals.
-    Reading EXR files to numpy arrays. Principally used for Z depth files in BVP, 
-    so by default this only returns the first (R of RGB) channel in an EXR image
-    (R, G, B will all be the same in a Z depth image). Set isZ to False to change 
-    this behavior.
-    """
-    import array
-    import OpenEXR
-    import Imath
-
-    # Open the input file
-    file = OpenEXR.InputFile(fNm)
-    # Compute the size
-    dw = file.header()['dataWindow']
-    sz = (dw.max.x - dw.min.x + 1, dw.max.y - dw.min.y + 1)
-    # Read the three color channels as 32-bit floats
-    FLOAT = Imath.PixelType(Imath.PixelType.FLOAT)
-    (R, G, B) = [array.array('f', file.channel(Chan, FLOAT)).tolist() for Chan in ("R", "G", "B") ]
-    if isZ:
-        Im = np.array(R)
-        Im.shape = sz
-    else:
-        Im = np.array([R, G, B])
-        Im.shape = [3, sz[0], sz[1]]
-        Im = Im.T
-    return Im
-
-
-def RunScriptForAllFiles(scriptF, fNm, Is_Cluster=False, Inpts=None):
-    """Run a script in all files in in some list (fNm)
-    ?? Update to run on selected/all files within the library? (so, get rid of fNm input?) ??
-
-    TO DO: allow substitutions at particular lines of the script file? This would allow different script behavior for different files...
-    """
-    
-    if not Is_Cluster:
-        for BlendFile in fNm:
-            #BlendFile = os.path.join(fDir, BlendFile)
-            full_cmd = [blender_cmd, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?
-            if not Inpts is None:
-                full_cmd+=Inpts
-            print('Calling:')
-            print(full_cmd)
-            subprocess.call(full_cmd)
-            print('Done with %s'%BlendFile)
-    else:
-        nCPUs = '2'
-        ClusterGrp = 'blender' # For now, GLab Slurm computers enabled to run Blender
-        TempScriptDir = os.path.join(bvp.__path__[0], 'Temp') # FAAAAK fix me
-        for ii, BlendFile in enumerate(fNm):
-            full_cmd = [blender_cmd, '-b', BlendFile, '-P', scriptF] # Specify output? stdout? File?                
-            TempScriptName = os.path.join(TempScriptDir, 'RunScriptForAllFiles_%s_%04d.sh'%(time.strftime('%Y%m%d_%m%M'), ii+1))
-            with open(TempScriptName, 'wb') as fid:
-                fid.write('#!/bin/sh\n')
-                fid.write('#SBATCH\n')
-                full_cmd = blender_cmd+' -b '+BlendFile+' -P '+BlenderPyFile
-                fid.write(full_cmd)
-                # Cleanup (move to .done file instead?)
-                #fid.write('rm '+BlenderPyFile) 
-                #fid.write('rm '+TempScriptName) 
-            SlurmOut = TempScriptName.replace('.sh', '_SlurmLog.out')
-            SlurmCmd = ['sbatch', '-c', nCPUs, '-p', ClusterGrp, TempScriptName, '-o', SlurmOut]
-            # For call to individual cluster computer: 
-            #SlurmCmd = ['sbatch', '-c', nCPUs, '-w', 'ibogaine', TempScriptName, '-o', SlurmOut]
-            subprocess.call(SlurmCmd)
-            print('Slurm call done for file %s'%BlendFile)
+def check_file_blender_version(fpath):
+    """Check which version of blender saved a particular file"""
+    import struct
+    with open(fpath, mode='rb') as fid:
+        fid.seek(7)
+        bitness, endianess, major, minor = struct.unpack("sss2s", fid.read(5))
+    return (int(major), int(minor))
 
 
 class fixedKeyDict(dict):
