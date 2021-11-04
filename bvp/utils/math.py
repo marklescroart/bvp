@@ -379,7 +379,11 @@ def get_camera_matrix(camera_location,
             [0., 0., 1.]])
 
     camera_matrix = x_rot * y_rot * z_rot
-    return camera_matrix    
+    camera_matrix = np.hstack([camera_matrix, camera_location])
+    bottom_row = np.array([[0, 0, 0, 1]])
+    print(bottom_row.shape)
+    camera_matrix = np.vstack([camera_matrix, bottom_row])
+    return camera_matrix
 
 def perspective_projection(location, 
                            camera_location, 
