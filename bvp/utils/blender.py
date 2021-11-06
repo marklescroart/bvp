@@ -109,6 +109,34 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     return act
 
 
+def make_physics_animation(ob, frames=(1, 4), steps_per_second=100, **kwargs):
+    """Kwargs are: location, rotation"""
+    scn = bpy.context.scene
+    # Rigidbody world
+    if scn.rigidbody_world is None:
+        bpy.ops.rigidbody.world_add()
+    scn.rigidbody_world.steps_per_second = steps_per_second
+    grab_only(ob)
+    bpy.ops.rigidbody.object_add()
+    ob.rigid_body.collision_shape = 'MESH'
+    # Starting position
+    object_action = make_locrotscale_animation(
+        frames,
+        action_name='ObjectMotion',
+        handle_type='VECTOR',
+        **kwargs)
+    # Apply action
+    ob.animation_data_create()
+    ob.animation_data.action = object_action
+    # Animate the dependency on animation
+    ob.rigid_body.kinematic = True
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[0])
+    ob.rigid_body.kinematic = True
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[1])
+    ob.rigid_body.kinematic = False
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[1]+1)
+
+
 def add_selected_to_group(group_name):
     """Adds all selected objects to group named `group_name`
     """

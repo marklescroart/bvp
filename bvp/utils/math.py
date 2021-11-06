@@ -1,9 +1,7 @@
 """BVP Math utilities"""
 
-from __future__ import division
-
 import numpy as np
-
+import copy
 from .basics import make_blender_safe
 
 
@@ -191,15 +189,7 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
         circ_pos[:, 1] = -(circ_pos[:, 1]-y_center) + y_center
     elif direction.upper()=='TOPCW':
         circ_pos[:, 1] = -(circ_pos[:, 2]-y_center) + y_center
-    return circ_pos
-
-
-# def perspective_projection_bounds(sensor_size=36):
-#     """Gives image coordinates of an object (Bottom, Top, L, R) given the 3D position of the object and a camera.
-#     Assumes that the origin of the object is at the center of its base (BVP convention!)
-    
-#     Parameters
-#     ----------
+    return circ_possensor_size_
 #     bvp_object : Object class
 #         Should contain object position (x, y, z) and size
 #     camera : Camera class
@@ -325,33 +315,39 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
 #     return mbs(imPos_Top), mbs(imPos_Bot), mbs(imPos_L), mbs(imPos_R)
 
 
-def get_camera_matrix(camera_location, 
-                      fix_location,
-                      camera_fov=None, 
-                      camera_lens=None, 
-                      image_size=(1., 1.),
-                      handedness='right', # Blender default
-                      sensor_size=36):
+def get_camera_matrix(camera_location, fix_location, handedness='right'):
     """Get 3 x 3 camera matrix. 
 
+    Parameters
+    ----------
+    camera_location : array-like
+        list, tuple, or array for (x, y, z) camera location
+    fix_location : array_like
+        list, tuple, or array for (x, y, z) camera target (fixation) location
+    handedness : str
+        'right' or 'left'. Not tested or likey to be working for left-handed 
+        coordinates. 
+
+    Notes
+    -----
     This returns the top left 3x3 part of Blender's 4x4 camera matrix; 
-    do we need to bother with 4D camera matrix? Maybe.
+    do we need to bother with 4D camera matrix? Maybe. Not so far.
     """
-    assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
-    if camera_lens is not None:
-        camera_fov = 2*atand(sensor_size/(2*camera_lens))
     
     # Convert to vector
     camera_location = vector_fn(camera_location)
     fix_location = vector_fn(fix_location)
     # Prep for shift in L, R directions (wrt camera)
-    camera_vector = fix_location - camera_location
-    # Get angle of camera in world coordinates 
-    camera_euler = vector_to_eulerxyz(camera_vector)
-    # Blender is Right-handed
-    x, y, z = 0, 1, 2
     if handedness == 'left':
-        # (Here just in case)
+        camera_vector = fix_location - camera_location
+        # Get angle of camera in world coordinates 
+        camera_euler = vector_to_eulerxyz(camera_vector)
+        # Blender is Right-handed
+        x, y, z = 0, 1, 2
+        warnings.warn("Not checked for left-handed coordinates!")
+        # is this just a different up vector??
+        # (Here just in case; note, this is missing a factor here, doesn't work if 
+        # camera is below fixation target.
         # X rotation
         x_rot = np.matrix([[1., 0., 0.], 
             [0., cosd(camera_euler[x]), -sind(camera_euler[x])], 
@@ -364,25 +360,17 @@ def get_camera_matrix(camera_location,
         z_rot = np.matrix([[cosd(camera_euler[z]), -sind(camera_euler[z]), 0.], 
             [sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
             [0., 0., 1.]])
+        camera_matrix = x_rot * y_rot * z_rot
     elif handedness == 'right':
-        # X rotation
-        x_rot = np.matrix([[1., 0., 0.], 
-            [0., cosd(camera_euler[x]), sind(camera_euler[x])], 
-            [0., -sind(camera_euler[x]), cosd(camera_euler[x])]])
-        # Y rotation
-        y_rot = np.matrix([[cosd(camera_euler[y]), 0., -sind(camera_euler[y])], 
-            [0., 1., 0.], 
-            [sind(camera_euler[y]), 0., cosd(camera_euler[y])]])
-        # Z rotation
-        z_rot = np.matrix([[cosd(camera_euler[z]), sind(camera_euler[z]), 0.], 
-            [-sind(camera_euler[z]), cosd(camera_euler[z]), 0.], 
-            [0., 0., 1.]])
-
-    camera_matrix = x_rot * y_rot * z_rot
-    camera_matrix = np.hstack([camera_matrix, camera_location])
-    bottom_row = np.array([[0, 0, 0, 1]])
-    print(bottom_row.shape)
-    camera_matrix = np.vstack([camera_matrix, bottom_row])
+        # Per: https://ksimek.github.io/2012/08/22/extrinsic/
+        up = (0, 0, 1)
+        p, c = fix_location.flatten(), camera_location.flatten()
+        L = np.array(p) - np.array(c)
+        L = L / np.linalg.norm(L)
+        s = np.cross(L, up)
+        s = s / np.linalg.norm(s)
+        u = np.cross(s, L)
+        camera_matrix = np.matrix(np.vstack([s, u, -L]))
     return camera_matrix
 
 def perspective_projection(location, 
@@ -392,6 +380,7 @@ def perspective_projection(location,
                            camera_lens=None, 
                            image_size=(1., 1.),
                            handedness='right', # Blender default
+                           aspect_ratio=1.0,
                            sensor_size=36): 
     """Maps a 3D location to its 2D location given camera parameters
     
@@ -419,9 +408,7 @@ def perspective_projection(location,
     # Convert to vector
     location = vector_fn(location)
     camera_location = vector_fn(camera_location)
-    camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
-                                      camera_lens=camera_lens, image_size=image_size, 
-                                      handedness=handedness, sensor_size=sensor_size)
+    camera_matrix = get_camera_matrix(camera_location, fix_location, handedness=handedness)
     # Blender is Right-handed
     x_sz, y_sz = image_size
     #d = np.array(camera_matrix * (location - camera_location))
@@ -441,6 +428,7 @@ def perspective_projection_inv(image_location,
                                camera_lens=None, 
                                image_size=(1., 1.),
                                handedness='right', 
+                               aspect_ratio=1.,
                                sensor_size=36.):
     """Compute object location from image location + distance using inverse perspective projection
 
@@ -454,6 +442,12 @@ def perspective_projection_inv(image_location,
     Z : scalar
         Distance from camera for inverse computation (distance
         is not uniquely specified otherwise)
+    camera_fov : 
+
+    handedness : str
+        'right' or 'left'. 'left' not guaranteed to work. Probably not working.
+    sensor_size : int or array-like
+        size of sensor. 
 
     Notes
     -----
@@ -464,13 +458,17 @@ def perspective_projection_inv(image_location,
         Z = -Z # ensure that Z < 0
     assert sum([(camera_lens is None), (camera_fov is None)]) == 1, 'Please specify EITHER `camera_lens` or `camera_fov` input'
     if camera_lens is not None:
-        camera_fov = 2*atand(sensor_size/(2*camera_lens))
+        sensor_size_x = copy.copy(sensor_size)
+        sensor_size_y = sensor_size / aspect_ratio 
+        camera_fov = [2 * atand(ss / (2 * camera_lens)) for ss in [sensor_size_x, sensor_size_y]]
         camera_lens = None
+    if not isinstance(camera_fov, (list, tuple)):
+        camera_fov_x = camera_fov_y = camera_fov
+    else:
+        camera_fov_x, camera_fov_y = camera_fov
     
     # Get camera matrix
-    camera_matrix = get_camera_matrix(camera_location, fix_location, camera_fov=camera_fov, 
-                                      camera_lens=camera_lens, image_size=image_size, 
-                                      handedness=handedness, sensor_size=sensor_size)
+    camera_matrix = get_camera_matrix(camera_location, fix_location, handedness=handedness)
 
     x_pos, y_pos = image_location
     x_sz, y_sz = image_size
@@ -492,8 +490,8 @@ def perspective_projection_inv(image_location,
         y_pos = ((y_pos - y_sz / 2.) / (y_sz / 2.))
     else:
         y_pos = (y_pos - 0.5) / 0.5
-    dx = -x_pos * tand(camera_fov / 2.) * (x_frac / 2.) * Z
-    dy = y_pos * tand(camera_fov / 2.) * (y_frac / 2.) * Z
+    dx = -x_pos * tand(camera_fov_x / 2.) * (x_frac / 2.) * Z
+    dy = y_pos * tand(camera_fov_y / 2.) * (y_frac / 2.) * Z
     d = vector_fn([2 * dx, 2 * dy, Z])
     # d is a vector pointing straight from the camera to the object, with the camera at (0, 0, 0) pointing DOWN
     # d needs to be rotated and shifted, according to the camera's real position, to have d point to the location
@@ -508,6 +506,7 @@ def aim_camera(object_location,
                camera_fov=None, 
                camera_lens=None, 
                image_size=(1., 1.),
+               aspect_ratio = 1.,
                handedness='right'):
     """Place camera fixation to put an object at a specified 2D location
     
@@ -556,6 +555,7 @@ def aim_camera(object_location,
                                                  camera_fov=camera_fov, 
                                                  camera_lens=camera_lens, 
                                                  image_size=image_size,
+                                                 aspect_ratio=aspect_ratio,
                                                  handedness=handedness)
     return fix_location_3d
     
