@@ -189,7 +189,9 @@ def circle_pos(radius, n_positions, x_center=0, y_center=0, direction='botccw'):
         circ_pos[:, 1] = -(circ_pos[:, 1]-y_center) + y_center
     elif direction.upper()=='TOPCW':
         circ_pos[:, 1] = -(circ_pos[:, 2]-y_center) + y_center
-    return circ_possensor_size_
+    return circ_pos
+    
+    #sensor_size_
 #     bvp_object : Object class
 #         Should contain object position (x, y, z) and size
 #     camera : Camera class
