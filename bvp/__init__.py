@@ -27,10 +27,7 @@ from __future__ import absolute_import
 __version__ = '0.2a' 
 
 # Imports
-import re
 import os
-import six
-import uuid
 import time
 import textwrap
 import subprocess
@@ -73,16 +70,6 @@ def set_scn(fname='bvp_test', ropts=None, cam=None, sky=None):
     scn.create(render_options=ropts)
     return scn
 
-## -- Useful functions -- ##
-def _get_uuid():
-    """Overkill for unique file names"""
-    import uuid
-    uu = str(uuid.uuid4()).replace('\n', '').replace('-', '')
-    return uu
-    
-def _get_uuid():
-    return str(uuid.uuid4()).replace('-','')
-
 
 ## -- Cluster -- ##
 bvp_cluster_script = """
@@ -117,127 +104,6 @@ if stderr:
         raise Exception('Python error in Blender script! See above.')
 
 """
-
-#def _cluster(script, blender_binary=None, **kwargs):
-#    """Run cluster render job"""
-#    kwargs.update(blender_binary=blender_binary,
-#                  cmd=cmd)
-
-
-
-def _cluster_deprecated(script, 
-             logdir='~/slurm_log/', 
-             slurm_out='bvprender_node_%N_job_%j.out',
-             slurm_err=True, 
-             job_name=None, 
-             dep=None, 
-             mem=30,
-             ncpus=3,
-             partition='regular',
-             instant_buffer_write=True):
-    """Run a python script on the cluster.
-    
-    Parameters
-    ----------
-    script : string
-        Either a full script (as a string, probably in triple quoters) or a path to a script file
-    logdir : string
-        Directory in which to store slurm logs
-    slurm_out : string
-        File name for slurm log file. For slurm outputs, %j is job id; %N is node name
-    slurm_err : string 
-        File name for separate error file (if desired - if slurm_err is None, errors are 
-        written to the `slurm_out` file)
-    job_name : string
-        Name that will appear in the slurm queue
-    dep : string | None
-        String job numbers for dependencies, e.g. '78823,78824,78825' (for 
-        3 slurm job dependencies with those job id numbers). default=None
-    mem : scalar
-        Memory usage in gigabytes 
-    ncpus : scalar {1 OR 3}
-        Number of CPUs requested. Glab convention is to request 1 cpu per ~8GB of memory
-    partition : string
-        Either 'regular' or 'big' (regular = 32GB memory max, big = 64GB memory max)
-    """
-    if os.path.exists(script):
-        with open(script,'r') as fid:
-            script=fid.read()
-    if slurm_err is True:
-        slurm_err = 'Error_'+slurm_out
-    if job_name is None:
-        job_name = 'glab_script_'+time.strftime('%Y_%m_%d_%H%M',time.localtime())
-    logfile = os.path.join(logdir, slurm_out)
-    header = '#!/usr/bin/env python\n#SBATCH\n\n'
-    if slurm_err is None:
-        error_handling = ""
-    else:
-        errfile = os.path.join(logdir, slurm_err)
-        error_handling = textwrap.dedent(
-        """
-        # Cleanup error files
-        import socket, os
-        ef = '{slurm_err}'.replace('%j',os.getenv('SLURM_JOB_ID'))
-        ef = ef.replace('%N',socket.gethostname())
-        with open(ef,'r') as fid:
-            output=fid.read()
-        if len(output)>0:
-            print('Warnings detected!')
-            print(output)
-            os.unlink(ef)
-        else:
-            print('Cleanup -> removing ' + ef)
-            #os.unlink(ef)
-        """).format(slurm_err=errfile) # write error file locally
-        
-    # Create full script     
-    python_script = header + script + error_handling
-    if instant_buffer_write:
-        script_name = os.path.join(logdir, "{}_{}.py".format(job_name, _get_uuid()))
-        with open(script_name, "w") as fp:
-            fp.write(python_script)
-
-    # Create slurm command
-    slurm_cmd = ['sbatch', 
-                 '-c', str(ncpus),
-                 '-p', partition,
-                 '--mem', str(mem)+'G',
-                 '-o', logfile,
-                 '-J', job_name]
-    if not dep is None:
-        slurm_cmd += ['-d', dep]
-    if not slurm_err is None:
-        slurm_cmd += ['-e', errfile]
-    if instant_buffer_write:
-        # Force immediate buffer write
-        slurm_script = textwrap.dedent(
-        """#!/bin/bash
-        #SBATCH
-        stdbuf -o0 -e0 python {script_name}
-        echo "Job finished! cleanup:"
-        echo "removing {script_name}"
-        rm {script_name}
-        """).format(script_name=script_name)
-    else:
-        slurm_script = python_script
-
-    # Call slurm
-    clust = subprocess.Popen(slurm_cmd,
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE)
-    if six.PY3:
-        slurm_script = slurm_script.encode()    
-    stdout, stderr = clust.communicate(slurm_script)
-    if six.PY3:
-        stdout = stdout.decode()
-        stderr = stderr.decode()
-    # Retrieve job ID
-    try:
-        job_id = re.search('(?<=Submitted batch job )[0-9]*',stdout).group()
-    except:
-        raise Exception('Slurm job submission failed! %s'%stderr)
-    return job_id, stderr
 
 def blend(script, blend_file=None, is_local=True, blender_binary=None,
           tmpdir='/tmp/', is_verbose=False, **kwargs):
@@ -301,18 +167,9 @@ def blend(script, blend_file=None, is_local=True, blender_binary=None,
             from slurm_utils import run_script as _cluster
         except:
             print("No cluster code available. Please install slurm_utils (https://github.com:piecesofmindlab/slurm_utils).")
-
         # Call via cluster
-        #if is_verbose:
-        #    print('Calling via cluster: %s'%(' '.join(blender_cmd)))
-        #jobid, stderr = _cluster_orig(blender_cmd, **kwargs)
-        #if instant_buffer_write:
         print(script)
         pyscript = bvp_cluster_script.format(script=script, blend_file=blend_file, is_verbose=is_verbose, blender_binary=blender_binary)
-        #else:
-        #    pyscript = script
-        #jobid, stderr = _cluster(pyscript, **kwargs)
-        #cmd = ' '.join(blender_cmd[:-1])
         jobid = _cluster(pyscript, **kwargs)
         return jobid
 

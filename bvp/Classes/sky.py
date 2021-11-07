@@ -1,7 +1,5 @@
 # Imports
 import os
-import math as bnp
-from six import string_types
 from .. import utils
 from .mapped_class import MappedClass
 
