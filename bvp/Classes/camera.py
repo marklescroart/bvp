@@ -193,16 +193,52 @@ class Camera(MappedClass):
         # Set camera animation action
         cam.animation_data_create()
         cam.animation_data.action = a
-    def set_fixation_location(self, frames, locations):
-        """Set locations for fixation target (as an animation)"""
-        if self.blender_fixation is None:
-            raise Exception("Only works within blender, with an already-instantiated camera!")
-        fixation_action = bvpu.blender.make_locrotscale_animation(frames,
-                                                    action_name='FixMotion_update', handle_type='AUTO',
-                                                    location=locations)
-        if self.blender_fixation.animation_data is None:
-            self.blender_fixation.animation_data_create()
-        self.blender_fixation.animation_data.action = fixation_action
+
+    def set_fixation_location(self, frames, locations, handle_type='AUTO'):
+        """Set locations for fixation target (as an animation)
+
+        Parameters
+        ----------
+        frames : list
+            frames at which keyframes should be inserted
+        locations : list
+            list of (x, y, z) locations
+        handle_type : str
+            'AUTO' or 'VECTOR' (for smoothed or linear interpolation btw keypoints)
+        """
+        self.fix_location = locations
+        self.fix_frames = frames
+        if self.blender_fixation is not None:
+            fixation_action = bvpu.blender.make_locrotscale_animation(frames,
+                                                        action_name='FixMotion_update', 
+                                                        handle_type=handle_type,
+                                                        location=locations)
+            if self.blender_fixation.animation_data is None:
+                self.blender_fixation.animation_data_create()
+            self.blender_fixation.animation_data.action = fixation_action
+
+    def set_location(self, frames, locations, handle_type='VECTOR'):
+        """Set locations for camera (as an animation)
+
+        Parameters
+        ----------
+        frames : list
+            frames at which keyframes should be inserted
+        locations : list
+            list of (x, y, z) locations
+        handle_type : str
+            'AUTO' or 'VECTOR' (for smoothed or linear interpolation btw keypoints)
+        """
+        self.location = locations
+        self.frames = frames
+        if self.blender_camera is not None:
+            camera_action = bvpu.blender.make_locrotscale_animation(frames,
+                                                                    action_name='CamMotion_update', 
+                                                                    handle_type=handle_type,
+                                                                    location=locations)
+            if self.blender_camera.animation_data is None:
+                self.blender_camera.animation_data_create()
+            self.blender_camera.animation_data.action = camera_action
 
 
     def place_stereo(self, disparity, layers=None, scn=None):
