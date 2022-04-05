@@ -10,7 +10,6 @@ import warnings
 import copy
 import re
 import numpy as np
-from six import string_types
 
 from ..options import config
 
@@ -70,10 +69,10 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     def _reconcile_handles(handle_type, frames):
         """Make handle_type input into a list of lists of appropriate length"""
         htype = copy.copy(handle_type)
-        if isinstance(htype, string_types):
+        if isinstance(htype, (str,)):
             htype = [htype] * len(frames)
         for ih, h in enumerate(htype):
-            if isinstance(h, string_types):
+            if isinstance(h, (str,)):
                 htype[ih] = [h] * 2
             elif isinstance(h, (list, tuple)):
                 if len(h) == 1:
