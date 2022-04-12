@@ -1635,6 +1635,7 @@ def get_framewise_location(blender_object,
 
 def set_zoom(bvp_camera, bvp_object,
              bone_name=None,
+             min_distance=2,
              max_distance=10,
              absolute_distance=10,
              frame_start=1,
@@ -1658,8 +1659,10 @@ def set_zoom(bvp_camera, bvp_object,
         Object for which to set zoom
     bone_name : str, optional
         blender bone name, if zoom to bone within armature is desired, by default None
+    min_distance : int, optional
+        minimum distance from object to camera
     max_distance : int, optional
-        _description_, by default 10
+        maximum distance from object to camera, by default 10
     absolute_distance : int, optional
         _description_, by default 10
     frame_start : int, optional
