@@ -1564,9 +1564,11 @@ def part_focus(blender_object, part_name, transparent_material=None, part_bones=
     bpy.ops.object.editmode_toggle()
     bpy.ops.mesh.select_all(action='INVERT')
     bpy.ops.object.editmode_toggle()
-    material_to_vertices(blender_object,
-                         transparent_material, is_verbose=True)
-
+    if len([x for x in blender_object.data.vertices if x.select]) > 0:
+        material_to_vertices(blender_object,
+                            transparent_material, is_verbose=True)
+    else:
+        print("No vertices in group for %s"%blender_object.name)
 
 def get_framewise_location(blender_object,
                            bone_name=None,
@@ -1767,11 +1769,3 @@ def set_zoom(bvp_camera, bvp_object,
     bvp_camera.set_fixation_location(
         (fixation_frames + 1).tolist(), new_fixation_locations, handle_type='AUTO')
 
-# For rigid body physics
-
-
-def get_random_throw_vector(r=1, origin=(0, 0, 0), elev_range=(-5, 15), az_range=(-180, 180)):
-    az = np.random.uniform(*az_range)
-    elev = np.random.uniform(*elev_range)
-    x, y, z = bvpmath.sph2cart(r, az, elev, origin=origin)
-    return [x, y, z]

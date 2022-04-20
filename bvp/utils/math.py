@@ -764,3 +764,10 @@ def vector_to_eulerxyz(vec, y_rot=0):
     x_rot = np.degrees(np.arctan(-np.linalg.norm([x, y])/z))
     return x_rot, y_rot, z_rot
 
+
+# For rigid body physics
+def get_random_throw_vector(r=1, origin=(0, 0, 0), elev_range=(-5, 15), az_range=(-180, 180)):
+    az = np.random.uniform(*az_range)
+    elev = np.random.uniform(*elev_range)
+    x, y, z = sph2cart(r, az, elev, origin=origin)
+    return [x, y, z]
