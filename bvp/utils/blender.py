@@ -1422,6 +1422,7 @@ def select_vertex_group(obj, vertex_label, weight_thresh=0.2, side=None,
         return
     elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
         return
+    grab_only(obj)
     # Get vertex group indices
     vertex_groups = obj.vertex_groups
     vertex_group_indices = []
@@ -1431,14 +1432,14 @@ def select_vertex_group(obj, vertex_label, weight_thresh=0.2, side=None,
         vertex_label = (vertex_label,)
     for label in vertex_label:
         # Implement ANDing across labels provided (e.g. for left AND hand)
-        vertex_groups = [
+        vertex_groups_this_label = [
             x for x in vertex_groups if label.lower() in x.name.lower()]
         if side is not None:
-            vertex_groups = [
-                x for x in vertex_groups if side.lower() in x.name.lower()]
+            vertex_groups_this_label = [
+                x for x in vertex_groups_this_label if side.lower() in x.name.lower()]
         if is_verbose:
-            print(len(vertex_groups), 'found for %s' % label)
-        vertex_group_indices.extend([vg.index for vg in vertex_groups])
+            print(len(vertex_groups_this_label), 'found for %s' % label)
+        vertex_group_indices.extend([vg.index for vg in vertex_groups_this_label])
 
     # Deselect all
     bpy.ops.object.editmode_toggle()  # Go in edit mode
@@ -1523,7 +1524,7 @@ def new_transparent_material(name='transparent'):
     return mat
 
 
-DEFAULT_PART_BONES = dict(head=('head', 'jaw', 'eye', 'pupil', 'hair'),
+DEFAULT_PART_BONES = dict(head=('head', 'jaw', 'eye', 'pupil', 'hair', 'lip', 'nostril', 'brow'),
                   torso=('spine', 'shoulder', 'hip',
                          'breast', 'ribs', 'back',
                          'chest', 'deltoid', 'pec',
@@ -1536,13 +1537,14 @@ DEFAULT_PART_BONES = dict(head=('head', 'jaw', 'eye', 'pupil', 'hair'),
                   )
 
 
-def part_focus(blender_object, part_name, transparent_material=None, part_bones=DEFAULT_PART_BONES, weight_thresh=0.2, side=None):
+def part_focus(blender_armature, part_name, transparent_material=None, part_bones=DEFAULT_PART_BONES, weight_thresh=0.2, side=None):
     """Make only one body part in a human mesh visible (e.g. the arm)
 
     Parameters
     ----------
-    blender_object : blender object 
-        Object with parent armature and vertex groups mapped to each body part
+    blender_armature : blender armature object 
+        armature that controls one or more objects with vertex groups
+        mapped to each body part
     part_name : str
         key into `part_bones` dictionary; (body) part to be shown
     transparent_material : blender material, optional
@@ -1559,16 +1561,17 @@ def part_focus(blender_object, part_name, transparent_material=None, part_bones=
     if transparent_material is None:
         transparent_material = new_transparent_material()
     bones = part_bones[part_name]
-    vv = select_vertex_group(blender_object, bones, side=side, weight_thresh=weight_thresh,
-                             return_vertices=True, is_verbose=False)
-    bpy.ops.object.editmode_toggle()
-    bpy.ops.mesh.select_all(action='INVERT')
-    bpy.ops.object.editmode_toggle()
-    if len([x for x in blender_object.data.vertices if x.select]) > 0:
-        material_to_vertices(blender_object,
-                            transparent_material, is_verbose=True)
-    else:
-        print("No vertices in group for %s"%blender_object.name)
+    for child_object in blender_armature.children:
+        vv = select_vertex_group(child_object, bones, side=side, weight_thresh=weight_thresh,
+                                return_vertices=True, is_verbose=False)
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.select_all(action='INVERT')
+        bpy.ops.object.editmode_toggle()
+        if len([x for x in child_object.data.vertices if x.select]) > 0:
+            material_to_vertices(child_object,
+                                transparent_material, is_verbose=True)
+        else:
+            print("No vertices in group for %s"%child_object.name)
 
 def get_framewise_location(blender_object,
                            bone_name=None,
