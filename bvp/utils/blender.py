@@ -1256,7 +1256,7 @@ def blackout(scn, is_cycles=True):
             apply_material(o, black)
 
 def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
-               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
+               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), side=None,
                return_vertices=False, is_verbose=False, is_cycles=True):
     """Highlight all vertices in a group with some color
     
@@ -1284,19 +1284,23 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         whether to return blender vertices for the group that was
         labeled.
     """
+
+
     if (bpy.app.version < (2, 80, 0)) and obj.hide:
         return
     elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
         return
-    # Get vertex group indices
-    vertex_groups = obj.vertex_groups
-    if not isinstance(vertex_label, (list, tuple)):
-        vertex_label = (vertex_label,)
-    for label in vertex_label:
-        # Implement ANDing across labels provided (e.g. for left AND hand)
-        vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
-    vertex_group_indices = [vg.index for vg in vertex_groups]
-
+    # # Get vertex group indices
+    # vertex_groups = obj.vertex_groups
+    # if not isinstance(vertex_label, (list, tuple)):
+    #     vertex_label = (vertex_label,)
+    # for label in vertex_label:
+    #     # Implement ANDing across labels provided (e.g. for left AND hand)
+    #     vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
+    # vertex_group_indices = [vg.index for vg in vertex_groups]
+    vertices = select_vertex_group(obj, vertex_label, weight_thresh=weight_thresh, 
+        side=side, return_vertices=True, is_verbose=is_verbose)
+    
     # Make new materials for fg and bg if necessary
     if name in bpy.data.materials:
         fg_mat = bpy.data.materials[name]
@@ -1321,29 +1325,29 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         #bpy.ops.object.material_slot_add() #Add a material slot
         obj.material_slots[0].material = bg_mat
 
-    # Deselect all
-    bpy.ops.object.editmode_toggle()  #Go in edit mode
-    bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
-    bpy.ops.object.editmode_toggle()  #Return in object mode
+    # # Deselect all
+    # bpy.ops.object.editmode_toggle()  #Go in edit mode
+    # bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
+    # bpy.ops.object.editmode_toggle()  #Return in object mode
 
-    # Select vertices in specified group
-    vertices = []
-    for vg_idx in vertex_group_indices:
-        vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
-        vertices += vs
+    # # Select vertices in specified group
+    # vertices = []
+    # for vg_idx in vertex_group_indices:
+    #     vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
+    #     vertices += vs
 
-    # Set up list to keep
-    any_vertex = False
-    n_vertices = 0
-    for v in vertices:
-        for vg in v.groups:
-            if vg.group in vertex_group_indices:
-                #print(vg.weight)
-                if vg.weight > weight_thresh:
-                    v.select = True
-                    n_vertices += 1
-                    any_vertex = True
-    if any_vertex:
+    # # Set up list to keep
+    # any_vertex = False
+    # n_vertices = 0
+    # for v in vertices:
+    #     for vg in v.groups:
+    #         if vg.group in vertex_group_indices:
+    #             #print(vg.weight)
+    #             if vg.weight > weight_thresh:
+    #                 v.select = True
+    #                 n_vertices += 1
+    #                 any_vertex = True
+    if len(vertices) > 0:
         islot = -1
         if len(obj.material_slots) == 0:
             #print('WITHIN LABEL_VERTEX_GROUP: Creating first material slot')
@@ -1392,7 +1396,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
 
     if return_vertices:
         # Change this to coordinates? 
-        return [v for v in vertices if v.select]
+        return vertices
     else:
         return
 
@@ -1454,7 +1458,6 @@ def select_vertex_group(obj, vertex_label, weight_thresh=0.2, side=None,
         vertices += vs
 
     # Set up list to keep
-    any_vertex = False
     n_vertices = 0
     for v in vertices:
         for vg in v.groups:
@@ -1463,7 +1466,6 @@ def select_vertex_group(obj, vertex_label, weight_thresh=0.2, side=None,
                 if vg.weight > weight_thresh:
                     v.select = True
                     n_vertices += 1
-                    any_vertex = True
 
     if return_vertices:
         # Change this to coordinates?
