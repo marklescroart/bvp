@@ -1609,9 +1609,18 @@ def get_framewise_location(blender_object,
         bone = blender_object.pose.bones[bone_name]
         # bone bone_locations:
         bone_locations = []
-    # xyz location of the central (z) axis of the parent
-    # object during the same time:
-    object_locations = []
+        # xyz location of the central (z) axis of the parent
+        # object during the same time:
+        object_locations = []
+    else:
+        if blender_object.motion_path is None:
+            for fr in range(frame_start, frame_end+1):
+                bpy.context.scene.frame_set(fr)
+                bpy.context.view_layer.update()  # only for blender 2.8+ ...
+            grab_only(blender_object)
+            bpy.ops.object.paths_calculate(start_frame=frame_start, end_frame=frame_end+1)
+        object_locations = [x.co for x in blender_object.motion_path.points]
+    
     # Loop over all frames in action, getting locations of 
     # the bone and the central axis
     for fr in range(frame_start, frame_end):
@@ -1630,7 +1639,8 @@ def get_framewise_location(blender_object,
                 # Fancy new matrix multiplication operator
                 bone_locations.append(blender_object.matrix_world @
                                  bone.matrix @ bone.location)
-        object_locations.append(blender_object.location.copy())
+            object_locations.append(blender_object.location.copy())
+            
     if center_upward:
         for vec in object_locations:
             vec.z += blender_object.dimensions.z / 2
