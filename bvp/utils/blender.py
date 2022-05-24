@@ -1277,7 +1277,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         name of resulting material
     color : 3-tuple
         R,G,B values for color. 
-    bg_color : 3-tuple
+    bg_color : 3-tuple or blender Material
         background color. If provided, all materials are cleared
         and whole mesh is set to bg_color at outset.
     return_vertices : bool
@@ -1312,12 +1312,15 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
 
     # Create & assign background color only if provided
     if bg_color is not None:
-        if (name + '_bg') in bpy.data.materials:
-            bg_mat = bpy.data.materials[name + '_bg']
+        if isinstance(bg_color, bpy.types.Material):
+            bg_mat = bg_color
         else:
-            bg_mat = bpy.data.materials.new(name + '_bg')
-        bg_mat = set_simple_material_color(
-            bg_mat, bg_color, is_cycles=is_cycles)
+            if (name + '_bg') in bpy.data.materials:
+                bg_mat = bpy.data.materials[name + '_bg']
+            else:
+                bg_mat = bpy.data.materials.new(name + '_bg')
+            bg_mat = set_simple_material_color(
+                bg_mat, bg_color, is_cycles=is_cycles)
         #Assign first material on all the mesh
         if len(obj.material_slots) == 0:
             bpy.ops.object.material_slot_add() # Add a material slot
