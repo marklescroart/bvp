@@ -1285,7 +1285,6 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         labeled.
     """
 
-
     if (bpy.app.version < (2, 80, 0)) and obj.hide:
         return
     elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
@@ -1300,15 +1299,20 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
     # vertex_group_indices = [vg.index for vg in vertex_groups]
     vertices = select_vertex_group(obj, vertex_label, weight_thresh=weight_thresh, 
         side=side, return_vertices=True, is_verbose=is_verbose)
-    
+    is_transparent = (len(color) == 4) and (color[-1] == 0)
     # Make new materials for fg and bg if necessary
     if name in bpy.data.materials:
         fg_mat = bpy.data.materials[name]
     else:
         if is_verbose:
             print('o Creating new material for %s'%name)
-        fg_mat = bpy.data.materials.new(name)
-    fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
+        if is_transparent:
+            print('SETTING TRANSPARENT MATERIAL')
+            fg_mat = new_transparent_material(name=name)
+        else:
+            fg_mat = bpy.data.materials.new(name)
+    if not is_transparent:
+        fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
 
     # Create & assign background color only if provided
     if bg_color is not None:
