@@ -21,8 +21,6 @@ TODO:
 
 """
 
-from __future__ import absolute_import
-
 # Imports
 import numpy as np
 import subprocess

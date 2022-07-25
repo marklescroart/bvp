@@ -1,6 +1,5 @@
 # Imports
 import os
-import six
 from bvp.utils.blender import add_group, grab_only, apply_material
 from .constraint import ObConstraint, CamConstraint
 from .mapped_class import MappedClass
@@ -77,7 +76,7 @@ class Background(MappedClass):
                 #TODO: SemanticCat =/= semantic_category. Fix this at some point.
                 self.obstacles = [Object(pos3D=obst['pos3D'],size3D=obst['size3D']) for obst in obstacles] 
             else:
-                if isinstance(obstacles, six.string_types):
+                if isinstance(obstacles, (str,)):
                     if obstacles.lower() != 'none':
                         raise Exception('String variable for `obstacles` in background not understood')
                     else:

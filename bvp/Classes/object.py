@@ -1,12 +1,3 @@
-"""
-.B.lender .V.ision .Project class for storage of abstraction of a Blender object
-
-To do: Move Shape to this file? 
-Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
-
-"""
-## NOTE! See http://western-skies.blogspot.com/2008/02/simple-complete-example-of-python.html for __getstate__() and __setstate__() methods
-
 # Imports
 import os
 import warnings
@@ -21,12 +12,16 @@ except ImportError:
 
 class Object(MappedClass):
     """Layer of abstraction for objects (imported from other files) in Blender scenes.
+
+    To do: Move Shape to this file?
+    Add methods for re-doing textures, rendering point cloud, rendering axes, etc.
     """
     def __init__(self, name=None, type='Object', fname=None, action=None, pose=None, materials=None,
         pos3D=(0., 0., 0.), size3D=3., rot3D=(0., 0., 0.), n_faces=None, n_vertices=None, n_poses=0,
         basic_category=None, semantic_category=None, wordnet_label=None, armature=None, 
         constraints=None, real_world_size=None, _id=None, _rev=None, dbi=None, is_cycles=False, 
-        is_realistic=False):
+        is_realistic=False, movement_locations=None, movement_frames=None, movement_rotation_euler=None, 
+        rigid_body=False):
         """ Class to store an abstraction of an object in a BVP scene. 
 
         Stores all necessary information to define an object in a scene: identifying information for
@@ -48,7 +43,12 @@ class Object(MappedClass):
             Size of largest dimension. Set to "None" to use object's real world size? (TO DO??)
         rot3D : bpy euler or tuple | (0., 0., 0.)
             rotation (xyz euler) in 3D
-        
+        movement_locations : list
+            list of tuples, keyframes for locations
+        movement_frames : list
+            list of frames corresponding to keyframe locations
+        movement_rotation_euler : list
+            list of rotations corresponding to keyframes
         _id : uuid string
             ID for object in database
         semantic_category : list
@@ -76,7 +76,9 @@ class Object(MappedClass):
                     setattr(self, k, v)
 
         self._db_fields = [] # action?
-        self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose', 'materials']
+        self._data_fields = ['pos2D', 'pos3D', 'rot3D', 'size3D', 'action', 'pose', 'materials', 
+                             'movement_locations', 'movement_frames', 'movement_rotation_euler', 
+                             'rigid_body']
         self._temp_fields = ['min_xyz_pos', 'max_xyz_pos', 'bounding_box_center', 
                              'bounding_box_dimensions', 'xyz_trajectory', 'max_xyz_trajectory',
                              'min_xyz_trajectory', 'blender_object', 'blender_group', 'proxy']
@@ -198,6 +200,17 @@ class Object(MappedClass):
             self.apply_pose(new_armature, self.pose)
         if self.action is not None:
             self.apply_action(new_armature, self.action)
+        elif self.movement_locations is not None:
+            if self.rigid_body:
+                utils.blender.make_physics_animation(new_ob, frames=self.movement_frames, 
+                    location=self.movement_locations, rotation_euler=self.movement_rotation_euler,)
+            else:
+                object_action = utils.blender.make_locrotscale_animation(
+                    self.movement_frames, action_name='ObjectMotion', handle_type='ALIGNED', 
+                    location=self.movement_locations)
+                # Apply action
+                new_ob.animation_data_create()
+                new_ob.animation_data.action = object_action
         # Deal with particle systems on imported objects. Use of particle 
         # systems in general is not advised, since they complicate sizing 
         # and drastically slow renders.
@@ -314,13 +327,16 @@ class Object(MappedClass):
         """
         blender_default_size = 10 # by convention... just making explicit here
         utils.blender.set_cursor((0, 0, 0))
-        bpy.ops.mesh.primitive_uv_sphere_add(size=blender_default_size / 2.)
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=blender_default_size / 2.)
         utils.blender.set_cursor((0, 0, -blender_default_size / 2.))
         bpy.ops.object.origin_set(type='ORIGIN_CURSOR')
         bpy.ops.transform.translate(value=(0, 0, blender_default_size / 2.))
         utils.blender.set_cursor((0, 0, 0))
         obj = bpy.context.object
-        grp = bpy.data.groups.new('dummy')
+        if bpy.app.version < (2, 80, 0):
+            grp = bpy.data.groups.new('dummy')
+        else:
+            grp = bpy.data.collections.new('dummy')
         grp.objects.link(obj)
         # Rotations don't matter; it's a sphere.
         return obj
@@ -502,9 +518,7 @@ class Object(MappedClass):
                 if o.name in scn.objects:
                     scn.objects.unlink(o)
         else:
-            # Assumption here that top-level scene collection is called "Collection"
-            # May want to re-visit this. 
-            scn.collection.children['Collection'].children.unlink(self.blender_group[instance])
+            list(scn.collection.children)[0].children.unlink(self.blender_group[instance])
         _ = self.blender_object.pop(instance)
         _ = self.blender_group.pop(instance)
         _ = self.armature.pop(instance)

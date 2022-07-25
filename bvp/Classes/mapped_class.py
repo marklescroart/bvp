@@ -87,7 +87,8 @@ def _data_to_obj(datadict, dbinterface, is_verbose=False):
     if isinstance(datadict, dict) and 'bvp_object' in datadict:
         object_class_name = datadict.pop('bvp_object')
         module, clsname = object_class_name.split('.')
-        print('Importing %s, %s'%(module, clsname))
+        if is_verbose:
+            print('Importing %s, %s'%(module, clsname))
         module = importlib.import_module('bvp.Classes.%s'%module)
         obcls = getattr(module, clsname)
     else:

@@ -4,15 +4,12 @@
 """
 
 import os
-import random
-import subprocess
-import warnings
 import copy
 import re
 import numpy as np
-from six import string_types
 
 from ..options import config
+from . import math as bvpmath
 
 try:
     import bpy
@@ -70,10 +67,10 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     def _reconcile_handles(handle_type, frames):
         """Make handle_type input into a list of lists of appropriate length"""
         htype = copy.copy(handle_type)
-        if isinstance(htype, string_types):
+        if isinstance(htype, (str,)):
             htype = [htype] * len(frames)
         for ih, h in enumerate(htype):
-            if isinstance(h, string_types):
+            if isinstance(h, (str,)):
                 htype[ih] = [h] * 2
             elif isinstance(h, (list, tuple)):
                 if len(h) == 1:
@@ -109,6 +106,34 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     return act
 
 
+def make_physics_animation(ob, frames=(1, 4), steps_per_second=100, **kwargs):
+    """Kwargs are: location, rotation"""
+    scn = bpy.context.scene
+    # Rigidbody world
+    if scn.rigidbody_world is None:
+        bpy.ops.rigidbody.world_add()
+    scn.rigidbody_world.steps_per_second = steps_per_second
+    grab_only(ob)
+    bpy.ops.rigidbody.object_add()
+    ob.rigid_body.collision_shape = 'MESH'
+    # Starting position
+    object_action = make_locrotscale_animation(
+        frames,
+        action_name='ObjectMotion',
+        handle_type='VECTOR',
+        **kwargs)
+    # Apply action
+    ob.animation_data_create()
+    ob.animation_data.action = object_action
+    # Animate the dependency on animation
+    ob.rigid_body.kinematic = True
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[0])
+    ob.rigid_body.kinematic = True
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[1])
+    ob.rigid_body.kinematic = False
+    ob.keyframe_insert(data_path='rigid_body.kinematic', frame=frames[1]+1)
+
+
 def add_selected_to_group(group_name):
     """Adds all selected objects to group named `group_name`
     """
@@ -139,7 +164,7 @@ def clear_scene(scn=None):
     """
 
     ### --- Removing objects for next scene: --- ### 
-    scn = bvpu.blender.set_scene(scn)
+    scn = set_scene(scn)
     # Enumerate mesh objects to remove
     mesh_objects = list()
     for o in bpy.data.objects:
@@ -1185,9 +1210,54 @@ def make_cube(name, mn, mx):
     mesh.from_pydata(verts, [], faces)
     mesh.update(calc_edges=True)
 
+def set_simple_material_color(mat, color, is_cycles=True):
+    """Set a material color for a very basic material"""
+
+    if is_cycles or bpy.app.version > (2, 80, 0):
+        # If not, use nodes:
+        mat.use_nodes = True
+        nodes = mat.node_tree.nodes
+        to_kill = []
+        for nn in nodes:
+            if nn.name != "Material Output":
+                to_kill.append(nn)
+        for nn in to_kill:
+            nodes.remove(nn)
+        emission = nodes.new('ShaderNodeEmission')
+        emission.inputs[0].default_value = color
+        mat_out = nodes['Material Output']
+        mat.node_tree.links.new(emission.outputs[0], mat_out.inputs[0])
+    else:
+        mat.diffuse_color = color
+        mat.diffuse_intensity = 1.0
+        mat.use_shadeless = True
+    return mat
+
+def blackout(scn, is_cycles=True):
+    if 'black' in [x.name for x in bpy.data.materials]:
+        black = bpy.data.materials['black']
+    else:
+        black = bpy.data.materials.new('black')
+    black = set_simple_material_color(black, (0., 0., 0., 1.0), is_cycles=is_cycles)
+    for o in scn.objects:
+        if len(o.particle_systems) > 0:
+            grab_only(o)
+            bpy.ops.object.particle_system_remove()
+        if is_cycles and (not o.visible_get()):
+            continue
+        if bpy.app.version < (2, 80, 0):
+            hidden = o.hide
+        else:
+            hidden = o.hide_viewport
+        if (not is_cycles) and hidden:
+            continue
+        if hasattr(o.data, 'materials'):
+            print(o.name)
+            apply_material(o, black)
+
 def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label', 
-               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), 
-               return_vertices=False, is_verbose=False):
+               color=(1.0, 1.0, 1.0), bg_color=(0.0, 0.0, 0.0), side=None,
+               return_vertices=False, is_verbose=False, is_cycles=True):
     """Highlight all vertices in a group with some color
     
     Parameters
@@ -1207,49 +1277,50 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         name of resulting material
     color : 3-tuple
         R,G,B values for color. 
-    bg_color : 3-tuple
+    bg_color : 3-tuple or blender Material
         background color. If provided, all materials are cleared
         and whole mesh is set to bg_color at outset.
     return_vertices : bool
         whether to return blender vertices for the group that was
         labeled.
     """
-    if obj.hide:
-        return
-    # Get vertex group indices
-    vertex_groups = obj.vertex_groups
-    if not isinstance(vertex_label, (list, tuple)):
-        vertex_label = (vertex_label,)
-    for label in vertex_label:
-        # Implement ANDing across labels provided (e.g. for left AND hand)
-        vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
-    vertex_group_indices = [vg.index for vg in vertex_groups]
 
+
+    if (bpy.app.version < (2, 80, 0)) and obj.hide:
+        return
+    elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
+        return
+    # # Get vertex group indices
+    # vertex_groups = obj.vertex_groups
+    # if not isinstance(vertex_label, (list, tuple)):
+    #     vertex_label = (vertex_label,)
+    # for label in vertex_label:
+    #     # Implement ANDing across labels provided (e.g. for left AND hand)
+    #     vertex_groups = [x for x in vertex_groups if label.lower() in x.name.lower()]
+    # vertex_group_indices = [vg.index for vg in vertex_groups]
+    vertices = select_vertex_group(obj, vertex_label, weight_thresh=weight_thresh, 
+        side=side, return_vertices=True, is_verbose=is_verbose)
+    
     # Make new materials for fg and bg if necessary
     if name in bpy.data.materials:
         fg_mat = bpy.data.materials[name]
-        if not np.all(np.array(fg_mat.diffuse_color) == np.array(color)):
-           fg_mat.diffuse_color = color
     else:
         if is_verbose:
             print('o Creating new material for %s'%name)
         fg_mat = bpy.data.materials.new(name)
-        fg_mat.diffuse_color = color
-        fg_mat.diffuse_intensity = 1.0
-        fg_mat.use_shadeless = True
+    fg_mat = set_simple_material_color(fg_mat, color, is_cycles=is_cycles)
 
     # Create & assign background color only if provided
     if bg_color is not None:
-        if (name + '_bg') in bpy.data.materials:
-            bg_mat = bpy.data.materials[name + '_bg']
-            if not np.all(np.array(bg_mat.diffuse_color) == np.array(bg_color)):
-                bg_mat.diffuse_color = bg_color
+        if isinstance(bg_color, bpy.types.Material):
+            bg_mat = bg_color
         else:
-            bg_mat = bpy.data.materials.new(name + '_bg')
-            bg_mat.diffuse_color = bg_color
-            bg_mat.diffuse_intensity = 1.0
-            bg_mat.use_shadeless = True
-
+            if (name + '_bg') in bpy.data.materials:
+                bg_mat = bpy.data.materials[name + '_bg']
+            else:
+                bg_mat = bpy.data.materials.new(name + '_bg')
+            bg_mat = set_simple_material_color(
+                bg_mat, bg_color, is_cycles=is_cycles)
         #Assign first material on all the mesh
         if len(obj.material_slots) == 0:
             bpy.ops.object.material_slot_add() # Add a material slot
@@ -1257,29 +1328,29 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         #bpy.ops.object.material_slot_add() #Add a material slot
         obj.material_slots[0].material = bg_mat
 
-    # Deselect all
-    bpy.ops.object.editmode_toggle()  #Go in edit mode
-    bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
-    bpy.ops.object.editmode_toggle()  #Return in object mode
+    # # Deselect all
+    # bpy.ops.object.editmode_toggle()  #Go in edit mode
+    # bpy.ops.mesh.select_all(action='DESELECT') #Select all the vertices
+    # bpy.ops.object.editmode_toggle()  #Return in object mode
 
-    # Select vertices in specified group
-    vertices = []
-    for vg_idx in vertex_group_indices:
-        vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
-        vertices += vs
+    # # Select vertices in specified group
+    # vertices = []
+    # for vg_idx in vertex_group_indices:
+    #     vs = [v for v in obj.data.vertices if vg_idx in [vg.group for vg in v.groups]]
+    #     vertices += vs
 
-    # Set up list to keep
-    any_vertex = False
-    n_vertices = 0
-    for v in vertices:
-        for vg in v.groups:
-            if vg.group in vertex_group_indices:
-                #print(vg.weight)
-                if vg.weight > weight_thresh:
-                    v.select = True
-                    n_vertices += 1
-                    any_vertex = True
-    if any_vertex:
+    # # Set up list to keep
+    # any_vertex = False
+    # n_vertices = 0
+    # for v in vertices:
+    #     for vg in v.groups:
+    #         if vg.group in vertex_group_indices:
+    #             #print(vg.weight)
+    #             if vg.weight > weight_thresh:
+    #                 v.select = True
+    #                 n_vertices += 1
+    #                 any_vertex = True
+    if len(vertices) > 0:
         islot = -1
         if len(obj.material_slots) == 0:
             #print('WITHIN LABEL_VERTEX_GROUP: Creating first material slot')
@@ -1315,8 +1386,12 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         bpy.ops.object.editmode_toggle()  # Return to object mode
         # One-of BS for Ironman rig, which animates differently than
         # other rigs
-        if obj.draw_type == 'WIRE':
-            obj.draw_type = 'TEXTURED'
+        if bpy.app.version < (2, 80, 0):
+            if obj.draw_type == 'WIRE':
+                obj.draw_type = 'TEXTURED'
+        else:
+            if obj.display_type == 'WIRE':
+                obj.display_type = 'TEXTURED'
         # Un-hide objects with vertices that have been labeled
         obj.hide_render = False
     else:
@@ -1324,6 +1399,391 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
 
     if return_vertices:
         # Change this to coordinates? 
+        return vertices
+    else:
+        return
+
+
+def select_vertex_group(obj, vertex_label, weight_thresh=0.2, side=None,
+                        return_vertices=False, is_verbose=False):
+    """Highlight all vertices in a group with some color
+    
+    Parameters
+    ----------
+    obj : blender object
+        Object to be colorized
+    vertex_label : string or list/tuple of strings
+        Names (or parts of names) of vertex groups to select. 
+        These names must be IN the name of the vertex group (e.g. 
+        'Leg' will select vertex groups called "Right Leg" and 
+        "Right Lower Leg"). For tuples with more than one string,
+        logical AND is assumed.
+    weight_thresh : scalar  
+        threshold for vertex weights (some weights for vertex groups
+        are continuous from 0 to 1; this binarizes for labeling)
+    return_vertices : bool
+        whether to return blender vertices for the group that was
+        selected.
+    """
+    if (bpy.app.version < (2, 80, 0)) and obj.hide:
+        return
+    elif (bpy.app.version < (2, 80, 0)) and obj.hide_viewport:
+        return
+    grab_only(obj)
+    # Get vertex group indices
+    vertex_groups = obj.vertex_groups
+    vertex_group_indices = []
+    if is_verbose:
+        print(len(vertex_groups), 'to start.')
+    if not isinstance(vertex_label, (list, tuple)):
+        vertex_label = (vertex_label,)
+    for label in vertex_label:
+        # Implement ANDing across labels provided (e.g. for left AND hand)
+        vertex_groups_this_label = [
+            x for x in vertex_groups if label.lower() in x.name.lower()]
+        if side is not None:
+            vertex_groups_this_label = [
+                x for x in vertex_groups_this_label if side.lower() in x.name.lower()]
+        if is_verbose:
+            print(len(vertex_groups_this_label), 'found for %s' % label)
+        vertex_group_indices.extend([vg.index for vg in vertex_groups_this_label])
+
+    # Deselect all
+    bpy.ops.object.editmode_toggle()  # Go in edit mode
+    bpy.ops.mesh.select_all(action='DESELECT')  # Select all the vertices
+    bpy.ops.object.editmode_toggle()  # Return in object mode
+
+    # Select vertices in specified group
+    vertices = []
+    for vg_idx in vertex_group_indices:
+        vs = [v for v in obj.data.vertices if vg_idx in [
+            vg.group for vg in v.groups]]
+        vertices += vs
+
+    # Set up list to keep
+    n_vertices = 0
+    for v in vertices:
+        for vg in v.groups:
+            if vg.group in vertex_group_indices:
+                #print(vg.weight)
+                if vg.weight > weight_thresh:
+                    v.select = True
+                    n_vertices += 1
+
+    if return_vertices:
+        # Change this to coordinates?
         return [v for v in vertices if v.select]
     else:
         return
+
+
+def material_to_vertices(blender_object, material, is_verbose=True):
+    islot = -1
+    for i, mslot in enumerate(blender_object.material_slots):
+        if mslot.material.name == material.name:
+            islot = i
+    if islot == -1:
+        # Create new material slot
+        print('> Creating new material slot')
+        bpy.ops.object.material_slot_add()  # Add a material slot
+        islot = len(blender_object.material_slots) - 1
+    blender_object.material_slots[islot].link = 'DATA'
+    if is_verbose:
+        print("> Using material slot %d" % islot)
+    mslot = blender_object.material_slots[islot]
+    mslot.material = material
+    blender_object.active_material_index = islot
+    bpy.ops.object.editmode_toggle()  # Go into edit mode
+    # Assign the material on the selected vertices
+    bpy.ops.object.material_slot_assign()
+    # Return to object mode
+    bpy.ops.object.editmode_toggle()
+    # One-off BS for Ironman rig, which animates differently than other rigs
+    if bpy.app.version < (2, 80, 0):
+        if blender_object.draw_type == 'WIRE':
+            blender_object.draw_type = 'TEXTURED'
+    else:
+        if blender_object.display_type == 'WIRE':
+            blender_object.display_type = 'TEXTURED'
+    # Un-hide objects with vertices that have been labeled
+    blender_object.hide_render = False
+
+
+def new_transparent_material(name='transparent'):
+    """Create a new cycles material that is transparent & invisible
+
+    Parameters
+    ----------
+    name : str, optional
+        name for material, by default 'transparent'
+
+    Returns
+    -------
+    blender material
+        transparent material
+    """    
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    mat.node_tree.nodes['Principled BSDF'].inputs['Alpha'].default_value = 0.0
+    mat.blend_method = 'BLEND'
+    return mat
+
+
+DEFAULT_PART_BONES = dict(head=('head', 'jaw', 'eye', 'pupil', 'hair', 'lip', 'nostril', 'brow'),
+                  torso=('spine', 'shoulder', 'hip',
+                         'breast', 'ribs', 'back',
+                         'chest', 'deltoid', 'pec',
+                         'trap', 'lat.', 'stomach'),
+                  arm=('arm', 'forearm', 'upper_arm', 'bicep'),
+                  leg=('leg', 'thigh', 'shin', 'knee', 'calf'),
+                  foot=('foot', 'toe'),
+                  hand=('hand', 'thumb', 'index',
+                        'middle', 'ring', 'pinkie', 'finger', 'palm'),
+                  )
+
+
+def part_focus(blender_armature, part_name, transparent_material=None, part_bones=DEFAULT_PART_BONES, weight_thresh=0.2, side=None):
+    """Make only one body part in a human mesh visible (e.g. the arm)
+
+    Parameters
+    ----------
+    blender_armature : blender armature object 
+        armature that controls one or more objects with vertex groups
+        mapped to each body part
+    part_name : str
+        key into `part_bones` dictionary; (body) part to be shown
+    transparent_material : blender material, optional
+        transparent material to use, by default None, which creates a new material
+        (arg is here to prevent potential creation of many identical transparent 
+        materials)
+    part_bones : dict, optional
+        _description_, by default part_bones
+    weight_thresh : float, optional
+        _description_, by default 0.2
+    side : _type_, optional
+        _description_, by default None
+    """    
+    if transparent_material is None:
+        transparent_material = new_transparent_material()
+    bones = part_bones[part_name]
+    for child_object in blender_armature.children:
+        vv = select_vertex_group(child_object, bones, side=side, weight_thresh=weight_thresh,
+                                return_vertices=True, is_verbose=False)
+        bpy.ops.object.editmode_toggle()
+        bpy.ops.mesh.select_all(action='INVERT')
+        bpy.ops.object.editmode_toggle()
+        if len([x for x in child_object.data.vertices if x.select]) > 0:
+            material_to_vertices(child_object,
+                                transparent_material, is_verbose=True)
+        else:
+            print("No vertices in group for %s"%child_object.name)
+
+def get_framewise_location(blender_object,
+                           bone_name=None,
+                           frame_start=0,
+                           frame_end=100,
+                           center_upward=False):
+    """Gets location of animated blender object at each frame
+
+    Parameters
+    ----------
+    blender_object : blender object class
+        blender object to be tracked
+    bone_name : str or None, optional
+            if str, name of bone within armature for which  to get location, 
+            if None, whole object location is returned. By default None
+    frame_start : int, optional
+        start of interval over which to track location, by default 0
+    frame_end : int, optional
+        end of interval over which to track location, by default 100
+    center_upward : bool, optional
+        whether to m ove position up by half the size of the object;
+        for bvp object, center is at bottom rather than center of mass.
+        By default False
+
+    Returns
+    -------
+    _type_
+        array of (x,y,z) locations
+    """    
+    scn = bpy.context.scene
+    if bone_name is not None:
+        # Find the bone to track
+        bone = blender_object.pose.bones[bone_name]
+        # bone bone_locations:
+        bone_locations = []
+        # xyz location of the central (z) axis of the parent
+        # object during the same time:
+        object_locations = []
+    else:
+        if blender_object.motion_path is None:
+            for fr in range(frame_start, frame_end+1):
+                bpy.context.scene.frame_set(fr)
+                bpy.context.view_layer.update()  # only for blender 2.8+ ...
+            grab_only(blender_object)
+            bpy.ops.object.paths_calculate(start_frame=frame_start, end_frame=frame_end+1)
+        object_locations = [x.co for x in blender_object.motion_path.points]
+    
+    # Loop over all frames in action, getting locations of 
+    # the bone and the central axis
+    for fr in range(frame_start, frame_end):
+        # Update scene frame
+        scn.frame_set(fr)
+        if bpy.app.version < (2, 80, 0):
+            scn.update()
+        else:
+            bpy.context.view_layer.update()
+        if bone_name is not None:
+            # Calculate global position
+            try:
+                bone_locations.append(blender_object.matrix_world *
+                                 bone.matrix * bone.location)
+            except TypeError:
+                # Fancy new matrix multiplication operator
+                bone_locations.append(blender_object.matrix_world @
+                                 bone.matrix @ bone.location)
+            object_locations.append(blender_object.location.copy())
+            
+    if center_upward:
+        for vec in object_locations:
+            vec.z += blender_object.dimensions.z / 2
+    if bone_name is None:
+        return object_locations
+    else:
+        return bone_locations
+
+
+def set_zoom(bvp_camera, bvp_object,
+             bone_name=None,
+             min_distance=2,
+             max_distance=10,
+             absolute_distance=10,
+             frame_start=1,
+             frame_end=60,
+             center_upward=False,
+             distance_to_set='framewise',  # or 'framewise'
+             fps=24,
+             aspect_ratio=4/3,
+             track_position=True,
+             im_location=(0, 0),
+             fixation_fps=None,
+             upsample_camera_position=True,
+             ):
+    """set distance from camera to a target object
+
+    Parameters
+    ----------
+    bvp_camera : bvp.Camera
+        Camera for which to set zoom
+    bvp_object : bvp.Object
+        Object for which to set zoom
+    bone_name : str, optional
+        blender bone name, if zoom to bone within armature is desired, by default None
+    min_distance : int, optional
+        minimum distance from object to camera
+    max_distance : int, optional
+        maximum distance from object to camera, by default 10
+    absolute_distance : int, optional
+        _description_, by default 10
+    frame_start : int, optional
+        _description_, by default 1
+    frame_end : int, optional
+        _description_, by default 60
+    center_upward : bool, optional
+        _description_, by default False
+    distance_to_set : str, optional
+        _description_, by default 'framewise'
+    aspect_ratio : _type_, optional
+        _description_, by default 4/3
+    track_position : bool, optional
+        _description_, by default True
+    im_location : tuple, optional
+        _description_, by default (0, 0)
+    fixation_fps : _type_, optional
+        _description_, by default None
+    upsample_camera_position : bool, optional
+        _description_, by default True
+
+    Raises
+    ------
+    ValueError
+        _description_
+    """             
+    n_frames = frame_end - frame_start + 1
+    if fixation_fps is None:
+        fixation_fps = fps
+    # Get camera and object positions by frame
+    camera_locations = get_framewise_location(
+        bvp_camera.blender_camera,
+        bone_name=None,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        center_upward=center_upward)
+    if len(camera_locations) == 1:
+        camera_locations *= len(bvp_camera.fix_location)
+    if bone_name is None:
+        ob = bvp_object.blender_object[0]
+    else:
+        ob = bvp_object.armature[-1]
+    object_locations = get_framewise_location(
+        ob,
+        bone_name=bone_name,
+        frame_start=frame_start,
+        frame_end=frame_end,
+        center_upward=center_upward)
+
+    # Check on distance from objects. Too far means objects are too small; zoom in
+    cam_to_obj_vectors = np.array(
+        object_locations) - np.array(camera_locations)
+    cam_to_obj_distances = np.linalg.norm(cam_to_obj_vectors, axis=1)
+    # Move camera toward object along current vector to object
+    if distance_to_set == 'median':
+        # Set median distance
+        median_distance = np.median(cam_to_obj_distances)
+        # option 1:
+        #median_vector = np.median(cam_to_obj_vectors, axis=0)
+        # option 2:
+        med_dist_i = np.nonzero(median_distance == cam_to_obj_distances)[0][0]
+        median_vector = cam_to_obj_vectors[med_dist_i]
+
+        if median_distance > max_distance:
+            pct = (median_distance - max_distance) / median_distance
+            vec_adjust = median_vector * pct
+            new_camera_locations = [(np.array(loc) + vec_adjust).tolist()
+                                    for loc in camera_locations]
+    elif distance_to_set == 'framewise':
+        pct_framewise = (cam_to_obj_distances -
+                         absolute_distance) / cam_to_obj_distances
+
+        new_camera_locations = [(np.array(loc) + (cam_to_obj_vec * pct)).tolist()
+                                for loc, cam_to_obj_vec, pct in zip(camera_locations, cam_to_obj_vectors, pct_framewise)]
+    else:
+        raise ValueError("Unknown value for `distance_to_set`!")
+    # Set fixation & image position
+    new_fixation_locations = [bvpmath.aim_camera(ob_loc, im_location, cam_loc,
+                                                        camera_lens=bvp_camera.lens,
+                                                        aspect_ratio=aspect_ratio)
+                              for ob_loc, cam_loc in zip(object_locations, new_camera_locations)]
+
+    if track_position:
+        # Smooth a bit
+        fixation_frames = np.arange(
+            0, n_frames-1, np.maximum(int(fps / fixation_fps), 1))
+    else:
+        idx = int(len(new_fixation_locations) / 2)
+        fixation_frames = [idx]
+    if upsample_camera_position:
+        camera_frames = np.arange(n_frames-1)
+    else:
+        camera_frames = bvp_camera.frames
+
+    new_camera_locations = [new_camera_locations[fr]
+                            for fr in camera_frames]
+    new_fixation_locations = [new_fixation_locations[fr]
+                              for fr in fixation_frames]
+
+    bvp_camera.set_location(
+        (camera_frames + 1).tolist(), new_camera_locations, handle_type='VECTOR')
+    bvp_camera.set_fixation_location(
+        (fixation_frames + 1).tolist(), new_fixation_locations, handle_type='AUTO')
+
