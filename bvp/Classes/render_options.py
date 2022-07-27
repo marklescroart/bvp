@@ -12,6 +12,7 @@ FOR NOW, this is not going to be a mapped class...
 import os
 import sys
 import math as bnp
+import numpy as np
 from .. import utils as bvpu
 from ..options import config
 
@@ -65,6 +66,7 @@ else:
 
 class RenderOptions(object):
     """Class for storing render options for a scene."""
+
     def __init__(self, blender_params=None, bvp_params=None):
         """Initialize rendering options for scenes in BVP framework.
 
@@ -101,13 +103,14 @@ class RenderOptions(object):
         Scene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
 
         """
-        
-        self.use_freestyle = False # May need some clever if statement here - checking on version of blender
+
+        # May need some clever if statement here - checking on version of blender
+        self.use_freestyle = False
         if self.use_freestyle:
             pass
             # Freestyle settings. Not used yet as of 2016.07
             #FSlineThickness = 3.0
-            #FSlineCol = (0.0, 0.0, 0.0)            
+            #FSlineCol = (0.0, 0.0, 0.0)
         self.use_antialiasing = True
         self.antialiasing_samples = '8'
         self.use_edge_enhance = False
@@ -118,61 +121,70 @@ class RenderOptions(object):
         self.use_shadows = True
         self.use_envmaps = False
         # File size
-        self.engine='BLENDER_RENDER'
+        self.engine = 'BLENDER_RENDER'
         self.resolution_x = 512
         self.resolution_y = 512
         self.resolution_percentage = 100
-        self.tile_x = 64 # More?
-        self.tile_y = 64 # More?
+        self.tile_x = 64  # More?
+        self.tile_y = 64  # More?
         # Fields not in bpy.data.scene.render class:
         # Image settings: File format and color mode
         self.image_settings = dict(color_mode='RGBA',
                                    file_format='PNG')
-        
+
         self.DefaultLayerOpts = {
-            'layers':tuple([True]*20), 
-            'use_zmask':False, 
-            'use_all_z':False, 
-            'use_solid':True, # Necessary for almost everything
-            'use_halo':False, 
-            'use_ztransp':False, 
-            'use_sky':False, 
-            'use_edge_enhance':False, 
-            'use_strand':False, 
-            'use_freestyle':False, 
-            'use_pass_combined':False, 
-            'use_pass_z':False, 
-            'use_pass_vector':False, 
-            'use_pass_normal':False, 
-            'use_pass_uv':False, 
-            'use_pass_mist':False, 
-            'use_pass_object_index':False, 
-            'use_pass_color':False, 
-            'use_pass_diffuse':False, 
-            'use_pass_specular':False, 
-            'use_pass_shadow':False, 
-            'use_pass_emit':False, 
-            'use_pass_ambient_occlusion':False, 
-            'use_pass_environment':False, 
-            'use_pass_indirect':False, 
-            'use_pass_reflection':False, 
-            'use_pass_refraction':False, 
-            }
+            'layers': tuple([True]*20),
+            'use_zmask': False,
+            'use_all_z': False,
+            'use_solid': True,  # Necessary for almost everything
+            'use_halo': False,
+            'use_ztransp': False,
+            'use_sky': False,
+            'use_edge_enhance': False,
+            'use_strand': False,
+            'use_freestyle': False,
+            'use_pass_combined': False,
+            'use_pass_z': False,
+            'use_pass_vector': False,
+            'use_pass_normal': False,
+            'use_pass_uv': False,
+            'use_pass_mist': False,
+            'use_pass_object_index': False,
+            'use_pass_color': False,
+            'use_pass_diffuse': False,
+            'use_pass_specular': False,
+            'use_pass_shadow': False,
+            'use_pass_emit': False,
+            'use_pass_ambient_occlusion': False,
+            'use_pass_environment': False,
+            'use_pass_indirect': False,
+            'use_pass_reflection': False,
+            'use_pass_refraction': False,
+        }
         self.BVPopts = {
             # BVP specific rendering options
-            "Image":True, 
-            "Voxels":False, # Not yet implemented reliably. 
-            "ObjectMasks":False, 
-            "Motion":False, # Not yet implemented reliably. Buggy AF
-            "Zdepth":False, 
-            "Contours":False, #Freestyle, yet to be implemented
-            "Axes":False, # based on N.Cornea code, for now - still unfinished
-            "Normals":False,
-            "Clay":False, # Not yet implemented - All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
-            "Type":'FirstFrame', # other options: "All", "FirstAndLastFrame", 'every4th'
-            "RenderFile":render_file, 
-            "BasePath":RENDER_DIR, 
-            }
+            "Image": True,
+            "Voxels": False,  # Not yet implemented reliably.
+            "ObjectMasks": False,
+            "Motion": False,  # Not yet implemented reliably. Buggy AF
+            "Zdepth": False,
+            "Contours": False,  # Freestyle, yet to be implemented
+            "Axes": False,  # based on N.Cornea code, for now - still unfinished
+            "Normals": False,
+            # Not yet implemented - All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
+            "Clay": False,
+            "Type": 'FirstFrame',  # other options: "All", "FirstAndLastFrame", 'every4th'
+            "RenderFile": render_file,
+            "BasePath": RENDER_DIR,
+        }
+        node_grid_scale_x = 200
+        node_grid_scale_y = 300
+        n_steps_max = 8
+        n_rows = 20  # overkill, but whatever
+        tx = (np.arange(0, n_steps_max) - (n_steps_max / 2)) * node_grid_scale_x
+        ty = - ((np.arange(0, n_rows) - (n_rows / 2)) * node_grid_scale_y)
+        xg, yg = np.meshgrid(tx, ty)
+        self._node_grid_locations = np.dstack([xg, yg])
         # Disallow updates that add fields
         self.__dict__ = bvpu.basics.fixedKeyDict(self.__dict__)
         # Update defaults w/ inputs
@@ -180,16 +192,17 @@ class RenderOptions(object):
             # TO DO: Change this variable name. Big change, tho.
             self.BVPopts.update(bvp_params)
         if not blender_params is None:
-            # TO DO: Clean this shit up. Sloppy organization. 
+            # TO DO: Clean this shit up. Sloppy organization.
             if 'DefaultLayerOpts' in blender_params.keys():
                 DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
                 self.DefaultLayerOpts.update(DefaultLayerOpts)
             self.__dict__.update(blender_params)
+
     def __repr__(self):
         S = 'Class "RenderOptions":\n'+self.__dict__.__repr__()
         return S
-    
-    def apply_opts(self, scn=None):
+
+    def apply_opts(self, scn=None, objects_to_mask=None, use_occlusion=False):
         if scn is None:
             # Get current scene if input not supplied
             scn = bpy.context.scene
@@ -204,15 +217,21 @@ class RenderOptions(object):
             scn.layers = [True]+[False]*19
         else:
             # NEED TO FIGURE OUT WHAT TO DO HERE
-            pass 
-        
+            pass
+        if '/Scenes/' not in self.BVPopts['BasePath']:
+            aa, bb = os.path.split(self.BVPopts['BasePath'])
+            self.BVPopts['BasePath'] = os.path.join(aa, 'Scenes', bb)
+        # Set render path
+        scn.render.filepath = self.BVPopts['BasePath']  # ???
         # Get all non-function attributes
-        ToSet = [x for x in self.__dict__.keys() if not hasattr(self.__dict__[x], '__call__') and not x in ['BVPopts', 'DefaultLayerOpts', 'image_settings']]
-        for s in ToSet:
+        render_params_to_set = [x for x in self.__dict__.keys() if not hasattr(
+            self.__dict__[x], '__call__') and not x in ['BVPopts', 'DefaultLayerOpts', 'image_settings']]
+        for rparam in render_params_to_set:
             try:
-                setattr(scn.render, s, self.__dict__[s]) # define __getattr__ or whatever so self[s] works
+                # define __getattr__ or whatever so self[rparam] works
+                setattr(scn.render, rparam, self.__dict__[rparam])
             except:
-                print('Unable to set attribute %s!'%s)
+                print('Unable to set attribute %s!' % rparam)
         # Set image settings:
         scn.render.image_settings.file_format = self.image_settings['file_format']
         scn.render.image_settings.color_mode = self.image_settings['color_mode']
@@ -230,13 +249,17 @@ class RenderOptions(object):
         # if a layer named RenderLayer already exists)
         bpy.context.scene.render.layers[0].name = 'RenderLayer'
         # Add basic node setup:
-        RL = scn.node_tree.nodes.new(type=RLayerNode)
-        compositor_output = scn.node_tree.nodes.new(type=CompositorNode)
-        scn.node_tree.links.new(RL.outputs['Image'], compositor_output.inputs['Image'])
-        scn.node_tree.links.new(RL.outputs['Alpha'], compositor_output.inputs['Alpha'])
+        node_image_rl = scn.node_tree.nodes.new(type=RLayerNode)
+        node_image_rl.location = self._node_grid_locations[0, 0]
+        node_image_output = scn.node_tree.nodes.new(type=CompositorNode)
+        node_image_output.location = self._node_grid_locations[0, -2]
+        scn.node_tree.links.new(
+            node_image_rl.outputs['Image'], node_image_output.inputs['Image'])
+        scn.node_tree.links.new(
+            node_image_rl.outputs['Alpha'], node_image_output.inputs['Alpha'])
         # Decide whether we're only rendering one type of output:
-        single_output = sum([self.BVPopts['Image'], self.BVPopts['ObjectMasks'], self.BVPopts['Zdepth'], 
-                        self.BVPopts['Contours'], self.BVPopts['Axes'], self.BVPopts['Normals']])==1
+        single_output = sum([self.BVPopts['Image'], self.BVPopts['ObjectMasks'], self.BVPopts['Zdepth'],
+                             self.BVPopts['Contours'], self.BVPopts['Axes'], self.BVPopts['Normals']]) == 1
         if bpy.app.version < (2, 80, 0):
             update = scn.update
         else:
@@ -245,9 +268,13 @@ class RenderOptions(object):
         if self.BVPopts['Voxels']:
             self.SetUpVoxelization()
             update()
-            return # Special case! no other node-based options can be applied!
+            return  # Special case! no other node-based options can be applied!
         if self.BVPopts['ObjectMasks']:
-            self.add_object_masks(single_output=single_output)
+            self.add_object_masks(
+                single_output=single_output, 
+                objects_to_mask=objects_to_mask,
+                use_occlusion=use_occlusion,
+                )
         if self.BVPopts['Motion']:
             self.add_motion(single_output=single_output)
         if self.BVPopts['Zdepth']:
@@ -263,20 +290,22 @@ class RenderOptions(object):
             #self.AddClayLayerNodes(Is_RenderOnlyClay=single_output)
         if not self.BVPopts['Image']:
             # Switch all properties from one of the file output nodes to the composite output
-            # Grab a node
-            aa = [N for N in scn.node_tree.nodes if N.type=='OUTPUT_FILE']
-            print([a.type for a in scn.node_tree.nodes])
-            output = aa[0]
+            # Grab a random output node to get path from it as main path
+            all_output_nodes = [
+                n for n in scn.node_tree.nodes if n.type == 'OUTPUT_FILE']
+            output = all_output_nodes[0]
             # Find input to this node
-            Lnk = [L for L in scn.node_tree.links if L.to_node == output][0]
-            Input = Lnk.from_socket
+            link_to_output = [
+                this_link for this_link in scn.node_tree.links if this_link.to_node == output][0]
+            node_input = link_to_output.from_socket
             # Remove all input to composite node:
-            NodeComposite = [N for N in scn.node_tree.nodes if N.type=='COMPOSITE'][0]
-            L = [L for L in scn.node_tree.links if L.to_node==NodeComposite]
+            NodeComposite = [
+                n for n in scn.node_tree.nodes if n.type == 'COMPOSITE'][0]
+            L = [L for L in scn.node_tree.links if L.to_node == NodeComposite]
             for ll in L:
                 scn.node_tree.links.remove(ll)
             # Make link from input to file output to composite output:
-            scn.node_tree.links.new(Input, NodeComposite.inputs['Image'])
+            scn.node_tree.links.new(node_input, NodeComposite.inputs['Image'])
             # Update Scene info to reflect node info:
             scn.render.filepath = output.base_path+output.file_slots[0].path
             scn.render.image_settings.file_format = output.format.file_format
@@ -295,7 +324,12 @@ class RenderOptions(object):
     To add nodes: NewNode = nt.nodes.new(type=NodeType) 
     See top of code for list of node types used.
     """
-    def add_object_masks(self, scn=None, single_output=False):
+
+    def add_object_masks(self, 
+                        scn=None,
+                        single_output=False,
+                        objects_to_mask=None,
+                        use_occlusion=True):
         """Adds compositor nodes to render out object masks.
 
         Parameters
@@ -319,29 +353,33 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
-        ########################################################################
-        ### --- First: Allocate all objects' pass indices (and groups??) --- ### 
-        ########################################################################
-        DisallowedNames = ['BG_', 'CamTar', 'Shadow_'] # Also constraint objects...
-        Ob = [o for o in bpy.context.scene.objects if not any([x in o.name for x in DisallowedNames])]
-        PassCt = 1
+        #####################################################################################
+        ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
+        #####################################################################################
+        if objects_to_mask is None:
+            # Also constraint objects...
+            disallowed_names = ['BG_', 'CamTar', 'Shadow_']
+            objects_to_mask = [o for o in bpy.context.scene.objects if not any(
+                [x in o.name for x in disallowed_names])]
+        object_count = 1
         to_skip = []
-        for o in Ob:
+        for o in objects_to_mask:
             if o.name in to_skip:
                 continue
             # Check for dupli groups:
-            if o.type=='EMPTY':
+            if o.type == 'EMPTY':
                 if o.dupli_group:
-                    o.pass_index = PassCt
+                    o.pass_index = object_count
                     for po in o.dupli_group.objects:
-                        po.pass_index = PassCt
-                    bvpu.blender.set_layers(o, [0, PassCt])
-                    PassCt +=1
+                        po.pass_index = object_count
+                    bvpu.blender.set_layers(o, [0, object_count])
+                    object_count += 1
             # Check for mesh objects:
             elif o.type in ('MESH', 'CURVE'):
-                print('assigning pass index %d to %s'%(PassCt, o.name))
-                o.pass_index = PassCt
-                bvpu.blender.set_layers(o, [0, PassCt])
+                print('assigning pass index %d to %s' % (object_count, o.name))
+                o.pass_index = object_count
+                # change w/ 2.8+
+                bvpu.blender.set_layers(o, [0, object_count])
                 if bpy.app.version < (2, 80, 0):
                     ug = o.users_group
                 else:
@@ -349,71 +387,94 @@ class RenderOptions(object):
                 if len(ug) > 0:
                     for sibling in ug[0].objects:
                         to_skip.append(sibling.name)
-                        print('assigning pass index %d to %s'%(PassCt, sibling.name))
+                        print('assigning pass index %d to %s' %
+                              (object_count, sibling.name))
                         print(to_skip)
-                        sibling.pass_index = PassCt
-                        bvpu.blender.set_layers(sibling, [0, PassCt])                
-                PassCt += 1
-            # Other types of objects?? 
-        
+                        sibling.pass_index = object_count
+                        # change w/ 2.8+
+                        bvpu.blender.set_layers(sibling, [0, object_count])
+                object_count += 1
+            # Other types of objects??
+        n_objects_masked = object_count - 1
         #####################################################################
-        ### ---            Second: Set up render layers:              --- ### 
+        ### ---            Second: Set up render layers:              --- ###
         #####################################################################
-        RL = scn.render.layers.keys()
-        if not 'ObjectMasks1' in RL:
-            for iob in range(PassCt-1):
-                ob_layer = scn.render.layers.new('ObjectMasks%d'%(iob + 1))
+        render_layer_names = scn.render.layers.keys()
+        if not 'ObjectMasks1' in render_layer_names:
+            for iob in range(n_objects_masked):
+                # change w / 2.8+
+                ob_layer = scn.render.layers.new('ObjectMasks%d' % (iob + 1))
+                # to here
+                # Changeable to be more flexible, get all props with use_
+                #props = [p for p in ob_layer.__dir__() if 'use_' in p]
+                # for p in props: ob_layer.__setattr__(p, False)
                 for k, v in self.DefaultLayerOpts.items():
                     ob_layer.__setattr__(k, v)
-                layers = [False for x in range(20)];
-                layers[iob+1] = True 
+                # Necessary for object indices to work for transparent materials
+                ob_layer.use_ztransp = True
+                ob_layer.use_pass_object_index = True  # This one only
+                if use_occlusion:
+                    # Do only one layer, and none of the below
+                    break
+                # change w/ 2.8+
+                layers = [False for x in range(20)]
+                layers[iob+1] = True
                 ob_layer.layers = tuple(layers)
-                ob_layer.use_ztransp = True # Necessary for object indices to work for transparent materials
-                ob_layer.use_pass_object_index = True # This one only
+                # / to here
         else:
             raise Exception('ObjectMasks layers already exist!')
-        ########################################################################
-        ### ---            Third: Set up compositor nodes:               --- ### 
-        ########################################################################
+        #####################################################################
+        ### ---            Third: Set up compositor nodes:            --- ###
+        #####################################################################
         nt = scn.node_tree
         # Object index nodes (pass_index=100 is for skies!)
         pass_idx = [o.pass_index for o in scn.objects if o.pass_index < 100]
         max_pi = max(pass_idx)
-        print('Found %d pass indices'%(max_pi))
+        grid = self._node_grid_locations[6:6 + len(pass_idx) * 2, :]
+        print('Found %d pass indices' % (max_pi))
         for iob in range(max_pi):
-            node_rl = nt.nodes.new(type=RLayerNode)
-            node_rl.layer = 'ObjectMasks%d'%(iob + 1)
+            # Render layer
+            if use_occlusion:
+                if iob == 0:
+                    node_rl = nt.nodes.new(type=RLayerNode)
+                    node_rl.layer = 'ObjectMasks%d' % (iob + 1)
+                    node_rl.location = grid[iob * 2, 0]
+            else:
+                node_rl = nt.nodes.new(type=RLayerNode)
+                node_rl.layer = 'ObjectMasks%d' % (iob + 1)
+                node_rl.location = grid[iob * 2, 0]
 
-            NewVwNode = nt.nodes.new(ViewerNode)
-            NewIDNode = nt.nodes.new(IDmaskNode)
-            NewIDOut = nt.nodes.new(OutputFileNode)
-            
-            VwNm = 'ID Mask %d View'%(iob+1)
-            NewVwNode.name = VwNm
-            
-            IDNm = 'ID Mask %d'%(iob+1)
-            NewIDNode.name = IDNm
-            NewIDNode.index = iob+1
-            # Link nodes
-            nt.links.new(node_rl.outputs['IndexOB'], NewIDNode.inputs['ID value'])
-            nt.links.new(NewIDNode.outputs['Alpha'], NewIDOut.inputs[0])
-            nt.links.new(NewIDNode.outputs['Alpha'], NewVwNode.inputs['Image'])
-            NewIDOut.format.file_format = 'PNG'
-            NewIDOut.base_path = scn.render.filepath.replace('/Scenes/', '/Masks/')
-            endCut = NewIDOut.base_path.index('Masks/')+len('Masks/')
+            # View
+            node_view = nt.nodes.new(ViewerNode)
+            node_view.name = 'ID Mask %d View' % (iob+1)
+            node_view.location = grid[iob*2 + 1, -1]
+            # ID mask
+            node_id_mask = nt.nodes.new(IDmaskNode)
+            node_id_mask.name = 'ID Mask %d' % (iob+1)
+            node_id_mask.index = iob+1
+            node_id_mask.location = grid[iob * 2, 1]
+            # Output
+            node_file_output = nt.nodes.new(OutputFileNode)
+            node_file_output.location = grid[iob * 2, -2]
+            node_file_output.format.file_format = 'PNG'
+            node_file_output.base_path = scn.render.filepath.replace(
+                '/Scenes/', '/Masks/')
+            endCut = node_file_output.base_path.index('Masks/')+len('Masks/')
             # Set unique name per frame
-            NewIDOut.file_slots[0].path = NewIDOut.base_path[endCut:]+'_m%02d'%(iob+1)
-            NewIDOut.name = 'Object %d'%(iob)
+            node_file_output.file_slots[0].path = node_file_output.base_path[endCut:] + \
+                '_m%02d' % (iob+1)
+            node_file_output.name = 'Object %d' % (iob)
             # Set base path
-            NewIDOut.base_path = NewIDOut.base_path[:endCut]
-            # Set location with NewIdNode.location = ((x, y))
-            nPerRow = 8.
-            Loc = bmu.Vector((bnp.modf(iob/nPerRow)[0]*nPerRow, -bnp.modf(iob/nPerRow)[1]))
-            Offset = 250.
-            Loc = Loc*Offset - bmu.Vector((nPerRow/2. * Offset - 300., 100.))  # hard-coded to be below RL node
-            NewIDNode.location = Loc
-            NewVwNode.location = Loc - bmu.Vector((0., 100))
-            NewIDOut.location = Loc - bmu.Vector((-150., 100))
+            node_file_output.base_path = node_file_output.base_path[:endCut]
+
+            # Link nodes
+            nt.links.new(node_rl.outputs['IndexOB'],
+                         node_id_mask.inputs['ID value'])
+            nt.links.new(node_id_mask.outputs['Alpha'], node_file_output.inputs[0])
+            nt.links.new(node_id_mask.outputs['Alpha'], node_view.inputs['Image'])
+            
+            
+            
 
     def add_depth(self, scn=None, single_output=False):
         """Adds compositor nodes to render out Z buffer
@@ -422,81 +483,91 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
+        grid = self._node_grid_locations[1:3]
         #####################################################################
-        ### ---                Set up render layers:                  --- ### 
+        ### ---                Set up render layers:                  --- ###
         #####################################################################
-        RL = scn.render.layers.keys()
-        if not 'Zdepth' in RL:
-            #bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            #ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
-            #ob_layer = scn.render.layers[ob_layer[0]]
+        render_layer_names = scn.render.layers.keys()
+        if not 'Zdepth' in render_layer_names:
             ob_layer = scn.render.layers.new('Zdepth')
             for k in self.DefaultLayerOpts.keys():
                 ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
-            #ob_layer.name = 'Zdepth'
-            #RL.append('Zdepth')
-            ob_layer.use_ztransp = True # Necessary for z depth to work for transparent materials ?
-            ob_layer.use_pass_z = True # Principal interest
-            ob_layer.use_pass_object_index = True # for masking out depth of sky dome 
+            # Necessary for z depth to work for transparent materials ?
+            ob_layer.use_ztransp = True
+            ob_layer.use_pass_z = True  # Principal interest
+            ob_layer.use_pass_object_index = True  # for masking out depth of sky dome
         else:
             raise Exception('Zdepth layer already exists!')
         ########################################################################
-        ### ---                Set up compositor nodes:                  --- ### 
+        ### ---                Set up compositor nodes:                  --- ###
         ########################################################################
         nt = scn.node_tree
         # Get all node names (keys)
         node_rl = nt.nodes.new(type=RLayerNode)
         node_rl.layer = 'Zdepth'
-
+        node_rl.location = grid[0, 0]
         # Zero out all depth info from the sky dome (the sky doesn't have any depth!)
-        NodeSky = nt.nodes.new(IDmaskNode)
-        NodeSky.use_antialiasing = False  #No AA for z depth! doesn't work to combine non-AA node w/ AA node!
-        NodeSky.index = 100
-        nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
-        NodeInv = nt.nodes.new(MathNode)
-        NodeInv.operation = 'SUBTRACT'
+        node_sky_id = nt.nodes.new(IDmaskNode)
+        # No AA for z depth! doesn't work to combine non-AA node w/ AA node!
+        node_sky_id.use_antialiasing = False
+        node_sky_id.index = 100
+        node_sky_id.location = grid[1, 1]
+        nt.links.new(node_rl.outputs['IndexOB'], node_sky_id.inputs['ID value'])
         # Invert (ID) alpha layer, so sky values are zero, objects/bg are 1
-        NodeInv.inputs[0].default_value = 1.0
-        nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+        node_invert_value = nt.nodes.new(MathNode)
+        node_invert_value.operation = 'SUBTRACT'        
+        node_invert_value.inputs[0].default_value = 1.0
+        node_invert_value.location = grid[0, 2]
+        nt.links.new(node_sky_id.outputs[0], node_invert_value.inputs[1])
         # Mask out sky by multiplying with inverted sky mask
-        NodeMult = nt.nodes.new(MathNode)
-        NodeMult.operation = 'MULTIPLY'
-        nt.links.new(node_rl.outputs['Depth'], NodeMult.inputs[0])
-        nt.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
-        # Add 1000 to the sky:
-        NodeMult1000 = nt.nodes.new(MathNode)
-        NodeMult1000.operation = 'MULTIPLY'
-        NodeMult1000.inputs[0].default_value = 1000.0
-        nt.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
-        NodeAdd1000 = nt.nodes.new(MathNode)
-        NodeAdd1000.operation = 'ADD'
-        NodeAdd1000.inputs[0].default_value = 1000.0
-        nt.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
-        nt.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
-
+        node_multiply = nt.nodes.new(MathNode)
+        node_multiply.operation = 'MULTIPLY'
+        node_multiply.location = grid[0, 3]
+        nt.links.new(node_rl.outputs['Depth'], node_multiply.inputs[0])
+        nt.links.new(node_invert_value.outputs[0], node_multiply.inputs[1])
+        # Add 1000 to the sky to distinguish it from other masks
+        node_multiply1000 = nt.nodes.new(MathNode)
+        node_multiply1000.operation = 'MULTIPLY'
+        node_multiply1000.inputs[0].default_value = 1000.0
+        node_multiply1000.location = grid[1, 3]
+        nt.links.new(node_multiply1000.inputs[1], node_sky_id.outputs[0])
+        # Add 1000 value back to depth image
+        node_add_1000 = nt.nodes.new(MathNode)
+        node_add_1000.operation = 'ADD'
+        node_add_1000.inputs[0].default_value = 1000.0
+        node_add_1000.location = grid[0, 4]
+        nt.links.new(node_multiply.outputs[0], node_add_1000.inputs[0])
+        nt.links.new(node_multiply1000.outputs[0], node_add_1000.inputs[1])
         # Depth output node
-        DepthOut = nt.nodes.new(OutputFileNode)
-        DepthOut.location =  bmu.Vector((900., 300.))
-        DepthOut.format.file_format = 'OPEN_EXR' # Changed 2012.10.24
-        if '/Masks/' in scn.render.filepath: 
-            DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
-            DepthOut.base_path = DepthOut.base_path.replace('/Masks/', '/Zdepth/')+'_z'
+        node_depth_output = nt.nodes.new(OutputFileNode)
+        node_depth_output.location = grid[0, -2]
+        node_depth_output.format.file_format = 'OPEN_EXR'  # Changed 2012.10.24
+        if '/Masks/' in scn.render.filepath:
+            node_depth_output.base_path = scn.render.filepath[0:-4]  # get rid of "_m01"
+            node_depth_output.base_path = node_depth_output.base_path.replace(
+                '/Masks/', '/Zdepth/')+'_z'
         elif '/Motion/' in scn.render.filepath:
-            DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_mot"
-            DepthOut.base_path = DepthOut.base_path.replace('/Motion/', '/Zdepth/')+'_z'
+            node_depth_output.base_path = scn.render.filepath[0:-4]  # get rid of "_mot"
+            node_depth_output.base_path = node_depth_output.base_path.replace(
+                '/Motion/', '/Zdepth/')+'_z'
         elif '/Normals/' in scn.render.filepath:
-            DepthOut.base_path = scn.render.filepath[0:-4] # get rid of "_nor"
-            DepthOut.base_path = DepthOut.base_path.replace('/Normals/', '/Zdepth/')+'_z'
+            node_depth_output.base_path = scn.render.filepath[0:-4]  # get rid of "_nor"
+            node_depth_output.base_path = node_depth_output.base_path.replace(
+                '/Normals/', '/Zdepth/')+'_z'
         else:
-            DepthOut.base_path = scn.render.filepath.replace('/Scenes/', '/Zdepth/')
+            node_depth_output.base_path = scn.render.filepath.replace(
+                '/Scenes/', '/Zdepth/')
             # Set unique name per frame
-            endCut = DepthOut.base_path.index('Zdepth/')+len('Zdepth/')
-            DepthOut.file_slots[0].path = DepthOut.base_path[endCut:]+'_z'
+            endCut = node_depth_output.base_path.index('Zdepth/')+len('Zdepth/')
+            node_depth_output.file_slots[0].path = node_depth_output.base_path[endCut:]+'_z'
             # Set base path
-            DepthOut.base_path = DepthOut.base_path[:endCut]
-
-        nt.links.new(NodeAdd1000.outputs[0], DepthOut.inputs[0])
-            
+            node_depth_output.base_path = node_depth_output.base_path[:endCut]
+        nt.links.new(node_add_1000.outputs[0], node_depth_output.inputs[0])
+        # View node
+        node_view = nt.nodes.new(ViewerNode)
+        node_view.location = grid[1, -1]
+        nt.links.new(node_add_1000.outputs[0], node_view.inputs['Image'])
+        
     def add_normals(self, scn=None, single_output=False):
         """Adds compositor nodes to render out surface normals
         
@@ -511,93 +582,105 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
+        grid = self._node_grid_locations[3:6]
         #####################################################################
-        ### ---                Set up render layers:                  --- ### 
+        ### ---                Set up render layers:                  --- ###
         #####################################################################
-        RL = scn.render.layers.keys()
-        if not 'Normals' in RL:
-            bpy.ops.scene.render_layer_add() # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
-            ob_layer = scn.render.layers[ob_layer[0]]
+        render_layer_names = scn.render.layers.keys()
+        if not 'Normals' in render_layer_names:
+            ob_layer = scn.render.layers.new('Normals')
             for k in self.DefaultLayerOpts.keys():
                 ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
-            ob_layer.name = 'Normals'
-            RL.append('Normals')
-            ob_layer.use_ztransp = True # Necessary for Normals to work for transparent materials ?
-            ob_layer.use_pass_normal = True # Principal interest
-            ob_layer.use_pass_object_index = True # for masking out sky dome normals
+            render_layer_names.append('Normals')
+            # Necessary for Normals to work for transparent materials ?
+            ob_layer.use_ztransp = True
+            ob_layer.use_pass_normal = True  # Principal interest
+            ob_layer.use_pass_object_index = True  # for masking out sky dome normals
         else:
             raise Exception('Normal layer already exists!')
         ########################################################################
-        ### ---                 Set up compositor nodes:                 --- ### 
+        ### ---                 Set up compositor nodes:                 --- ###
         ########################################################################
-        # TO DO: Make a sensible layout for these, i.e. set .location field for all nodes (not urgent...)
         nt = scn.node_tree
         node_rl = nt.nodes.new(type=RLayerNode)
         node_rl.layer = 'Normals'
+        node_rl.location = grid[0, 0]
         # Normal output nodes
         # (1) Split normal channels
-        NorSpl = nt.nodes.new(type=SepRGBANode)
-        nt.links.new(node_rl.outputs['Normal'], NorSpl.inputs['Image'])
-        NorSpl.location = node_rl.location + bmu.Vector((600., 0))
-        UpDown = [75., 0., -75.]
+        node_split_normals = nt.nodes.new(type=SepRGBANode)
+        node_split_normals.location = grid[0, 2]
+        nt.links.new(node_rl.outputs['Normal'], node_split_normals.inputs['Image'])
         # (2) Zero out all normals on the sky dome (the sky doesn't really curve!)
-        NodeSky = nt.nodes.new(IDmaskNode)
-        NodeSky.use_antialiasing = True
-        NodeSky.index = 100
-        nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
-        NodeInv = nt.nodes.new(MathNode)
-        NodeInv.operation = 'SUBTRACT'
+        node_sky_id = nt.nodes.new(IDmaskNode)
+        node_sky_id.use_antialiasing = True
+        node_sky_id.index = 100
+        node_sky_id.location = grid[1, 1]
+        nt.links.new(node_rl.outputs['IndexOB'], node_sky_id.inputs['ID value'])
         # Invert alpha layer, so sky values are zero
-        NodeInv.inputs[0].default_value = 1.0
-        nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+        node_invert_value = nt.nodes.new(MathNode)
+        node_invert_value.operation = 'SUBTRACT'
+        node_invert_value.inputs[0].default_value = 1.0
+        node_invert_value.location = grid[1, 2]
+        nt.links.new(node_sky_id.outputs[0], node_invert_value.inputs[1])
         # (3) re-combine to RGB image
-        NorCom = nt.nodes.new(type=CombRGBANode)
-        NorCom.location = node_rl.location + bmu.Vector((1050., 0.))
-        # Normal values go from -1 to 1, but image formats won't support that, so we will add 1 
+        node_combine_normals = nt.nodes.new(type=CombRGBANode)
+        node_combine_normals.location = grid[1, -3]
+        # Normal values go from -1 to 1, but image formats won't support that, so we will add 1
         # and store a floating-point value from to 0-2 in an .hdr file
         for iMap in range(3):
             # For masking out sky:
-            NodeMult = nt.nodes.new(MathNode)
-            NodeMult.operation = 'MULTIPLY'
+            node_multiply = nt.nodes.new(MathNode)
+            node_multiply.operation = 'MULTIPLY'
+            node_multiply.location = grid[iMap, 3]
             # For adding 1 to normal values:
-            NodeAdd1 = nt.nodes.new(MathNode)
-            NodeAdd1.operation = 'ADD'
-            NodeAdd1.inputs[1].default_value = 1.0
+            node_add1 = nt.nodes.new(MathNode)
+            node_add1.operation = 'ADD'
+            node_add1.inputs[1].default_value = 1.0
+            node_add1.location = grid[iMap, 4]
             # Link nodes for order of computation:
-            # multiply by inverse of sky alpha: 
-            nt.links.new(NorSpl.outputs['RGB'[iMap]], NodeMult.inputs[0])
-            nt.links.new(NodeInv.outputs['Value'], NodeMult.inputs[1])
+            # multiply by inverse of sky alpha:
+            nt.links.new(node_split_normals.outputs['RGB'[iMap]], node_multiply.inputs[0])
+            nt.links.new(node_invert_value.outputs['Value'], node_multiply.inputs[1])
             # Add 1:
-            nt.links.new(NodeMult.outputs['Value'], NodeAdd1.inputs[0])
+            nt.links.new(node_multiply.outputs['Value'], node_add1.inputs[0])
             # Re-combine:
-            nt.links.new(NodeAdd1.outputs['Value'], NorCom.inputs['RGB'[iMap]])
+            nt.links.new(node_add1.outputs['Value'], node_combine_normals.inputs['RGB'[iMap]])
         # Normal output node
-        NorOut = nt.nodes.new(OutputFileNode)
-        NorOut.location = node_rl.location + bmu.Vector((1200., 0.))
-        NorOut.format.file_format = 'OPEN_EXR' #'PNG'
-        NorOut.name = 'fOutput Normals'
-        nt.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
+        node_normal_output = nt.nodes.new(OutputFileNode)
+        node_normal_output.location = grid[0, -2]
+        node_normal_output.format.file_format = 'OPEN_EXR'  # 'PNG'
+        node_normal_output.name = 'fOutput Normals'
+        nt.links.new(node_combine_normals.outputs['Image'], node_normal_output.inputs[0])
         # If any other node is the principal node, replace (output folder) with /Normals/:
         if '/Masks/' in scn.render.filepath:
-            NorOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
-            NorOut.base_path = NorOut.base_path.replace('/Masks/', '/Normals/')+'_z'
+            node_normal_output.base_path = scn.render.filepath[0:-4]  # get rid of "_m01"
+            node_normal_output.base_path = node_normal_output.base_path.replace(
+                '/Masks/', '/Normals/')+'_z'
         elif '/Motion/' in scn.render.filepath:
-            NorOut.base_path = scn.render.filepath[0:-4] # get rid of "_mot"
-            NorOut.base_path = NorOut.base_path.replace('/Motion/', '/Normals/')+'_mot'
+            node_normal_output.base_path = scn.render.filepath[0:-4]  # get rid of "_mot"
+            node_normal_output.base_path = node_normal_output.base_path.replace(
+                '/Motion/', '/Normals/')+'_mot'
         elif '/Zdepth/' in scn.render.filepath:
-            NorOut.base_path = NorOut.base_path[0:-2] # remove '_z' 
-            NorOut.base_path = scn.render.filepath.replace('/Zdepth/', '/Scenes/')+'_nor'
+            node_normal_output.base_path = node_normal_output.base_path[0:-2]  # remove '_z'
+            node_normal_output.base_path = scn.render.filepath.replace(
+                '/Zdepth/', '/Scenes/')+'_nor'
         else:
-            NorOut.base_path = scn.render.filepath.replace('/Scenes/', '/Normals/')
+            node_normal_output.base_path = scn.render.filepath.replace(
+                '/Scenes/', '/Normals/')
             # Set unique name per frame
-            print(NorOut.base_path)
-            endCut = NorOut.base_path.index('Normals/')+len('Normals/')
-            NorOut.file_slots[0].path = NorOut.base_path[endCut:]+'_nor'
+            print(node_normal_output.base_path)
+            endCut = node_normal_output.base_path.index('Normals/')+len('Normals/')
+            node_normal_output.file_slots[0].path = node_normal_output.base_path[endCut:]+'_nor'
             # Set base path
-            NorOut.base_path = NorOut.base_path[:endCut]
-        nt.links.new(NorCom.outputs['Image'], NorOut.inputs[0])
+            node_normal_output.base_path = node_normal_output.base_path[:endCut]
+        nt.links.new(node_combine_normals.outputs['Image'], node_normal_output.inputs[0])
+        # View
+        node_view = nt.nodes.new(ViewerNode)
+        node_view.location = grid[2, -1]
+        nt.links.new(
+            node_combine_normals.outputs['Image'], node_view.inputs['Image'])
         
+
     def add_motion(self, scn=None, single_output=False):
         """Adds compositor nodes to render motion (optical flow, a.k.a. vector pass)
 
@@ -613,11 +696,11 @@ class RenderOptions(object):
         scn.use_nodes = True
         scn.render.use_compositing = True
         #####################################################################
-        ### ---                Set up render layers:                  --- ### 
+        ### ---                Set up render layers:                  --- ###
         #####################################################################
         RL = scn.render.layers.keys()
         if not 'Motion' in RL:
-            bpy.ops.scene.render_layer_add() 
+            bpy.ops.scene.render_layer_add()
             # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
             ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
             ob_layer = scn.render.layers[ob_layer[0]]
@@ -627,65 +710,74 @@ class RenderOptions(object):
                 ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
             # And set motion-specific layer options
             ob_layer.name = 'Motion'
-            ob_layer.use_pass_vector = True # Motion layer
-            ob_layer.use_ztransp = True # Necessary (?) for motion to work for transparent materials
-            ob_layer.use_pass_z = True # Necessary (?)
-            #ob_layer.use_pass_object_index = True # for masking out depth of sky dome 
+            ob_layer.use_pass_vector = True  # Motion layer
+            # Necessary (?) for motion to work for transparent materials
+            ob_layer.use_ztransp = True
+            ob_layer.use_pass_z = True  # Necessary (?)
+            #ob_layer.use_pass_object_index = True # for masking out depth of sky dome
             RL.append('Motion')
         else:
             raise Exception('Motion layer already exists!')
         ########################################################################
-        ### ---                Set up compositor nodes:                  --- ### 
+        ### ---                Set up compositor nodes:                  --- ###
         ########################################################################
         nt = scn.node_tree
         # Get all node names (keys)
         node_rl = nt.nodes.new(type=RLayerNode)
         node_rl.layer = 'Motion'
 
-        # QUESTION: Better to zero out motion in sky?? NO for now, 
+        # QUESTION: Better to zero out motion in sky?? NO for now,
         # but leave here in case we want the option later...
         if False:
             # Zero out all depth info from the sky dome (the sky doesn't have any depth!)
-            NodeSky = nt.nodes.new(IDmaskNode)
-            NodeSky.use_antialiasing = False  #No AA for z depth! doesn't work to combine non-AA node w/ AA node!
-            NodeSky.index = 100
-            nt.links.new(node_rl.outputs['IndexOB'], NodeSky.inputs['ID value'])
-            NodeInv = nt.nodes.new(MathNode)
-            NodeInv.operation = 'SUBTRACT'
+            node_sky_id = nt.nodes.new(IDmaskNode)
+            # No AA for z depth! doesn't work to combine non-AA node w/ AA node!
+            node_sky_id.use_antialiasing = False
+            node_sky_id.index = 100
+            nt.links.new(node_rl.outputs['IndexOB'],
+                         node_sky_id.inputs['ID value'])
+            node_invert_value = nt.nodes.new(MathNode)
+            node_invert_value.operation = 'SUBTRACT'
             # Invert (ID) alpha layer, so sky values are zero, objects/bg are 1
-            NodeInv.inputs[0].default_value = 1.0
-            nt.links.new(NodeSky.outputs[0], NodeInv.inputs[1])
+            node_invert_value.inputs[0].default_value = 1.0
+            nt.links.new(node_sky_id.outputs[0], node_invert_value.inputs[1])
             # Mask out sky by multiplying with inverted sky mask
-            NodeMult = nt.nodes.new(MathNode)
-            NodeMult.operation = 'MULTIPLY'
-            nt.links.new(node_rl.outputs['Speed'], NodeMult.inputs[0])
-            nt.links.new(NodeInv.outputs[0], NodeMult.inputs[1])
+            node_multiply = nt.nodes.new(MathNode)
+            node_multiply.operation = 'MULTIPLY'
+            nt.links.new(node_rl.outputs['Speed'], node_multiply.inputs[0])
+            nt.links.new(node_invert_value.outputs[0], node_multiply.inputs[1])
             # Add 1000 to the sky:
-            NodeMult1000 = nt.nodes.new(MathNode)
-            NodeMult1000.operation = 'MULTIPLY'
-            NodeMult1000.inputs[0].default_value = 1000.0
-            nt.links.new(NodeMult1000.inputs[1], NodeSky.outputs[0])
-            NodeAdd1000 = nt.nodes.new(MathNode)
-            NodeAdd1000.operation = 'ADD'
-            NodeAdd1000.inputs[0].default_value = 1000.0
-            nt.links.new(NodeMult.outputs[0], NodeAdd1000.inputs[0])
-            nt.links.new(NodeMult1000.outputs[0], NodeAdd1000.inputs[1])
+            node_multiply1000 = nt.nodes.new(MathNode)
+            node_multiply1000.operation = 'MULTIPLY'
+            node_multiply1000.inputs[0].default_value = 1000.0
+            nt.links.new(node_multiply1000.inputs[1], node_sky_id.outputs[0])
+            node_add_1000 = nt.nodes.new(MathNode)
+            node_add_1000.operation = 'ADD'
+            node_add_1000.inputs[0].default_value = 1000.0
+            nt.links.new(node_multiply.outputs[0], node_add_1000.inputs[0])
+            nt.links.new(node_multiply1000.outputs[0], node_add_1000.inputs[1])
 
         # Depth output node
         MotionOut = nt.nodes.new(OutputFileNode)
-        MotionOut.location =  bmu.Vector((0., 300.))
+        MotionOut.location = bmu.Vector((0., 300.))
         MotionOut.format.file_format = 'OPEN_EXR'
-        if '/Masks/' in scn.render.filepath: 
-            MotionOut.base_path = scn.render.filepath[0:-4] # get rid of "_m01"
-            MotionOut.base_path = DepthOut.base_path.replace('/Masks/', '/Motion/')+'_mot'
+        if '/Masks/' in scn.render.filepath:
+            # get rid of "_m01"
+            MotionOut.base_path = scn.render.filepath[0:-4]
+            MotionOut.base_path = node_depth_output.base_path.replace(
+                '/Masks/', '/Motion/')+'_mot'
         elif '/Normals/' in scn.render.filepath:
-            MotionOut.base_path = scn.render.filepath[0:-4] # get rid of "_nor"
-            MotionOut.base_path = DepthOut.base_path.replace('/Normals/', '/Motion/')+'_mot'
+            # get rid of "_nor"
+            MotionOut.base_path = scn.render.filepath[0:-4]
+            MotionOut.base_path = node_depth_output.base_path.replace(
+                '/Normals/', '/Motion/')+'_mot'
         elif '/Zdepth/' in scn.render.filepath:
-            MotionOut.base_path = scn.render.filepath[0:-2] # get rid of "_z"
-            MotionOut.base_path = DepthOut.base_path.replace('/Zdepth/', '/Motion/')+'_mot'
+            MotionOut.base_path = scn.render.filepath[0:-2]  # get rid of "_z"
+            MotionOut.base_path = node_depth_output.base_path.replace(
+                '/Zdepth/', '/Motion/')+'_mot'
         else:
-            MotionOut.base_path = scn.render.filepath.replace('/Scenes/', '/Motion/')
+            MotionOut.base_path = scn.render.filepath.replace(
+                '/Scenes/', '/Motion/')
             # Set unique name per frame
             endCut = MotionOut.base_path.index('Motion/')+len('Motion/')
             MotionOut.file_slots[0].path = MotionOut.base_path[endCut:]+'_mot'
@@ -706,34 +798,38 @@ class RenderOptions(object):
         # Set renderer to cycles
         scn.render.engine = 'CYCLES'
         # Set camera to cycles, fisheye equisolid, 360 deg fov
-        Cam = [o for o in bpy.context.scene.objects if o.type=='CAMERA']
-        if len(Cam)==1:
+        Cam = [o for o in bpy.context.scene.objects if o.type == 'CAMERA']
+        if len(Cam) == 1:
             Cam = Cam[0]
         else:
             raise Exception('Zero or >1 camera in your scene! WTF!!')
-        Cam.data.type='PANO'
+        Cam.data.type = 'PANO'
         Cam.data.cycles.fisheye_fov = math.pi*2.
-        Cam.data.cycles.panorama_type='FISHEYE_EQUISOLID'
+        Cam.data.cycles.panorama_type = 'FISHEYE_EQUISOLID'
 
-        # Get all-white cycles emission material 
+        # Get all-white cycles emission material
         fpath = os.path.join(bvp_basedir, 'BlendFiles')
         fName = 'Cycles_Render.blend'
         MatNm = 'CycWhite'
         bpy.ops.wm.link_append(
-            directory=os.path.join(fpath, fName)+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Materials)
-            filepath="//"+fName+"\\Material\\"+'CycWhite', # local filepath within .blend file to the material to be imported
-            filename='CycWhite', # "filename" being the name of the data block, i.e. the name of the material.
-            link=False, 
-            relative_path=False, 
-            )
-        
+            # i.e., directory WITHIN .blend file (Scenes / Objects / Materials)
+            directory=os.path.join(fpath, fName)+"\\Material\\",
+            # local filepath within .blend file to the material to be imported
+            filepath="//"+fName+"\\Material\\"+'CycWhite',
+            # "filename" being the name of the data block, i.e. the name of the material.
+            filename='CycWhite',
+            link=False,
+            relative_path=False,
+        )
+
         # For all dupli-objects in scene, create proxies
         for bOb in bpy.context.scene.objects:
             # Create proxies for all objects within object
             if bOb.dupli_group:
                 for o in bOb.dupli_group.objects:
                     bvpu.blender.grab_only(bOb)
-                    bpy.ops.object.proxy_make(object=o.name) #, object=bOb.name, type=o.name)
+                    # , object=bOb.name, type=o.name)
+                    bpy.ops.object.proxy_make(object=o.name)
                 # Get rid of linked group now that dupli group objects are imported
                 bpy.context.scene.objects.unlink(bOb)
         # Change all materials to white Cycles emission material ("CycWhite", imported above)
