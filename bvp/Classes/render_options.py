@@ -244,15 +244,23 @@ class RenderOptions(object):
         # Re-set all nodes and render layers
         for n in scn.node_tree.nodes:
             scn.node_tree.nodes.remove(n)
-        old_render_layers = bpy.context.scene.render.layers.keys()
-        bpy.ops.scene.render_layer_add()
-        for ii in range(len(old_render_layers)):
-            bpy.context.scene.render.layers.active_index = 0
-            bpy.ops.scene.render_layer_remove()
-        # Rename newly-added layer (with default properties) to default name
-        # (Doing it in this order assures Blender won't make it, e.g., RenderLayer.001
-        # if a layer named RenderLayer already exists)
-        bpy.context.scene.render.layers[0].name = 'RenderLayer'
+        if bpy.app.version < (2, 80, 0):
+            old_render_layers = bpy.context.scene.render.layers.keys()
+            bpy.ops.scene.render_layer_add()
+            for j in range(len(old_render_layers)):
+                bpy.context.scene.render.layers.active_index = 0
+                bpy.ops.scene.render_layer_remove()
+            # Rename newly-added layer (with default properties) to default name
+            # (Doing it in this order assures Blender won't make it, e.g., RenderLayer.001
+            # if a layer named RenderLayer already exists)
+            bpy.context.scene.render.layers[0].name = 'RenderLayer'
+        else:
+            old_view_layers = list(bpy.context.scene.view_layers)
+            bpy.ops.scene.view_layer_add()
+            for layer in old_view_layers:
+                scn.view_layers.remove(layer)
+            scn.view_layers[0].name = 'RenderLayer'
+
         # Add basic node setup:
         node_image_rl = scn.node_tree.nodes.new(type=RLayerNode)
         node_image_rl.location = self._node_grid_locations[0, 0]
