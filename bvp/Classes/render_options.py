@@ -185,6 +185,7 @@ class RenderOptions(object):
         ty = - ((np.arange(0, n_rows) - (n_rows / 2)) * node_grid_scale_y)
         xg, yg = np.meshgrid(tx, ty)
         self._node_grid_locations = np.dstack([xg, yg])
+        print("FUKKIN SET IT ALRIGHT")
         # Disallow updates that add fields
         self.__dict__ = bvpu.basics.fixedKeyDict(self.__dict__)
         # Update defaults w/ inputs
@@ -212,12 +213,13 @@ class RenderOptions(object):
         if not 'Motion' in self.BVPopts:
             self.BVPopts['Motion'] = False
         scn.use_nodes = True
-        # Set only first layer to be active
-        if bpy.app.version < (2, 80, 0):
-            scn.layers = [True]+[False]*19
-        else:
-            # NEED TO FIGURE OUT WHAT TO DO HERE
-            pass
+        ## MOVED BELOW
+        # # Set only first layer to be active
+        # if bpy.app.version < (2, 80, 0):
+        #     scn.layers = [True]+[False]*19
+        # else:
+        #     # NEED TO FIGURE OUT WHAT TO DO HERE
+        #     pass
         if '/Scenes/' not in self.BVPopts['BasePath']:
             aa, bb = os.path.split(self.BVPopts['BasePath'])
             self.BVPopts['BasePath'] = os.path.join(aa, 'Scenes', bb)
@@ -225,7 +227,10 @@ class RenderOptions(object):
         scn.render.filepath = self.BVPopts['BasePath']  # ???
         # Get all non-function attributes
         render_params_to_set = [x for x in self.__dict__.keys() if not hasattr(
-            self.__dict__[x], '__call__') and not x in ['BVPopts', 'DefaultLayerOpts', 'image_settings']]
+            self.__dict__[x], '__call__') and not x in ['BVPopts', 
+                                                        'DefaultLayerOpts', 
+                                                        'image_settings',
+                                                        '_node_grid_locations']]
         for rparam in render_params_to_set:
             try:
                 # define __getattr__ or whatever so self[rparam] works
@@ -317,6 +322,12 @@ class RenderOptions(object):
             # Turn off raytracing??
 
         update()
+        # Set only first layer to be active
+        if bpy.app.version < (2, 80, 0):
+            scn.layers = [True]+[False]*19
+        else:
+            # NEED TO FIGURE OUT WHAT TO DO HERE
+            pass
     """
     Notes on nodes: The following functions add various types of compositor nodes to a scene in Blender.
     These allow output of other image files that represent other "meta-information" (e.g. Z depth, 
