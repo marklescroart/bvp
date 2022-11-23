@@ -561,7 +561,7 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
         print('get_voxelized_vert_list took %d mins, %.2f secs'%divmod((t1-t0), 60))
     return verts, norms
 
-def add_img_material(imfile, imtype, name=None):
+def add_img_material(imfile, imtype, shader_type='Principled BDSF', name=None):
     """Add a texture containing an image to Blender.
 
     Parameters
@@ -598,25 +598,32 @@ def add_img_material(imfile, imtype, name=None):
     else:
         # Create shader node arrangement
         material.use_nodes = True
-        #create a reference to the material output
-        material_output = material.node_tree.nodes.get('Material Output')
-        shader_node = material.node_tree.nodes.get('Principled BSDF')
+        # Image input node
         image_input = material.node_tree.nodes.new('ShaderNodeTexImage')
         image_input.image = img
         if imtype.upper() == 'MOVIE':
             image_input.image_user.use_cyclic = True
             image_input.image_user.frame_duration = img.frame_duration
             image_input.image_user.use_auto_refresh = True
+        # Output node
+        material_output = material.node_tree.nodes.get('Material Output')
+        # Shader node 
+        if shader_type == 'Principled BDSF':
+            shader_node = material.node_tree.nodes.get('Principled BSDF')
+            shader_node.inputs['Specular'].default_value = 0
+            shader_node.inputs['Roughness'].default_value = 0.5
+        elif shader_type == 'Emission':
+            shader_node = material.node_tree.nodes.new('ShaderNodeEmission')
+            material.node_tree.links.new(
+                shader_node.outputs[0], material_output.inputs[0])
+        material.node_tree.links.new(
+            image_input.outputs[0], shader_node.inputs[0])
 
         #set location of node
         material_output.location = (400, 20)
         shader_node.location = (0, 0)
         image_input.location = (-400, -500)
 
-        material.node_tree.links.new(
-            image_input.outputs[0], shader_node.inputs[0])
-        material.node_tree.nodes["Principled BSDF"].inputs['Specular'].default_value = 0
-        material.node_tree.nodes["Principled BSDF"].inputs['Roughness'].default_value = 0.5
         material.blend_method = 'CLIP'
 
     return material
