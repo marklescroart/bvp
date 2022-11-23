@@ -3,6 +3,7 @@
 (at Blender command line or in scripts run through Blender)
 """
 
+from bpy_extras.image_utils import load_image
 import os
 import copy
 import re
@@ -560,7 +561,7 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
         print('get_voxelized_vert_list took %d mins, %.2f secs'%divmod((t1-t0), 60))
     return verts, norms
 
-def add_img_material(name, imfile, imtype):
+def add_img_material(imfile, imtype, name=None):
     """Add a texture containing an image to Blender.
 
     Parameters
@@ -574,32 +575,52 @@ def add_img_material(name, imfile, imtype):
     imtype : string
         one of : 'sequence', 'file', 'generated', 'movie'
 
-    ## NOTE: 
-    #name = 'ori_noise'
-    #imfile = '/Users/mark/Projects/Mixamo_Downloads/Demo/bg_camo.png'
-    #from bvp.utils.blender import add_img_material
-    import bvp
-    name = 'ori_motion'
-    imfile = '/Users/mark/Notebooks/ori_noise2.gif'
-    imtype = 'movie' # options: 'sequence','file','generated','movie'
-    im = bvp.utils.blender.add_img_material(name,imfile,imtype)        
     """
-    # Load image
     from bpy_extras.image_utils import load_image
+    # New image
     img = load_image(imfile)
     img.source = imtype.upper()
-    # Link image to new texture 
-    tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
-    tex.image = img
-    if imtype.upper()=='MOVIE':
-        print("== YO I HAVE %d FRAMES!! =="%img.frame_duration)
-        tex.image_user.use_cyclic = True
-        tex.image_user.frame_duration = img.frame_duration
-    # Link texture to new material
-    mat = bpy.data.materials.new(name=name)
-    mat.texture_slots.create(0)
-    mat.texture_slots[0].texture = tex
-    return mat
+    if name is None:
+        name = img.name_full
+    # New material
+    material = bpy.data.materials.new(name=name)
+    if bpy.app.version < (2, 80, 0):
+        # Legacy for old blender
+        # Create image texture
+        tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
+        tex.image = img
+        if imtype.upper()=='MOVIE':
+            tex.image_user.use_cyclic = True
+            tex.image_user.frame_duration = img.frame_duration
+        # Link texture to material
+        material.texture_slots.create(0)
+        material.texture_slots[0].texture = tex
+    else:
+        # Create shader node arrangement
+        material.use_nodes = True
+        #create a reference to the material output
+        material_output = material.node_tree.nodes.get('Material Output')
+        shader_node = material.node_tree.nodes.get('Principled BSDF')
+        image_input = material.node_tree.nodes.new('ShaderNodeTexImage')
+        image_input.image = img
+        if imtype.upper() == 'MOVIE':
+            image_input.image_user.use_cyclic = True
+            image_input.image_user.frame_duration = img.frame_duration
+            image_input.image_user.use_auto_refresh = True
+
+        #set location of node
+        material_output.location = (400, 20)
+        shader_node.location = (0, 0)
+        image_input.location = (-400, -500)
+
+        material.node_tree.links.new(
+            image_input.outputs[0], shader_node.inputs[0])
+        material.node_tree.nodes["Principled BSDF"].inputs['Specular'].default_value = 0
+        material.node_tree.nodes["Principled BSDF"].inputs['Roughness'].default_value = 0.5
+        material.blend_method = 'CLIP'
+
+    return material
+
 
 def add_vcolor(hemis, mesh=None, name='color'):
     """Seems like `hemis` is color you wish to apply to currently selected mesh."""
