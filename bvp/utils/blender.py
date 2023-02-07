@@ -1413,6 +1413,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         bpy.ops.object.editmode_toggle()  # Go into edit mode
 
         if is_verbose:
+            n_vertices = len(vertices)
             print("> Assigning %d vertices!"%n_vertices)
         bpy.ops.object.material_slot_assign() # Assign the material on the selected vertices
         bpy.ops.object.editmode_toggle()  # Return to object mode

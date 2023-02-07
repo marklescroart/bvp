@@ -133,7 +133,6 @@ class RenderOptions(object):
                                    file_format='PNG')
 
         self.DefaultLayerOpts = {
-            'layers': tuple([True]*20),
             'use_zmask': False,
             'use_all_z': False,
             'use_solid': True,  # Necessary for almost everything
@@ -161,6 +160,13 @@ class RenderOptions(object):
             'use_pass_reflection': False,
             'use_pass_refraction': False,
         }
+        # Proposition: get rid of above, replace (below) with:
+        # to_set = {}
+        # for this_property in dir(this_view_layer):
+        #     if 'use' in this_property:
+        #         to_set[this_property] = False
+        if bpy.app.version < (2, 80, 0):
+            self.DefaultLayerOpts['layers'] = tuple([True]*20)
         self.BVPopts = {
             # BVP specific rendering options
             "Image": True,
@@ -372,6 +378,10 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
+        if bpy.app.version < (2, 80, 0):
+            layers = scn.layers
+        else:
+            layers = scn.view_layers
         #####################################################################################
         ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
         #####################################################################################
@@ -391,14 +401,14 @@ class RenderOptions(object):
                     o.pass_index = object_count
                     for po in o.dupli_group.objects:
                         po.pass_index = object_count
-                    bvpu.blender.set_layers(o, [0, object_count])
+                    #bvpu.blender.set_layers(o, [0, object_count])
                     object_count += 1
             # Check for mesh objects:
             elif o.type in ('MESH', 'CURVE'):
                 print('assigning pass index %d to %s' % (object_count, o.name))
                 o.pass_index = object_count
                 # change w/ 2.8+
-                bvpu.blender.set_layers(o, [0, object_count])
+                #bvpu.blender.set_layers(o, [0, object_count])
                 if bpy.app.version < (2, 80, 0):
                     ug = o.users_group
                 else:
@@ -411,18 +421,18 @@ class RenderOptions(object):
                         print(to_skip)
                         sibling.pass_index = object_count
                         # change w/ 2.8+
-                        bvpu.blender.set_layers(sibling, [0, object_count])
+                        #bvpu.blender.set_layers(sibling, [0, object_count])
                 object_count += 1
             # Other types of objects??
         n_objects_masked = object_count - 1
         #####################################################################
         ### ---            Second: Set up render layers:              --- ###
         #####################################################################
-        render_layer_names = scn.render.layers.keys()
+        render_layer_names = layers.keys()
         if not 'ObjectMasks1' in render_layer_names:
             for iob in range(n_objects_masked):
                 # change w / 2.8+
-                ob_layer = scn.render.layers.new('ObjectMasks%d' % (iob + 1))
+                ob_layer = layers.new('ObjectMasks%d' % (iob + 1))
                 # to here
                 # Changeable to be more flexible, get all props with use_
                 #props = [p for p in ob_layer.__dir__() if 'use_' in p]
@@ -436,9 +446,9 @@ class RenderOptions(object):
                     # Do only one layer, and none of the below
                     break
                 # change w/ 2.8+
-                layers = [False for x in range(20)]
-                layers[iob+1] = True
-                ob_layer.layers = tuple(layers)
+                #layers = [False for x in range(20)]
+                #layers[iob+1] = True
+                #ob_layer.layers = tuple(layers)
                 # / to here
         else:
             raise Exception('ObjectMasks layers already exist!')
