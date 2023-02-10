@@ -191,7 +191,6 @@ class RenderOptions(object):
         ty = - ((np.arange(0, n_rows) - (n_rows / 2)) * node_grid_scale_y)
         xg, yg = np.meshgrid(tx, ty)
         self._node_grid_locations = np.dstack([xg, yg])
-        print("FUKKIN SET IT ALRIGHT")
         # Disallow updates that add fields
         self.__dict__ = bvpu.basics.fixedKeyDict(self.__dict__)
         # Update defaults w/ inputs
@@ -199,10 +198,11 @@ class RenderOptions(object):
             # TO DO: Change this variable name. Big change, tho.
             self.BVPopts.update(bvp_params)
         if not blender_params is None:
-            # TO DO: Clean this shit up. Sloppy organization.
+            # Potential backward compatibility issue
             if 'DefaultLayerOpts' in blender_params.keys():
-                DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
-                self.DefaultLayerOpts.update(DefaultLayerOpts)
+                raise ValueError("DEPRECATED: You can no longer use 'DefaultLayerOpts' in blender_params dict")
+                #DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
+                #self.DefaultLayerOpts.update(DefaultLayerOpts)
             self.__dict__.update(blender_params)
 
     def __repr__(self):
@@ -382,9 +382,7 @@ class RenderOptions(object):
             layers = scn.layers
         else:
             layers = scn.view_layers
-        #####################################################################################
-        ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
-        #####################################################################################
+
         print(">>> Masking:")
         print(objects_to_mask)
         if objects_to_mask is None:
@@ -394,48 +392,14 @@ class RenderOptions(object):
                 [x in o.name for x in disallowed_names])]
         print(">>> Masking:")
         print(objects_to_mask)
-        object_count = 1
-        to_skip = []
-        for o in objects_to_mask:
-            if o.name in to_skip:
-                continue
-            # Check for dupli groups:
-            if o.type == 'EMPTY':
-                if o.dupli_group:
-                    o.pass_index = object_count
-                    for po in o.dupli_group.objects:
-                        po.pass_index = object_count
-                    #bvpu.blender.set_layers(o, [0, object_count])
-                    object_count += 1
-            # Check for mesh objects:
-            elif o.type in ('MESH', 'CURVE'):
-                print(o.type)
-                print('assigning pass index %d to %s' % (object_count, o.name))
-                o.pass_index = object_count
-                # change w/ 2.8+
-                #bvpu.blender.set_layers(o, [0, object_count])
-                if bpy.app.version < (2, 80, 0):
-                    ug = o.users_group
-                else:
-                    ug = o.users_collection
-                if len(ug) > 0:
-                    for sibling in ug[0].objects:
-                        to_skip.append(sibling.name)
-                        print('assigning pass index %d to %s' %
-                              (object_count, sibling.name))
-                        print(to_skip)
-                        sibling.pass_index = object_count
-                        # change w/ 2.8+
-                        #bvpu.blender.set_layers(sibling, [0, object_count])
-                object_count += 1
-            # Other types of objects??
-        n_objects_masked = object_count - 1
+        n_objects_masked = len(objects_to_mask)            
         #####################################################################
-        ### ---            Second: Set up render layers:              --- ###
+        ### ---             First: Set up render layers:              --- ###
         #####################################################################
         render_layer_names = layers.keys()
         if not 'ObjectMasks1' in render_layer_names:
             for iob in range(n_objects_masked):
+                this_object = objects_to_mask[iob]
                 ob_layer = layers.new('ObjectMasks%d' % (iob + 1))
                 for this_property in dir(ob_layer):
                     if 'use' in this_property:
@@ -458,6 +422,7 @@ class RenderOptions(object):
                 else:
                     # Create new collection and remove other collections
                     # from this view layer
+                    bvpu.blender.grab_only(this_object)
                     collection_name = 'object%02d'%iob
                     bpy.ops.collection.create(name=collection_name)
                     new_collection = bpy.data.collections[collection_name]
@@ -466,7 +431,47 @@ class RenderOptions(object):
                         if this_collection.name != collection_name:
                             this_collection.exclude = True
         else:
-            raise Exception('ObjectMasks layers already exist!')
+            raise Exception('ObjectMasks layers already exist!')            
+        ######################################################################################
+        ### --- Second: Allocate pass indices to objects (or group/collection-objects) --- ###
+        ######################################################################################
+
+        object_count = 1
+        to_skip = []
+        for o in objects_to_mask:
+            if o.name in to_skip:
+                continue
+            # Check for dupli groups:
+            if o.type == 'EMPTY':
+                if o.dupli_group:
+                    o.pass_index = object_count
+                    for po in o.dupli_group.objects:
+                        po.pass_index = object_count
+                    #bvpu.blender.set_layers(o, [0, object_count])
+                    object_count += 1
+            # Check for mesh objects:
+            elif o.type in ('MESH', 'CURVE'):
+                print('assigning pass index %d to %s' % (object_count, o.name))
+                o.pass_index = object_count
+                if bpy.app.version < (2, 80, 0):
+                    ug = o.users_group
+                    bvpu.blender.set_layers(o, [0, object_count])
+                else:
+                    ug = o.users_collection
+                if len(ug) > 0:
+                    for sibling in ug[0].objects:
+                        to_skip.append(sibling.name)
+                        print('assigning pass index %d to %s' %
+                              (object_count, sibling.name))
+                        print(to_skip)
+                        sibling.pass_index = object_count
+                        if bpy.app.version < (2, 80, 0):
+                            bvpu.blender.set_layers(sibling, [0, object_count])
+                object_count += 1
+            # Other types of objects??
+        n_objects_masked_check = object_count - 1
+        assert n_objects_masked == n_objects_masked_check
+
         #####################################################################
         ### ---            Third: Set up compositor nodes:            --- ###
         #####################################################################
