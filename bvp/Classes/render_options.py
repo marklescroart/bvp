@@ -132,34 +132,34 @@ class RenderOptions(object):
         self.image_settings = dict(color_mode='RGBA',
                                    file_format='PNG')
 
-        self.DefaultLayerOpts = {
-            'use_zmask': False,
-            'use_all_z': False,
-            'use_solid': True,  # Necessary for almost everything
-            'use_halo': False,
-            'use_ztransp': False,
-            'use_sky': False,
-            'use_edge_enhance': False,
-            'use_strand': False,
-            'use_freestyle': False,
-            'use_pass_combined': False,
-            'use_pass_z': False,
-            'use_pass_vector': False,
-            'use_pass_normal': False,
-            'use_pass_uv': False,
-            'use_pass_mist': False,
-            'use_pass_object_index': False,
-            'use_pass_color': False,
-            'use_pass_diffuse': False,
-            'use_pass_specular': False,
-            'use_pass_shadow': False,
-            'use_pass_emit': False,
-            'use_pass_ambient_occlusion': False,
-            'use_pass_environment': False,
-            'use_pass_indirect': False,
-            'use_pass_reflection': False,
-            'use_pass_refraction': False,
-        }
+        self.DefaultLayerOpts = {}
+        #     'use_zmask': False,
+        #     'use_all_z': False,
+        #     'use_solid': True,  # Necessary for almost everything
+        #     'use_halo': False,
+        #     'use_ztransp': False,
+        #     'use_sky': False,
+        #     'use_edge_enhance': False,
+        #     'use_strand': False,
+        #     'use_freestyle': False,
+        #     'use_pass_combined': False,
+        #     'use_pass_z': False,
+        #     'use_pass_vector': False,
+        #     'use_pass_normal': False,
+        #     'use_pass_uv': False,
+        #     'use_pass_mist': False,
+        #     'use_pass_object_index': False,
+        #     'use_pass_color': False,
+        #     'use_pass_diffuse': False,
+        #     'use_pass_specular': False,
+        #     'use_pass_shadow': False,
+        #     'use_pass_emit': False,
+        #     'use_pass_ambient_occlusion': False,
+        #     'use_pass_environment': False,
+        #     'use_pass_indirect': False,
+        #     'use_pass_reflection': False,
+        #     'use_pass_refraction': False,
+        # }
         # Proposition: get rid of above, replace (below) with:
         # to_set = {}
         # for this_property in dir(this_view_layer):
@@ -385,11 +385,15 @@ class RenderOptions(object):
         #####################################################################################
         ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
         #####################################################################################
+        print(">>> Masking:")
+        print(objects_to_mask)
         if objects_to_mask is None:
             # Also constraint objects...
             disallowed_names = ['BG_', 'CamTar', 'Shadow_']
             objects_to_mask = [o for o in bpy.context.scene.objects if not any(
                 [x in o.name for x in disallowed_names])]
+        print(">>> Masking:")
+        print(objects_to_mask)
         object_count = 1
         to_skip = []
         for o in objects_to_mask:
@@ -405,6 +409,7 @@ class RenderOptions(object):
                     object_count += 1
             # Check for mesh objects:
             elif o.type in ('MESH', 'CURVE'):
+                print(o.type)
                 print('assigning pass index %d to %s' % (object_count, o.name))
                 o.pass_index = object_count
                 # change w/ 2.8+
@@ -431,25 +436,35 @@ class RenderOptions(object):
         render_layer_names = layers.keys()
         if not 'ObjectMasks1' in render_layer_names:
             for iob in range(n_objects_masked):
-                # change w / 2.8+
                 ob_layer = layers.new('ObjectMasks%d' % (iob + 1))
-                # to here
-                # Changeable to be more flexible, get all props with use_
-                #props = [p for p in ob_layer.__dir__() if 'use_' in p]
-                # for p in props: ob_layer.__setattr__(p, False)
-                for k, v in self.DefaultLayerOpts.items():
-                    ob_layer.__setattr__(k, v)
+                for this_property in dir(ob_layer):
+                    if 'use' in this_property:
+                        ob_layer.__setattr__(this_property, False)
+                # Necessary for masks to work
+                ob_layer.use_solid = True
+                ob_layer.use_pass_object_index = True
                 # Necessary for object indices to work for transparent materials
-                ob_layer.use_ztransp = True
-                ob_layer.use_pass_object_index = True  # This one only
+                # Unclear what if anything to do in 2.8+
+                if bpy.app.version < (2, 80, 0):
+                    ob_layer.use_ztransp = True
                 if use_occlusion:
                     # Do only one layer, and none of the below
                     break
-                # change w/ 2.8+
-                #layers = [False for x in range(20)]
-                #layers[iob+1] = True
-                #ob_layer.layers = tuple(layers)
-                # / to here
+                if bpy.app.version < (2, 80, 0):
+                    # Set layers on which object appears
+                    layers = [False for x in range(20)]
+                    layers[iob+1] = True
+                    ob_layer.layers = tuple(layers)
+                else:
+                    # Create new collection and remove other collections
+                    # from this view layer
+                    collection_name = 'object%02d'%iob
+                    bpy.ops.collection.create(name=collection_name)
+                    new_collection = bpy.data.collections[collection_name]
+                    scn.collection.children.link(new_collection)
+                    for this_collection in ob_layer.layer_collection.children:
+                        if this_collection.name != collection_name:
+                            this_collection.exclude = True
         else:
             raise Exception('ObjectMasks layers already exist!')
         #####################################################################

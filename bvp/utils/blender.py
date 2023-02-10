@@ -3,7 +3,6 @@
 (at Blender command line or in scripts run through Blender)
 """
 
-from bpy_extras.image_utils import load_image
 import os
 import copy
 import re
@@ -1158,7 +1157,7 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     #else:
     #    print('Did not find group! Adding group to file.')
     old_obs = list(bpy.context.scene.objects)
-    if bpy.app.version[1] < 80:
+    if bpy.app.version < (2, 80, 0):
         import_type = '/Group/'
         kw = dict(instance_groups=proxy)
     else:
