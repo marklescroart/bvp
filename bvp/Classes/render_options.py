@@ -199,10 +199,11 @@ class RenderOptions(object):
             # TO DO: Change this variable name. Big change, tho.
             self.BVPopts.update(bvp_params)
         if not blender_params is None:
-            # TO DO: Clean this shit up. Sloppy organization.
+            # Potential backward compatibility issue
             if 'DefaultLayerOpts' in blender_params.keys():
-                DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
-                self.DefaultLayerOpts.update(DefaultLayerOpts)
+                raise ValueError("DEPRECATED: You can no longer use 'DefaultLayerOpts' in blender_params dict")
+                #DefaultLayerOpts = blender_params.pop('DefaultLayerOpts')
+                #self.DefaultLayerOpts.update(DefaultLayerOpts)
             self.__dict__.update(blender_params)
 
     def __repr__(self):
@@ -444,8 +445,9 @@ class RenderOptions(object):
                 object_count += 1
             # Other types of objects??
         n_objects_masked = object_count - 1
+
         #####################################################################
-        ### ---            Second: Set up render layers:              --- ###
+        ### ---             First: Set up render layers:              --- ###
         #####################################################################
         render_layer_names = layers.keys()
         if not 'object_mask_00' in render_layer_names:
