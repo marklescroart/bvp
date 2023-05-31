@@ -106,13 +106,22 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     return act
 
 
-def make_physics_animation(ob, frames=(1, 4), steps_per_second=100, **kwargs):
+def make_physics_animation(ob, frames=(1, 4), substeps_per_frame=10, fps=15, **kwargs):
     """Kwargs are: location, rotation"""
     scn = bpy.context.scene
     # Rigidbody world
     if scn.rigidbody_world is None:
         bpy.ops.rigidbody.world_add()
-    scn.rigidbody_world.steps_per_second = steps_per_second
+    if bpy.app.version < (2, 80, 0):
+        # Read scene frame rate? Unclear if scene frame rate variable is used 
+        # in blender, since frames are all rendered independently. That is:
+        # this value is important, but the value may not actually be set
+        # in the blender scene, because that might not matter as long as 
+        # the individual frames are stitched into an mp4 or played by code
+        # with the correct frame rate.
+        scn.rigidbody_world.steps_per_second = substeps_per_frame * fps
+    else:
+        scn.rigidbody_world.substeps_per_frame = substeps_per_frame
     grab_only(ob)
     bpy.ops.rigidbody.object_add()
     ob.rigid_body.collision_shape = 'MESH'

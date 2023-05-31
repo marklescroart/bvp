@@ -13,6 +13,7 @@ import os
 import sys
 import math as bnp
 import numpy as np
+
 from .. import utils as bvpu
 from ..options import config
 
@@ -191,7 +192,6 @@ class RenderOptions(object):
         ty = - ((np.arange(0, n_rows) - (n_rows / 2)) * node_grid_scale_y)
         xg, yg = np.meshgrid(tx, ty)
         self._node_grid_locations = np.dstack([xg, yg])
-        print("FUKKIN SET IT ALRIGHT")
         # Disallow updates that add fields
         self.__dict__ = bvpu.basics.fixedKeyDict(self.__dict__)
         # Update defaults w/ inputs
@@ -382,11 +382,20 @@ class RenderOptions(object):
             layers = scn.layers
         else:
             layers = scn.view_layers
+            assert scn.render.engine == 'CYCLES', "'C.scene.render.engine must be 'CYCLES' for mask rendering!"
         #####################################################################################
         ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
         #####################################################################################
-        print(">>> Masking:")
-        print(objects_to_mask)
+        if bpy.app.version >= (2, 80, 0):
+            scene_collections = list(scn.collection.children)
+            if (len(scene_collections) == 1) and ('Collection' in scene_collections[0].name):
+                # Basic setup is engaged
+                bg_collection = scene_collections[0]
+                bg_collection.name = 'bg_unmasked'
+            elif 'bg_unmasked' in [x.name for x in scene_collections]:
+                bg_collection = bpy.data.collections['bg_unmasked']
+            else:
+                bg_collection = None
         if objects_to_mask is None:
             # Also constraint objects...
             disallowed_names = ['BG_', 'CamTar', 'Shadow_']
@@ -401,12 +410,13 @@ class RenderOptions(object):
                 continue
             # Check for dupli groups:
             if o.type == 'EMPTY':
-                if o.dupli_group:
-                    o.pass_index = object_count
-                    for po in o.dupli_group.objects:
-                        po.pass_index = object_count
-                    #bvpu.blender.set_layers(o, [0, object_count])
-                    object_count += 1
+                if bpy.app.version < (2, 80, 0):
+                    if o.dupli_group:
+                        o.pass_index = object_count
+                        for po in o.dupli_group.objects:
+                            po.pass_index = object_count
+                        #bvpu.blender.set_layers(o, [0, object_count])
+                        object_count += 1
             # Check for mesh objects:
             elif o.type in ('MESH', 'CURVE'):
                 print(o.type)
@@ -418,15 +428,19 @@ class RenderOptions(object):
                     ug = o.users_group
                 else:
                     ug = o.users_collection
+                
                 if len(ug) > 0:
-                    for sibling in ug[0].objects:
-                        to_skip.append(sibling.name)
-                        print('assigning pass index %d to %s' %
-                              (object_count, sibling.name))
-                        print(to_skip)
-                        sibling.pass_index = object_count
-                        # change w/ 2.8+
-                        #bvpu.blender.set_layers(sibling, [0, object_count])
+                    if ug[0].name != 'bg_unmasked':
+                        # If group is top-level collection, do not 
+                        # select all siblings
+                        for sibling in ug[0].objects:
+                            to_skip.append(sibling.name)
+                            print('assigning pass index %d to %s' %
+                                (object_count, sibling.name))
+                            sibling.pass_index = object_count
+                            # change w/ 2.8+
+                            if bpy.app.version < (2, 80, 0):
+                                bvpu.blender.set_layers(sibling, [0, object_count])
                 object_count += 1
             # Other types of objects??
         n_objects_masked = object_count - 1
@@ -434,13 +448,14 @@ class RenderOptions(object):
         ### ---            Second: Set up render layers:              --- ###
         #####################################################################
         render_layer_names = layers.keys()
-        if not 'ObjectMasks1' in render_layer_names:
+        if not 'object_mask_00' in render_layer_names:
             for iob in range(n_objects_masked):
-                ob_layer = layers.new('ObjectMasks%d' % (iob + 1))
+                ob_layer = layers.new('object_mask_%02d' % (iob))
                 for this_property in dir(ob_layer):
                     if 'use' in this_property:
                         ob_layer.__setattr__(this_property, False)
                 # Necessary for masks to work
+                ob_layer.use = True
                 ob_layer.use_solid = True
                 ob_layer.use_pass_object_index = True
                 # Necessary for object indices to work for transparent materials
@@ -458,15 +473,26 @@ class RenderOptions(object):
                 else:
                     # Create new collection and remove other collections
                     # from this view layer
-                    collection_name = 'object%02d'%iob
+                    collection_name = 'object_mask_%02d'%iob
+                    bvpu.blender.grab_only(objects_to_mask[iob])
                     bpy.ops.collection.create(name=collection_name)
                     new_collection = bpy.data.collections[collection_name]
-                    scn.collection.children.link(new_collection)
-                    for this_collection in ob_layer.layer_collection.children:
-                        if this_collection.name != collection_name:
-                            this_collection.exclude = True
+                    if new_collection not in list(scn.collection.children):
+                        scn.collection.children.link(new_collection)
         else:
-            raise Exception('ObjectMasks layers already exist!')
+            raise Exception('object_mask layers already exist!')
+        # Loop through to remove 
+        object_layers = [x for x in layers.keys() if 'object_mask' in x]
+        object_collections = [x for x in bpy.data.collections if 'object' in x.name]
+        assert len(object_layers) == len(objects_to_mask), '%d object layers, %d masks'%(len(object_layers), len(objects_to_mask))
+        assert len(object_layers) == len(object_collections)
+
+        for iob in range(n_objects_masked):
+            ob_layer = layers['object_mask_%02d'%iob]
+            for this_collection in ob_layer.layer_collection.children:
+                if this_collection.name != 'object_mask_%02d'%iob:
+                    this_collection.exclude = True
+
         #####################################################################
         ### ---            Third: Set up compositor nodes:            --- ###
         #####################################################################
@@ -481,20 +507,20 @@ class RenderOptions(object):
             if use_occlusion:
                 if iob == 0:
                     node_rl = nt.nodes.new(type=RLayerNode)
-                    node_rl.layer = 'ObjectMasks%d' % (iob + 1)
+                    node_rl.layer = 'object_mask_%02d' % (iob)
                     node_rl.location = grid[iob * 2, 0]
             else:
                 node_rl = nt.nodes.new(type=RLayerNode)
-                node_rl.layer = 'ObjectMasks%d' % (iob + 1)
+                node_rl.layer = 'object_mask_%02d' % (iob)
                 node_rl.location = grid[iob * 2, 0]
 
             # View
             node_view = nt.nodes.new(ViewerNode)
-            node_view.name = 'ID Mask %d View' % (iob+1)
+            node_view.name = 'ID Mask %d View' % (iob)
             node_view.location = grid[iob*2 + 1, -1]
             # ID mask
             node_id_mask = nt.nodes.new(IDmaskNode)
-            node_id_mask.name = 'ID Mask %d' % (iob+1)
+            node_id_mask.name = 'ID Mask %d' % (iob)
             node_id_mask.index = iob+1
             node_id_mask.location = grid[iob * 2, 1]
             # Output
@@ -506,7 +532,7 @@ class RenderOptions(object):
             endCut = node_file_output.base_path.index('Masks/')+len('Masks/')
             # Set unique name per frame
             node_file_output.file_slots[0].path = node_file_output.base_path[endCut:] + \
-                '_m%02d' % (iob+1)
+                '_m%02d' % (iob)
             node_file_output.name = 'Object %d' % (iob)
             # Set base path
             node_file_output.base_path = node_file_output.base_path[:endCut]
