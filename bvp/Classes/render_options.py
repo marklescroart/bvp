@@ -220,6 +220,7 @@ class RenderOptions(object):
         if not 'Motion' in self.BVPopts:
             self.BVPopts['Motion'] = False
         scn.use_nodes = True
+        layers = self.get_layers(scn=scn)
         ## MOVED BELOW
         # # Set only first layer to be active
         # if bpy.app.version < (2, 80, 0):
@@ -332,8 +333,8 @@ class RenderOptions(object):
             # Get rid of old file output
             scn.node_tree.nodes.remove(output)
             # Get rid of render layer that renders image:
-            RL = scn.render.layers['RenderLayer']
-            scn.render.layers.remove(RL)
+            RL = layers['RenderLayer']
+            layers.remove(RL)
             # Turn off raytracing??
 
         update()
@@ -379,10 +380,8 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
-        if bpy.app.version < (2, 80, 0):
-            layers = scn.layers
-        else:
-            layers = scn.view_layers
+        layers = self.get_layers(scn=scn)
+        if bpy.app.version >= (2, 80, 0):
             assert scn.render.engine == 'CYCLES', "'C.scene.render.engine must be 'CYCLES' for mask rendering!"
         #####################################################################################
         ### --- First: Allocate pass indices to objects (or group/collection-objects) --- ###
@@ -502,7 +501,7 @@ class RenderOptions(object):
         # Object index nodes (pass_index=100 is for skies!)
         pass_idx = [o.pass_index for o in scn.objects if o.pass_index < 100]
         max_pi = max(pass_idx)
-        grid = self._node_grid_locations[6:6 + len(pass_idx) * 2, :]
+        grid = self._node_grid_locations[7:7 + len(pass_idx) * 2, :]
         print('Found %d pass indices' % (max_pi))
         for iob in range(max_pi):
             # Render layer
@@ -555,17 +554,18 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
-        grid = self._node_grid_locations[1:3]
+        grid = self._node_grid_locations[2:4]
+        layers = self.get_layers(scn=scn)
         #####################################################################
         ### ---                Set up render layers:                  --- ###
         #####################################################################
-        render_layer_names = scn.render.layers.keys()
+        render_layer_names = layers.keys()
         if not 'Zdepth' in render_layer_names:
-            ob_layer = scn.render.layers.new('Zdepth')
+            ob_layer = layers.new('Zdepth')
             for k in self.DefaultLayerOpts.keys():
                 ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
             # Necessary for z depth to work for transparent materials ?
-            ob_layer.use_ztransp = True
+            #ob_layer.use_ztransp = True
             ob_layer.use_pass_z = True  # Principal interest
             ob_layer.use_pass_object_index = True  # for masking out depth of sky dome
         else:
@@ -654,18 +654,20 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
-        grid = self._node_grid_locations[3:6]
+        layers = self.get_layers(scn=scn)
+        grid = self._node_grid_locations[4:7]
         #####################################################################
         ### ---                Set up render layers:                  --- ###
         #####################################################################
-        render_layer_names = scn.render.layers.keys()
+        render_layer_names = layers.keys()
         if not 'Normals' in render_layer_names:
-            ob_layer = scn.render.layers.new('Normals')
+            ob_layer = layers.new('Normals')
             for k in self.DefaultLayerOpts.keys():
                 ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
             render_layer_names.append('Normals')
             # Necessary for Normals to work for transparent materials ?
-            ob_layer.use_ztransp = True
+            #ob_layer.use_ztransp = True
+            ob_layer.use_pass_z = True
             ob_layer.use_pass_normal = True  # Principal interest
             ob_layer.use_pass_object_index = True  # for masking out sky dome normals
         else:
@@ -767,27 +769,25 @@ class RenderOptions(object):
             scn = bpy.context.scene
         scn.use_nodes = True
         scn.render.use_compositing = True
+        layers = self.get_layers(scn=scn)
+        grid = self._node_grid_locations[1:2]
         #####################################################################
         ### ---                Set up render layers:                  --- ###
         #####################################################################
-        RL = scn.render.layers.keys()
-        if not 'Motion' in RL:
-            bpy.ops.scene.render_layer_add()
-            # Seems like there should be a "name" input argument, but not yet so we have to be hacky about this:
-            ob_layer = [x for x in scn.render.layers.keys() if not x in RL]
-            ob_layer = scn.render.layers[ob_layer[0]]
-            # /Hacky
+        render_layer_names = layers.keys()
+        if not 'Motion' in render_layer_names:
+            mot_layer = layers.new('Motion')
             # Set default layer options
             for k in self.DefaultLayerOpts.keys():
-                ob_layer.__setattr__(k, self.DefaultLayerOpts[k])
+                mot_layer.__setattr__(k, self.DefaultLayerOpts[k])
             # And set motion-specific layer options
-            ob_layer.name = 'Motion'
-            ob_layer.use_pass_vector = True  # Motion layer
+            mot_layer.name = 'Motion'
+            mot_layer.use_pass_vector = True  # Motion layer
             # Necessary (?) for motion to work for transparent materials
-            ob_layer.use_ztransp = True
-            ob_layer.use_pass_z = True  # Necessary (?)
-            #ob_layer.use_pass_object_index = True # for masking out depth of sky dome
-            RL.append('Motion')
+            #mot_layer.use_ztransp = True
+            mot_layer.use_pass_z = True 
+            #mot_layer.use_pass_object_index = True # for masking out depth of sky dome
+            render_layer_names.append('Motion')
         else:
             raise Exception('Motion layer already exists!')
         ########################################################################
@@ -797,7 +797,7 @@ class RenderOptions(object):
         # Get all node names (keys)
         node_rl = nt.nodes.new(type=RLayerNode)
         node_rl.layer = 'Motion'
-
+        node_rl.location = grid[0, 0]
         # QUESTION: Better to zero out motion in sky?? NO for now,
         # but leave here in case we want the option later...
         if False:
@@ -830,33 +830,33 @@ class RenderOptions(object):
             nt.links.new(node_multiply1000.outputs[0], node_add_1000.inputs[1])
 
         # Depth output node
-        MotionOut = nt.nodes.new(OutputFileNode)
-        MotionOut.location = bmu.Vector((0., 300.))
-        MotionOut.format.file_format = 'OPEN_EXR'
+        node_motion_output = nt.nodes.new(OutputFileNode)
+        node_motion_output.location = grid[0, 1]
+        node_motion_output.format.file_format = 'OPEN_EXR'
         if '/Masks/' in scn.render.filepath:
             # get rid of "_m01"
-            MotionOut.base_path = scn.render.filepath[0:-4]
-            MotionOut.base_path = node_depth_output.base_path.replace(
+            node_motion_output.base_path = scn.render.filepath[0:-4]
+            node_motion_output.base_path = node_depth_output.base_path.replace(
                 '/Masks/', '/Motion/')+'_mot'
         elif '/Normals/' in scn.render.filepath:
             # get rid of "_nor"
-            MotionOut.base_path = scn.render.filepath[0:-4]
-            MotionOut.base_path = node_depth_output.base_path.replace(
+            node_motion_output.base_path = scn.render.filepath[0:-4]
+            node_motion_output.base_path = node_depth_output.base_path.replace(
                 '/Normals/', '/Motion/')+'_mot'
         elif '/Zdepth/' in scn.render.filepath:
-            MotionOut.base_path = scn.render.filepath[0:-2]  # get rid of "_z"
-            MotionOut.base_path = node_depth_output.base_path.replace(
+            node_motion_output.base_path = scn.render.filepath[0:-2]  # get rid of "_z"
+            node_motion_output.base_path = node_depth_output.base_path.replace(
                 '/Zdepth/', '/Motion/')+'_mot'
         else:
-            MotionOut.base_path = scn.render.filepath.replace(
+            node_motion_output.base_path = scn.render.filepath.replace(
                 '/Scenes/', '/Motion/')
             # Set unique name per frame
-            endCut = MotionOut.base_path.index('Motion/')+len('Motion/')
-            MotionOut.file_slots[0].path = MotionOut.base_path[endCut:]+'_mot'
+            endCut = node_motion_output.base_path.index('Motion/')+len('Motion/')
+            node_motion_output.file_slots[0].path = node_motion_output.base_path[endCut:]+'_mot'
             # Set base path
-            MotionOut.base_path = MotionOut.base_path[:endCut]
+            node_motion_output.base_path = node_motion_output.base_path[:endCut]
 
-        nt.links.new(node_rl.outputs['Speed'], MotionOut.inputs[0])
+        nt.links.new(node_rl.outputs['Vector'], node_motion_output.inputs[0])
 
     def SetUpVoxelization(self, scn=None):
         """
@@ -909,6 +909,15 @@ class RenderOptions(object):
             for m in nOb.material_slots:
                 m.material = bpy.data.materials['CycWhite']
 
+    def get_layers(self, scn=None):
+        if scn is None:
+            scn = bpy.context.scene
+        if bpy.app.version < (2, 80, 0):
+            layers = scn.layers
+        else:
+            layers = scn.view_layers
+        return layers
+        
     @classmethod
     def from_blend(cls, scn=None, bvp_params=None, blender_params=None):
         """Initialize render options from a given blend file
