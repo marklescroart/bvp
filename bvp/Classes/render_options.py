@@ -291,27 +291,36 @@ class RenderOptions(object):
             update()
             return  # Special case! no other node-based options can be applied!
         if self.BVPopts['ObjectMasks']:
+            print("Trying to add object masks")
             self.add_object_masks(
                 single_output=single_output, 
                 objects_to_mask=objects_to_mask,
                 use_occlusion=use_occlusion,
                 )
+            print("Added object masks")
         if self.BVPopts['Motion']:
+            print("Trying to add motion masks")
             self.add_motion(single_output=single_output)
+            print("Added motion masks")
         if self.BVPopts['Zdepth']:
+            print("Trying to add Zdepth")
             self.add_depth(single_output=single_output)
+            print("Added Zdepth")
         if self.BVPopts['Contours']:
             raise NotImplementedError('Not ready yet!')
         if self.BVPopts['Axes']:
             raise NotImplementedError('Not ready yet!')
         if self.BVPopts['Normals']:
+            print("Trying to add Normals")
             self.add_normals(single_output=single_output)
+            print("Added Normals")
         if self.BVPopts['Clay']:
             raise NotImplementedError('Not ready yet!')
             #self.AddClayLayerNodes(Is_RenderOnlyClay=single_output)
         if not self.BVPopts['Image']:
             # Switch all properties from one of the file output nodes to the composite output
             # Grab a random output node to get path from it as main path
+            print("Trying to get rid of image node")
             all_output_nodes = [
                 n for n in scn.node_tree.nodes if n.type == 'OUTPUT_FILE']
             output = all_output_nodes[0]
@@ -336,8 +345,10 @@ class RenderOptions(object):
             RL = layers['RenderLayer']
             layers.remove(RL)
             # Turn off raytracing??
-
-        update()
+            print("Got rid of image node")
+        print("Trying to update scene:")
+        #update()
+        print("Updated scene")
         # Set only first layer to be active
         if bpy.app.version < (2, 80, 0):
             scn.layers = [True]+[False]*19
@@ -442,9 +453,16 @@ class RenderOptions(object):
                             if bpy.app.version < (2, 80, 0):
                                 bvpu.blender.set_layers(sibling, [0, object_count])
                 object_count += 1
+            # Check for armatures
+            elif o.type == 'ARMATURE':
+                for child in o.children:
+                    child.pass_index = object_count
+                    if bpy.app.version < (2, 80, 0):
+                        bvpu.blender.set_layers(child, [0, object_count])
+                object_count += 1
             # Other types of objects??
         n_objects_masked = object_count - 1
-
+        print("Made it through labeling")
         #####################################################################
         ### ---             First: Set up render layers:              --- ###
         #####################################################################
@@ -480,6 +498,9 @@ class RenderOptions(object):
                     new_collection = bpy.data.collections[collection_name]
                     if new_collection not in list(scn.collection.children):
                         scn.collection.children.link(new_collection)
+                    # Add any children of this object
+                    for child in objects_to_mask[iob].children:
+                        new_collection.objects.link(child)
         else:
             raise Exception('object_mask layers already exist!')
         # Loop through to remove 
@@ -514,16 +535,18 @@ class RenderOptions(object):
                 node_rl = nt.nodes.new(type=RLayerNode)
                 node_rl.layer = 'object_mask_%02d' % (iob)
                 node_rl.location = grid[iob * 2, 0]
-
+            print("Added render layer node")
             # View
             node_view = nt.nodes.new(ViewerNode)
             node_view.name = 'ID Mask %d View' % (iob)
             node_view.location = grid[iob*2 + 1, -1]
+            print("Added view node")
             # ID mask
             node_id_mask = nt.nodes.new(IDmaskNode)
             node_id_mask.name = 'ID Mask %d' % (iob)
             node_id_mask.index = iob+1
             node_id_mask.location = grid[iob * 2, 1]
+            print("Added ID mask node")
             # Output
             node_file_output = nt.nodes.new(OutputFileNode)
             node_file_output.location = grid[iob * 2, -2]
@@ -531,6 +554,7 @@ class RenderOptions(object):
             node_file_output.base_path = scn.render.filepath.replace(
                 '/Scenes/', '/Masks/')
             endCut = node_file_output.base_path.index('Masks/')+len('Masks/')
+            print("Added file output node")
             # Set unique name per frame
             node_file_output.file_slots[0].path = node_file_output.base_path[endCut:] + \
                 '_m%02d' % (iob)
@@ -543,7 +567,7 @@ class RenderOptions(object):
                          node_id_mask.inputs['ID value'])
             nt.links.new(node_id_mask.outputs['Alpha'], node_file_output.inputs[0])
             nt.links.new(node_id_mask.outputs['Alpha'], node_view.inputs['Image'])
-            
+            print("Linked nodes")
             
             
 
