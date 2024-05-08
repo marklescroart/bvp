@@ -112,7 +112,7 @@ def make_physics_animation(ob, frames=(1, 4), substeps_per_frame=10, fps=15, **k
     # Rigidbody world
     if scn.rigidbody_world is None:
         bpy.ops.rigidbody.world_add()
-    if bpy.app.version < (2, 80, 0):
+    if bpy.app.version < (2, 91, 0):
         # Read scene frame rate? Unclear if scene frame rate variable is used 
         # in blender, since frames are all rendered independently. That is:
         # this value is important, but the value may not actually be set

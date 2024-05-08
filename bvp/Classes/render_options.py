@@ -501,6 +501,7 @@ class RenderOptions(object):
                     # Add any children of this object
                     for child in objects_to_mask[iob].children:
                         new_collection.objects.link(child)
+                    # Add background?
         else:
             raise Exception('object_mask layers already exist!')
         # Loop through to remove 

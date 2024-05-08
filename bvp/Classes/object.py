@@ -113,7 +113,7 @@ class Object(MappedClass):
         #     ob_str+='%d Verts; %d Faces'%(self.n_vertices, self.n_faces)
         return(ob_str)
  
-    def place(self, scn=None, proxy=False):
+    def place(self, scn=None, proxy=False, substeps_per_frame=1, fps=15):
         """Places object into Blender scene, with pose & animation information
 
         Parameters
@@ -203,7 +203,9 @@ class Object(MappedClass):
         elif self.movement_locations is not None:
             if self.rigid_body:
                 utils.blender.make_physics_animation(new_ob, frames=self.movement_frames, 
-                    location=self.movement_locations, rotation_euler=self.movement_rotation_euler,)
+                    location=self.movement_locations, rotation_euler=self.movement_rotation_euler,
+                    substeps_per_frame=substeps_per_frame,
+                    fps=fps,)
             else:
                 object_action = utils.blender.make_locrotscale_animation(
                     self.movement_frames, action_name='ObjectMotion', handle_type='ALIGNED', 
