@@ -19,7 +19,6 @@ from ..options import config
 
 try:
     import bpy
-    import mathutils as bmu
     is_blender = True
 except ImportError:
     is_blender = False
@@ -83,25 +82,19 @@ class RenderOptions(object):
                 ### --- Basic file / rendering stuff --- ###
                 Type : 'FirstFrame', # other options :  All, FirstAndLastFrame, 'every4th'
                 RenderFile : os.path.join(bvp.__path__[0], 'Scripts', 'BlenderRender.py') # File to call to render scenes
-                BasePath : '/auto/k1/mark/Desktop/BlenderTemp/', # Base render path (TO DO: replace with bvp config settings)
+                BasePath : '~/Desktop/BlenderTemp/', # Base render path, if you want to overwrite scene.render.filepath; defaults to none (leave scene filepath intact)
                 
                 ### --- Render passes --- ###
                 Image : True # Render RGB(A) images or not (alpha layer or not determined by blender_params )
                 ObjectMasks : False # Render masks for all BVP objects in scene (working)
                 Zdepth : False # Render Z depth pass 
                 Normals : False, # Not yet implemented
-                
+                Motion : False, # Render motion (ground truth optical flow) pass
                 ### --- Work-in-progress render passes (NOT working as of 2015.05) --- ###
                 Contours : False, #Freestyle, yet to be implemented
-                Motion : False, # Render motion (ground truth optical flow) pass
                 Voxels : False # Create voxelized version of each scene 
                 Axes : False, # based on N.Cornea code, for now 
                 Clay : False, # All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
-
-        Notes
-        -----
-        RenderOptions does not directly modify a scene's file path; it only provides the base file (parent directory) for all rendering.
-        Scene's "apply_opts" function should be the only function to modify with bpy.context.scene.filepath (!!) (2012.03.12)
 
         """
 
@@ -171,18 +164,18 @@ class RenderOptions(object):
         self.BVPopts = {
             # BVP specific rendering options
             "Image": True,
-            "Voxels": False,  # Not yet implemented reliably.
             "ObjectMasks": False,
-            "Motion": False,  # Not yet implemented reliably. Buggy AF
+            "Motion": False,
             "Zdepth": False,
-            "Contours": False,  # Freestyle, yet to be implemented
-            "Axes": False,  # based on N.Cornea code, for now - still unfinished
             "Normals": False,
-            # Not yet implemented - All shape, no material / texture (over-ride w/ plain [clay] material) lighting??
-            "Clay": False,
             "Type": 'FirstFrame',  # other options: "All", "FirstAndLastFrame", 'every4th'
             "RenderFile": render_file,
-            "BasePath": RENDER_DIR,
+            "BasePath": None,
+            # Below are WIP render passes
+            "Voxels": False,  # unclear what algorithm to use, meshes are often not closed
+            "Axes": False,  # based on N.Cornea code, for now, unfinished
+            "Contours": False,  # based on freestyle
+            "Clay": False,# aims to be pass with no material / texture (over-ride w/ plain [clay] material), not clear what to do with lighting
         }
         node_grid_scale_x = 200
         node_grid_scale_y = 300
@@ -221,18 +214,14 @@ class RenderOptions(object):
             self.BVPopts['Motion'] = False
         scn.use_nodes = True
         layers = self.get_layers(scn=scn)
-        ## MOVED BELOW
-        # # Set only first layer to be active
-        # if bpy.app.version < (2, 80, 0):
-        #     scn.layers = [True]+[False]*19
-        # else:
-        #     # NEED TO FIGURE OUT WHAT TO DO HERE
-        #     pass
-        if '/Scenes/' not in self.BVPopts['BasePath']:
-            aa, bb = os.path.split(self.BVPopts['BasePath'])
-            self.BVPopts['BasePath'] = os.path.join(aa, 'Scenes', bb)
-        # Set render path
-        scn.render.filepath = self.BVPopts['BasePath']  # ???
+
+        if self.BVPopts['BasePath'] is not None: 
+            # Set render path
+            scn.render.filepath = self.BVPopts['BasePath']
+        if '/Scenes/' not in scn.render.filepath:
+            aa, bb = os.path.split(scn.render.filepath)
+            scn.render.filepath = os.path.join(aa, 'Scenes', bb)
+        
         # Get all non-function attributes
         render_params_to_set = [x for x in self.__dict__.keys() if not hasattr(
             self.__dict__[x], '__call__') and not x in ['BVPopts', 
