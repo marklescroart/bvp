@@ -106,13 +106,22 @@ def make_locrotscale_animation(frames, action_name='ObjectMotion',
     return act
 
 
-def make_physics_animation(ob, frames=(1, 4), steps_per_second=100, **kwargs):
+def make_physics_animation(ob, frames=(1, 4), substeps_per_frame=10, fps=15, **kwargs):
     """Kwargs are: location, rotation"""
     scn = bpy.context.scene
     # Rigidbody world
     if scn.rigidbody_world is None:
         bpy.ops.rigidbody.world_add()
-    scn.rigidbody_world.steps_per_second = steps_per_second
+    if bpy.app.version < (2, 91, 0):
+        # Read scene frame rate? Unclear if scene frame rate variable is used 
+        # in blender, since frames are all rendered independently. That is:
+        # this value is important, but the value may not actually be set
+        # in the blender scene, because that might not matter as long as 
+        # the individual frames are stitched into an mp4 or played by code
+        # with the correct frame rate.
+        scn.rigidbody_world.steps_per_second = substeps_per_frame * fps
+    else:
+        scn.rigidbody_world.substeps_per_frame = substeps_per_frame
     grab_only(ob)
     bpy.ops.rigidbody.object_add()
     ob.rigid_body.collision_shape = 'MESH'
@@ -560,7 +569,7 @@ def get_voxelized_vert_list(obj, size=10/96., smooth=1, fname=None, show_vox=Fal
         print('get_voxelized_vert_list took %d mins, %.2f secs'%divmod((t1-t0), 60))
     return verts, norms
 
-def add_img_material(name, imfile, imtype):
+def add_img_material(imfile, imtype, shader_type='Principled BDSF', name=None):
     """Add a texture containing an image to Blender.
 
     Parameters
@@ -574,32 +583,59 @@ def add_img_material(name, imfile, imtype):
     imtype : string
         one of : 'sequence', 'file', 'generated', 'movie'
 
-    ## NOTE: 
-    #name = 'ori_noise'
-    #imfile = '/Users/mark/Projects/Mixamo_Downloads/Demo/bg_camo.png'
-    #from bvp.utils.blender import add_img_material
-    import bvp
-    name = 'ori_motion'
-    imfile = '/Users/mark/Notebooks/ori_noise2.gif'
-    imtype = 'movie' # options: 'sequence','file','generated','movie'
-    im = bvp.utils.blender.add_img_material(name,imfile,imtype)        
     """
-    # Load image
     from bpy_extras.image_utils import load_image
+    # New image
     img = load_image(imfile)
     img.source = imtype.upper()
-    # Link image to new texture 
-    tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
-    tex.image = img
-    if imtype.upper()=='MOVIE':
-        print("== YO I HAVE %d FRAMES!! =="%img.frame_duration)
-        tex.image_user.use_cyclic = True
-        tex.image_user.frame_duration = img.frame_duration
-    # Link texture to new material
-    mat = bpy.data.materials.new(name=name)
-    mat.texture_slots.create(0)
-    mat.texture_slots[0].texture = tex
-    return mat
+    if name is None:
+        name = img.name_full
+    # New material
+    material = bpy.data.materials.new(name=name)
+    if bpy.app.version < (2, 80, 0):
+        # Legacy for old blender
+        # Create image texture
+        tex = bpy.data.textures.new(name=name+'_image', type='IMAGE')
+        tex.image = img
+        if imtype.upper()=='MOVIE':
+            tex.image_user.use_cyclic = True
+            tex.image_user.frame_duration = img.frame_duration
+        # Link texture to material
+        material.texture_slots.create(0)
+        material.texture_slots[0].texture = tex
+    else:
+        # Create shader node arrangement
+        material.use_nodes = True
+        # Image input node
+        image_input = material.node_tree.nodes.new('ShaderNodeTexImage')
+        image_input.image = img
+        if imtype.upper() == 'MOVIE':
+            image_input.image_user.use_cyclic = True
+            image_input.image_user.frame_duration = img.frame_duration
+            image_input.image_user.use_auto_refresh = True
+        # Output node
+        material_output = material.node_tree.nodes.get('Material Output')
+        # Shader node 
+        if shader_type == 'Principled BDSF':
+            shader_node = material.node_tree.nodes.get('Principled BSDF')
+            shader_node.inputs['Specular'].default_value = 0
+            shader_node.inputs['Roughness'].default_value = 0.5
+        elif shader_type == 'Emission':
+            shader_node = material.node_tree.nodes.new('ShaderNodeEmission')
+            material.node_tree.links.new(
+                shader_node.outputs[0], material_output.inputs[0])
+        material.node_tree.links.new(
+            image_input.outputs[0], shader_node.inputs[0])
+
+        #set location of node
+        material_output.location = (400, 20)
+        shader_node.location = (0, 0)
+        image_input.location = (-400, -500)
+
+        material.blend_method = 'CLIP'
+
+    return material
+
 
 def add_vcolor(hemis, mesh=None, name='color'):
     """Seems like `hemis` is color you wish to apply to currently selected mesh."""
@@ -1130,7 +1166,7 @@ def add_group(name, fname, fpath=os.path.join(config.get('path','db_dir'), 'Obje
     #else:
     #    print('Did not find group! Adding group to file.')
     old_obs = list(bpy.context.scene.objects)
-    if bpy.app.version[1] < 80:
+    if bpy.app.version < (2, 80, 0):
         import_type = '/Group/'
         kw = dict(instance_groups=proxy)
     else:
@@ -1385,6 +1421,7 @@ def label_vertex_group(obj, vertex_label, weight_thresh=0.2, name='label',
         bpy.ops.object.editmode_toggle()  # Go into edit mode
 
         if is_verbose:
+            n_vertices = len(vertices)
             print("> Assigning %d vertices!"%n_vertices)
         bpy.ops.object.material_slot_assign() # Assign the material on the selected vertices
         bpy.ops.object.editmode_toggle()  # Return to object mode

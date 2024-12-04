@@ -36,6 +36,8 @@ class Camera(MappedClass):
                  rotation_euler=None,
                  frames=None,
                  fix_frames=None,
+                 fix_handle_type='AUTO',
+                 cam_handle_type='VECTOR',
                  lens=LENS,
                  clip=CLIP,
                  ):
@@ -67,7 +69,9 @@ class Camera(MappedClass):
         self.type = 'Camera'
         self._db_fields = []
         self._data_fields = ['location', 'fix_location', 'rotation_euler', 
-                            'frames', 'fix_frames', 'lens','clip']
+                            'frames', 'fix_frames', 'lens','clip',
+                            'fix_handle_type',
+                            'cam_handle_type',]
         self._temp_fields = ['blender_camera', 'blender_fixation']
         inpt = locals()
         for k, v in inpt.items():
@@ -146,7 +150,7 @@ class Camera(MappedClass):
             # Set camera rotation
             cam.rotation_euler = self.rotation_euler[0]
             a = bvpu.blender.make_locrotscale_animation(self.frames,
-                    action_name='CamMotion', handle_type='VECTOR',
+                    action_name='CamMotion', handle_type=self.cam_handle_type,
                     location=self.location, rotation_euler=self.rotation_euler)
         elif self.fix_location is not None and self.rotation_euler is None:
             # Set camera fixation target location
@@ -173,7 +177,7 @@ class Camera(MappedClass):
             # else:
             #     fr_cam = self.frames
             a = bvpu.blender.make_locrotscale_animation(self.frames,
-                    action_name='CamMotion', handle_type='VECTOR',
+                    action_name='CamMotion', handle_type=self.cam_handle_type,
                     location=self.location)
             # if (len(self.fix_location) != len(self.frames)) and (len(self.fix_location) == self.n_frames):
             #     fr_fix = np.arange(self.frames[0], self.frames[-1]+1)
@@ -181,7 +185,7 @@ class Camera(MappedClass):
             #     fr_fix = self.frames
             # # Smooth fixation, if necessary?
             f = bvpu.blender.make_locrotscale_animation(self.fix_frames,
-                    action_name='FixMotion', handle_type='AUTO',
+                    action_name='FixMotion', handle_type=self.fix_handle_type,
                     location=self.fix_location)
             fix.animation_data_create()
             fix.animation_data.action = f

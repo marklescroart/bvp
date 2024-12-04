@@ -306,7 +306,7 @@ class Scene(MappedClass):
         """
         pass
 
-    def bake(self, target, bone, change_camera_position=False, clear=False, fix_offset=None):
+    def bake(self, target, bone, change_camera_position=False, clear=False, fix_offset=None, substeps_per_frame=1):
         """Perform computations that must be performed before render time, but still need to run in Blender. 
 
         Currently calculates camera trajectory when it is made to follow a body part.
@@ -320,7 +320,7 @@ class Scene(MappedClass):
         scn = utils.blender.set_scene(None)
         # Place objects
         if (target.armature is None) or (len(target.armature) == 0):
-            ob = target.place(proxy=False)
+            ob = target.place(proxy=False, substeps_per_frame=substeps_per_frame)
         ta = target.armature[-1]
         # Find the bone to track
         bone = ta.pose.bones[bone] 
@@ -377,7 +377,7 @@ class Scene(MappedClass):
             target.clear()
 
 
-    def create(self, render_options=None, scn=None, is_working=False, proxy=True):
+    def create(self, render_options=None, scn=None, is_working=False, proxy=True, substeps_per_frame=10, fps=15):
         """Creates the stored scene (imports bg, sky, lights, objects, shadows) in Blender
 
         Optionally, applies rendering options 
@@ -423,7 +423,9 @@ class Scene(MappedClass):
         # Objects
         for ob in self.objects:
             try:
-                ob.place(proxy=proxy)
+                ob.place(proxy=proxy, 
+                         substeps_per_frame=substeps_per_frame,
+                         fps=fps)
             except Exception as e:
                 if not is_working:
                     raise e
