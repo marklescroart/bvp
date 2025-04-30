@@ -32,7 +32,8 @@ class Material(MappedClass):
             if not k in ('self', 'type'):
                 setattr(self, k, v)
         # Set _temp_params, etc.
-        self._temp_fields = []
+        self.blender_object = None
+        self._temp_fields = ['blender_object']
         self._data_fields = []
         self._db_fields = []
 
@@ -48,7 +49,8 @@ class Material(MappedClass):
                 directory=self.fpath+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
                 filename=self.name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
                 link=False)
-        return bpy.data.materials[self.name]
+        self.blender_object = bpy.data.materials[self.name]
+        return self.blender_object
 
     @classmethod
     def from_blender(cls, name, dbi=None, **kwargs):
@@ -79,7 +81,19 @@ class Material(MappedClass):
 
     @classmethod
     def from_media(cls, fname, name, is_cycles=IS_CYCLES, dbi=None, **kwargs):
-        """Create texture material from """
+        """Create texture material from image or movie file
+        
+        Parameters
+        ----------
+        fname : str
+            File path to media to be used
+        name : str
+            Name of material to be created in blender
+        is_cycles : bool
+            Whether to create material for cycles or EEVEE render (True=cycles)
+        dbi : DBInterface
+            interface with database (optional)
+        """
         if is_cycles:
             bpy.context.scene.render.engine = 'CYCLES'
         else:
@@ -95,9 +109,9 @@ class Material(MappedClass):
         ftype_dict = dict(mp4='MOVIE',
                          ogv='MOVIE',
                          gif='MOVIE',
-                         jpeg='IMAGE',
-                         jpg='IMAGE',
-                         png='IMAGE',
+                         jpeg='FILE', # I think these used to be'IMAGE' ...?
+                         jpg='FILE',
+                         png='FILE',
                          # More...
                          )
         if ftype not in ftype_dict:
@@ -105,8 +119,9 @@ class Material(MappedClass):
                               'need to modify `ftype_dict` in the code\n'
                               'to recognize this as an '
                               'image or movie...').format(ftype=ftype))
-        mat = utils.blender.add_img_material(name, fname, 
-                                             ftype_dict[ftype])
+        mat = utils.blender.add_img_material(fname, 
+                                             ftype_dict[ftype],
+                                             name=name)
         # Make sure material is always saved in this file
         mat.use_fake_user = True
         # Saving main file is up to user... seems precipitous to save whole file here.
