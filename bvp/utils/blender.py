@@ -840,13 +840,13 @@ def set_up_group(ob_list=None, scn=None):
                 o.constraints.remove(o.constraints['ChildOf'])
     
     # SECOND: Reposition all object origins 
-    (MinXYZ, MaxXYZ) = get_group_bounding_box(ob_list)
-    BotMid = [(MaxXYZ[0]+MinXYZ[0])/2, (MaxXYZ[1]+MinXYZ[1])/2, MinXYZ[2]]
+    (min_xyz, max_xyz) = get_group_bounding_box(ob_list)
+    BotMid = [(max_xyz[0]+min_xyz[0])/2, (max_xyz[1]+min_xyz[1])/2, min_xyz[2]]
     set_cursor(BotMid)
     
     SzXYZ = []
     for Dim in range(3):
-        SzXYZ.append(MaxXYZ[Dim]-MinXYZ[Dim])
+        SzXYZ.append(max_xyz[Dim]-min_xyz[Dim])
     
     ScaleF = ToSet_Size/max(SzXYZ)
     if verbosity_level > 3: 
@@ -881,7 +881,7 @@ def set_up_group(ob_list=None, scn=None):
                 o.select_set(True)
         bpy.ops.group.create(name=scn.name)
 
-def get_group_bounding_box(ob_list=None):
+def get_group_bounding_box(ob_list=None, object_types=('MESH', 'LATTICE'), apply_rotation=True):
     """Returns the maximum and minimum X, Y, and Z coordinates of a set of objects
 
     Parameters
@@ -891,31 +891,31 @@ def get_group_bounding_box(ob_list=None):
 
     Returns
     -------
-    minxyz, maxxyz : lists
+    min_xyz, max_xyz : lists
         min/max x, y, z coordinates for all objects. Think about re-structuring this to be a
         more standard format for a bounding box. 
     """
-    bb_types = ['MESH', 'LATTICE', 'ARMATURE'] 
     if ob_list is None:
         if bpy.app.version < (2, 80, 0):
             ob_list = [o for o in bpy.context.scene.objects if o.select]
         else:
             ob_list = [o for o in bpy.context.scene.objects if o.select_get()]
-    BBx = list()
-    BBy = list()
-    BBz = list()
+    bb_x = list()
+    bb_y = list()
+    bb_z = list()
     for ob in ob_list: 
         grab_only(ob)
-        if ob.type in bb_types:
-            bpy.ops.object.transform_apply(rotation=True)
-        for ii in range(8):
-            BBx.append(ob.bound_box[ii][0] * ob.scale[0] + ob.location[0]) 
-            BBy.append(ob.bound_box[ii][1] * ob.scale[1] + ob.location[1])
-            BBz.append(ob.bound_box[ii][2] * ob.scale[2] + ob.location[2])
-    MinXYZ = [min(BBx), min(BBy), min(BBz)]
-    MaxXYZ = [max(BBx), max(BBy), max(BBz)]
+        if ob.type in object_types:
+            if apply_rotation:
+                bpy.ops.object.transform_apply(rotation=True)
+            for ii in range(8): # 8 corners to box
+                bb_x.append(ob.bound_box[ii][0] * ob.scale[0] + ob.location[0]) 
+                bb_y.append(ob.bound_box[ii][1] * ob.scale[1] + ob.location[1])
+                bb_z.append(ob.bound_box[ii][2] * ob.scale[2] + ob.location[2])
+    min_xyz = [min(bb_x), min(bb_y), min(bb_z)]
+    max_xyz = [max(bb_x), max(bb_y), max(bb_z)]
     # Done
-    return MinXYZ, MaxXYZ
+    return min_xyz, max_xyz
 
 def get_collada_action(collada_file, act_name=None, scale=1.0):
     """Imports an armature and its associated action from a collada (.dae) file.

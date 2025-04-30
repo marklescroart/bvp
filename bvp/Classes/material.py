@@ -32,7 +32,8 @@ class Material(MappedClass):
             if not k in ('self', 'type'):
                 setattr(self, k, v)
         # Set _temp_params, etc.
-        self._temp_fields = []
+        self.blender_object = None
+        self._temp_fields = ['blender_object']
         self._data_fields = []
         self._db_fields = []
 
@@ -48,7 +49,8 @@ class Material(MappedClass):
                 directory=self.fpath+"\\Material\\", # i.e., directory WITHIN .blend file (Scenes / Objects / Groups)
                 filename=self.name, # "filename" is not the name of the file but the name of the data block, i.e. the name of the group. This stupid naming convention is due to Blender's API.
                 link=False)
-        return bpy.data.materials[self.name]
+        self.blender_object = bpy.data.materials[self.name]
+        return self.blender_object
 
     @classmethod
     def from_blender(cls, name, dbi=None, **kwargs):
